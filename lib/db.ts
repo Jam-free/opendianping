@@ -154,17 +154,19 @@ export function getShop(shopId: number): Shop | null {
 export function getShopsNear(lat: number, lng: number, radiusKm: number): Shop[] {
   const db = getDB();
   const stmt = db.prepare(`
-    SELECT *, 
+    SELECT *,
       (6371 * acos(cos(radians(?)) * cos(radians(lat)) * 
        cos(radians(lng) - radians(?)) + sin(radians(?)) * sin(radians(lat)))) 
       AS distance
     FROM shops
     WHERE lat IS NOT NULL AND lng IS NOT NULL
-    HAVING distance < ?
+      AND lat != 0 AND lng != 0
+      AND (6371 * acos(cos(radians(?)) * cos(radians(lat)) * 
+           cos(radians(lng) - radians(?)) + sin(radians(?)) * sin(radians(lat)))) < ?
     ORDER BY distance
   `);
   
-  const rows = stmt.all(lat, lng, lat, radiusKm) as any[];
+  const rows = stmt.all(lat, lng, lat, lat, lng, lat, radiusKm) as any[];
   
   return rows.map(row => ({
     ...row,

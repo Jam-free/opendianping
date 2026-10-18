@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "opendianping": {
+      "command": "npm",
+      "args": ["run", "mcp"],
+      "cwd": "/workspace"
+    }
+  }
+}

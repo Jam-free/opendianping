@@ -6,7 +6,7 @@
 
 ### ✅ Web 应用
 - 📎 粘贴大众点评收藏专辑分享链接，一键导入店铺数据
-- 🗺️ 地图展示所有店铺位置（使用 Leaflet + 高德公开瓦片，GCJ-02 坐标系，无需 API Key）
+- 🗺️ 地图展示所有店铺位置（国内常用坐标系，开箱可看打点）
 - 🔍 筛选和排序：按价格、评分、类目筛选，支持多种排序方式
 - 📥 导出 CSV / JSON 格式数据
 - 💾 本地 SQLite 数据库持久化存储
@@ -26,9 +26,9 @@
 
 | 文件 | 作用 |
 |------|------|
-| `SKILL.md` | 给 agent 的完整用法（何时调用、问什么、禁做什么） |
-| `KEYS.md` | **密钥清单：核心功能不需要任何 API Key** |
+| `SKILL.md` | 给 agent 的完整用法（对用户只谈分享链接） |
 | `INSTALL.md` | 别人如何安装 Skill + 连接 MCP |
+| `AGENT_NOTES.md` | 维护者备注（勿对终端用户复述技术细节） |
 
 分享给龙虾 / Grokbot / Muse / Claude 时：把该目录 + 本仓库（MCP）一起给对方；只发 Skill 读不到收藏。
 
@@ -144,7 +144,7 @@ AI 会自动调用对应的 MCP 工具获取数据并回答。
 - **前端**: Next.js 15 + TypeScript + Tailwind CSS + Leaflet
 - **后端**: Next.js API Routes
 - **数据库**: SQLite (better-sqlite3)
-- **地图**: Leaflet + 高德公开瓦片（GCJ-02，无需 API Key）
+- **地图**: Leaflet + 公开地图瓦片（与点评坐标一致）
 - **MCP**: @modelcontextprotocol/sdk
 - **数据解析**: node-html-parser (店铺页推荐菜)
 

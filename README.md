@@ -21,6 +21,17 @@
 4. **shops_near** - 附近店铺搜索
 5. **plan_route** - 规划顺路探店路线（最近邻算法）
 
+### 📦 可分享 Skill
+目录：[`skills/opendianping/`](./skills/opendianping/)
+
+| 文件 | 作用 |
+|------|------|
+| `SKILL.md` | 给 agent 的完整用法（何时调用、问什么、禁做什么） |
+| `KEYS.md` | **密钥清单：核心功能不需要任何 API Key** |
+| `INSTALL.md` | 别人如何安装 Skill + 连接 MCP |
+
+分享给龙虾 / Grokbot / Muse / Claude 时：把该目录 + 本仓库（MCP）一起给对方；只发 Skill 读不到收藏。
+
 ## 快速开始
 
 ### 安装依赖

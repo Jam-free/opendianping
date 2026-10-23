@@ -10,7 +10,7 @@
 ## A. 安装项目（必做）
 
 ```bash
-git clone https://github.com/<你的用户名>/opendianping.git
+git clone https://github.com/Jam-free/opendianping.git
 cd opendianping
 npm install
 ```

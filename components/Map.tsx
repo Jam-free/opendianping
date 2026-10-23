@@ -122,7 +122,7 @@ export default function Map({ shops }: MapProps) {
     <div>
       <div ref={mapContainerRef} style={{ height: '400px', width: '100%', borderRadius: '8px' }} />
       <p className="text-xs text-gray-500 mt-2">
-        使用高德公开瓦片，GCJ-02 坐标系（与大众点评一致），无需 API Key
+        地图坐标系与大众点评一致，可直接对照打点
       </p>
     </div>
   );

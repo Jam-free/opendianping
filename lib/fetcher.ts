@@ -190,6 +190,25 @@ function mergeShopData(withVersionItem: any, noVersionItem: any): Partial<Shop> 
   };
 }
 
+async function fetchAllPages(albumId: number, withVersion: boolean): Promise<DianpingAPIResponse> {
+  const first: any = await fetchDianpingAPI(albumId, withVersion, 0, 0);
+  const key = withVersion ? 'favorList' : 'collectItemList';
+  const rec: any = first.records?.[0];
+  if (!rec) return first;
+  const all: any[] = [...(rec[key] || [])];
+  let next = rec.nextStart, end = rec.isEnd, guard = 0;
+  while (!end && next != null && guard++ < 50) {
+    await new Promise(r => setTimeout(r, 500));
+    const page: any = await fetchDianpingAPI(albumId, withVersion, 1, parseInt(String(next)));
+    const pr = page.records?.[0];
+    if (!pr || !(pr[key] || []).length) break;
+    all.push(...pr[key]);
+    next = pr.nextStart; end = pr.isEnd;
+  }
+  rec[key] = all;
+  return first;
+}
+
 export async function fetchAlbumData(albumId: number, useFixtures: boolean = false): Promise<{
   album: Album;
   shops: Shop[];
@@ -207,8 +226,8 @@ export async function fetchAlbumData(albumId: number, useFixtures: boolean = fal
   } else {
     try {
       [withVersionData, noVersionData] = await Promise.all([
-        fetchDianpingAPI(albumId, true, 0, 0),
-        fetchDianpingAPI(albumId, false, 0, 0)
+        fetchAllPages(albumId, true),
+        fetchAllPages(albumId, false)
       ]);
     } catch (error) {
       console.error('API fetch failed, falling back to fixtures:', error);
@@ -224,7 +243,7 @@ export async function fetchAlbumData(albumId: number, useFixtures: boolean = fal
   const albumItem = withVersionData.favorAlbumItem;
   const album: Album = {
     albumId,
-    title: albumItem.title,
+    title: albumItem.title || `专辑${albumId}`,
     shopCount: parseInt(albumItem.shopCount || '0'),
     contentCount: parseInt(albumItem.contentCount || '0'),
     createTime: albumItem.createTime,

@@ -53,6 +53,7 @@ description: >
 ### `import_album`
 - 输入：`url`（分享链接）；可选 `use_fixtures=true`（仅演示）
 - 何时用：用户新贴链接，或本地还没有该专辑
+- 会自动翻页拿全整个专辑（50+ 家也能完整导入）；专辑没有标题时以「专辑{albumid}」命名
 
 ### `list_shops`
 - 输入：可选 `album_id`、`min_price`、`max_price`、`min_score`、`category`
@@ -88,7 +89,7 @@ description: >
 
 ## 6. 安装与连接
 
-本 skill 依赖同仓库的 MCP 服务。需要本机已安装 Node.js 18+。
+本 skill 依赖同仓库的 MCP 服务。需要本机已安装 Node.js 22+（better-sqlite3 要求），以及编译工具（如 build-essential / Xcode CLT）。
 
 ```bash
 cd <opendianping项目目录>

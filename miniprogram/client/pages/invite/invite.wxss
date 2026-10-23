@@ -1,0 +1,51 @@
+.card {
+  margin: 32rpx;
+  border: 1rpx solid var(--line);
+}
+
+.top {
+  padding: 36rpx;
+  background: linear-gradient(90deg, #ff8a2b, #ff2d87);
+  color: #fff;
+  min-height: 240rpx;
+}
+
+.sub {
+  font-size: 26rpx;
+  opacity: 0.9;
+}
+
+.title {
+  font-size: 48rpx;
+  font-weight: 700;
+  margin-top: 48rpx;
+  white-space: pre-line;
+}
+
+.kv {
+  display: flex;
+  justify-content: space-between;
+  padding: 24rpx 32rpx;
+  font-size: 28rpx;
+}
+
+.pad {
+  padding: 0 32rpx;
+}
+
+.h1 {
+  font-size: 40rpx;
+  font-weight: 700;
+  margin-bottom: 24rpx;
+}
+
+.block {
+  width: 100%;
+  margin-bottom: 16rpx;
+}
+
+.foot {
+  text-align: center;
+  font-size: 22rpx;
+  padding: 32rpx;
+}

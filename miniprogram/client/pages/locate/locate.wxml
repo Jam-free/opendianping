@@ -1,0 +1,8 @@
+<view class="page">
+  <view class="demo muted">附近的圈友收藏店</view>
+  <block wx:for="{{shops}}" wx:key="poiKey">
+    <shop-row shop="{{item}}" bind:tap="pickShop" />
+  </block>
+  <view wx:if="{{!shops.length}}" class="pad muted">附近暂无圈内收藏，可先导入专辑。</view>
+  <bottom-bar />
+</view>

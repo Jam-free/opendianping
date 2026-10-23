@@ -1,0 +1,25 @@
+<view class="page">
+  <view class="card" wx:if="{{circle}}">
+    <view class="top">
+      <view class="sub">美食肥猫 · 小程序</view>
+      <view class="title">来「{{circle.name}}」<text>\n</text>一起收藏好店</view>
+    </view>
+    <view class="kv">
+      <text>{{circle.member_count || 1}} 位成员</text>
+      <text class="muted">7 天内有效</text>
+    </view>
+  </view>
+
+  <view class="pad" wx:if="{{circle}}">
+    <button class="btn-gradient block" open-type="share">分享到微信群</button>
+    <button wx:if="{{!circle}}" class="btn-outline block" bindtap="createCircle">先创建圈子</button>
+  </view>
+
+  <view wx:if="{{!circle}}" class="pad">
+    <view class="h1">还没有圈子</view>
+    <button class="btn-gradient block" bindtap="createCircle">创建收藏圈</button>
+  </view>
+
+  <view class="foot muted">加入需对方主动点击；你的位置不会共享给圈友。</view>
+  <bottom-bar />
+</view>

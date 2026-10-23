@@ -1,0 +1,16 @@
+<view class="bar">
+  <view class="item" bindtap="onImport">
+    <text class="icon">↓</text>
+    <text>导入</text>
+  </view>
+  <view class="divider"></view>
+  <view class="item" bindtap="onLocate">
+    <text class="icon">◎</text>
+    <text>记美食</text>
+  </view>
+  <view class="divider"></view>
+  <view class="item" bindtap="onInvite">
+    <text class="icon">+</text>
+    <text>邀请</text>
+  </view>
+</view>

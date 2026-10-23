@@ -1,0 +1,26 @@
+<view class="page">
+  <view wx:if="{{!items.length}}" class="empty muted">还没有收藏，去导入一批吧</view>
+
+  <view class="shop-card" wx:for="{{items}}" wx:key="id">
+    <view class="card-top">
+      <view class="card-main">
+        <view class="name">{{item.name}}</view>
+        <view class="meta" wx:if="{{item.avg_price}}">{{item.avg_price}}</view>
+      </view>
+      <view class="source-tag">{{item.visibility === 'circles' ? '圈内共享' : '私密'}}</view>
+    </view>
+    <view class="sub" wx:if="{{item.category || item.district}}">
+      <text wx:if="{{item.category}}">{{item.category}}</text>
+      <text wx:if="{{item.category && item.district}}"> · </text>
+      <text wx:if="{{item.district}}">{{item.district}}</text>
+    </view>
+    <view class="addr muted" wx:if="{{item.address}}">{{item.address}}</view>
+    <view class="ops">
+      <text class="link" data-id="{{item.id}}" data-vis="{{item.visibility}}" bindtap="toggleVis">
+        {{item.visibility === 'circles' ? '设为私密' : '共享到圈'}}
+      </text>
+      <text class="link" data-index="{{index}}" bindtap="nav">导航</text>
+      <text class="link danger" data-id="{{item.id}}" bindtap="remove">删除</text>
+    </view>
+  </view>
+</view>

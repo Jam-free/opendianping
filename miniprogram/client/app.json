@@ -1,0 +1,25 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/friend-shops/friend-shops",
+    "pages/shop-detail/shop-detail",
+    "pages/import/import",
+    "pages/locate/locate",
+    "pages/locate-note/locate-note",
+    "pages/invite/invite",
+    "pages/join/join",
+    "pages/favorites/favorites",
+    "pages/circles/circles",
+    "pages/circle-detail/circle-detail"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTitleText": "美食肥猫",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#ffffff",
+    "backgroundTextStyle": "dark"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

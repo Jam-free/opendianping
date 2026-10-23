@@ -1,0 +1,93 @@
+.row {
+  display: flex;
+  align-items: center;
+  padding: 28rpx 32rpx;
+  gap: 20rpx;
+}
+
+.dist {
+  width: 140rpx;
+  flex: none;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -1rpx;
+}
+
+.dist .num {
+  font-size: 72rpx;
+}
+
+.dist .unit {
+  font-size: 32rpx;
+  margin-left: 4rpx;
+}
+
+.dist.na .num {
+  font-size: 32rpx;
+  color: #bbb;
+  font-weight: 500;
+}
+
+.thumb {
+  width: 88rpx;
+  height: 88rpx;
+  flex: none;
+  background: var(--placeholder);
+}
+
+.thumb.placeholder {
+  border: 1rpx solid var(--line);
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  font-size: 34rpx;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  margin: 6rpx 0 10rpx;
+  font-size: 26rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.avs {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8rpx;
+}
+
+.av {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: var(--placeholder);
+  flex: none;
+}
+
+.av.text {
+  font-size: 22rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #333;
+  font-weight: 600;
+}
+
+.rec {
+  font-size: 24rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-left: 4rpx;
+}

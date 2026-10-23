@@ -1,0 +1,73 @@
+.page {
+  padding: 24rpx;
+}
+
+.empty {
+  padding: 80rpx 24rpx;
+  text-align: center;
+}
+
+.shop-card {
+  background: var(--card);
+  border-radius: 20rpx;
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 8rpx 24rpx rgba(255, 106, 61, 0.06);
+}
+
+.card-top {
+  display: flex;
+  gap: 16rpx;
+}
+
+.card-main {
+  flex: 1;
+}
+
+.name {
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.meta {
+  margin-top: 6rpx;
+  color: var(--orange-deep);
+  font-weight: 600;
+}
+
+.source-tag {
+  font-size: 20rpx;
+  color: var(--orange);
+  background: var(--orange-soft);
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  height: fit-content;
+}
+
+.sub {
+  margin-top: 12rpx;
+  color: var(--muted);
+  font-size: 24rpx;
+}
+
+.addr {
+  margin-top: 8rpx;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ops {
+  margin-top: 20rpx;
+  display: flex;
+  gap: 28rpx;
+}
+
+.link {
+  color: var(--orange);
+  font-size: 26rpx;
+}
+
+.link.danger {
+  color: var(--danger);
+}

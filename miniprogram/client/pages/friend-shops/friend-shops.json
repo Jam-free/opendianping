@@ -1,0 +1,9 @@
+{
+  "navigationBarTitleText": "朋友的收藏",
+  "navigationBarBackgroundColor": "#ffffff",
+  "navigationBarTextStyle": "black",
+  "usingComponents": {
+    "shop-row": "/components/shop-row/shop-row",
+    "bottom-bar": "/components/bottom-bar/bottom-bar"
+  }
+}

@@ -1,0 +1,9 @@
+.page {
+  padding: 48rpx 40rpx;
+}
+
+.desc {
+  margin: 32rpx 0 48rpx;
+  color: var(--muted);
+  line-height: 1.6;
+}

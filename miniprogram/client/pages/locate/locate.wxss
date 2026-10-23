@@ -1,0 +1,11 @@
+.demo {
+  margin: 12rpx 32rpx;
+  font-size: 22rpx;
+  text-align: center;
+  border: 1rpx dashed #ccc;
+  padding: 6rpx 16rpx;
+}
+
+.pad {
+  padding: 48rpx 32rpx;
+}

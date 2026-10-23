@@ -1,0 +1,35 @@
+@import './styles/theme.wxss';
+
+page {
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 28rpx;
+  line-height: 1.5;
+  min-height: 100%;
+  padding-bottom: 160rpx;
+}
+
+.muted {
+  color: var(--sub);
+  font-size: 24rpx;
+}
+
+.hairline {
+  border-bottom: 1rpx solid var(--line);
+}
+
+.btn-outline {
+  background: #fff;
+  color: var(--ink);
+  border: 2rpx solid var(--ink);
+  border-radius: 0;
+  font-weight: 600;
+}
+
+.btn-gradient {
+  background: var(--gradient);
+  color: #fff;
+  border: none;
+  border-radius: 0;
+  font-weight: 600;
+}

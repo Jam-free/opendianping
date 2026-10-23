@@ -1,0 +1,10 @@
+{
+  "navigationBarTitleText": "美食肥猫",
+  "navigationBarBackgroundColor": "#ffffff",
+  "navigationBarTextStyle": "black",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "bottom-bar": "/components/bottom-bar/bottom-bar",
+    "shop-row": "/components/shop-row/shop-row"
+  }
+}

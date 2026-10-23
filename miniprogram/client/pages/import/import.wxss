@@ -1,0 +1,154 @@
+.page {
+  padding: 24rpx 24rpx 160rpx;
+}
+
+.panel {
+  background: transparent;
+}
+
+.input {
+  margin-top: 24rpx;
+  width: 100%;
+  min-height: 200rpx;
+  padding: 24rpx;
+  box-sizing: border-box;
+  background: #fff;
+  border-radius: 16rpx;
+  border: 2rpx solid var(--line);
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin: 24rpx 0;
+  color: var(--muted);
+  font-size: 24rpx;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8rpx;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 24rpx;
+}
+
+.link {
+  color: var(--orange);
+  font-size: 26rpx;
+}
+
+.tip {
+  margin-bottom: 16rpx;
+}
+
+/* 信息层级参考点评卡片：店名 > 人均 > 品类·商圈 > 地址；缺失字段不渲染 */
+.shop-card {
+  background: var(--card);
+  border-radius: 20rpx;
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+  border: 2rpx solid transparent;
+  box-shadow: 0 8rpx 24rpx rgba(255, 106, 61, 0.06);
+}
+
+.shop-card.checked {
+  border-color: var(--orange-soft);
+  background: #fffaf7;
+}
+
+.card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 16rpx;
+}
+
+.card-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.meta {
+  margin-top: 6rpx;
+  color: var(--orange-deep);
+  font-size: 26rpx;
+  font-weight: 600;
+}
+
+.source-tag {
+  font-size: 20rpx;
+  color: var(--orange);
+  background: var(--orange-soft);
+  padding: 4rpx 12rpx;
+  border-radius: 8rpx;
+  white-space: nowrap;
+}
+
+.sub {
+  margin-top: 12rpx;
+  margin-left: 56rpx;
+  color: var(--muted);
+  font-size: 24rpx;
+}
+
+.addr {
+  margin-top: 8rpx;
+  margin-left: 56rpx;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.save-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 20rpx 24rpx calc(20rpx + env(safe-area-inset-bottom));
+  background: rgba(255, 247, 242, 0.96);
+  display: flex;
+  gap: 16rpx;
+  align-items: center;
+  border-top: 1rpx solid var(--line);
+}
+
+.vis {
+  padding: 16rpx 20rpx;
+  background: #fff;
+  border-radius: 12rpx;
+  color: var(--muted);
+  font-size: 24rpx;
+}
+
+.save-btn {
+  flex: 1;
+}
+
+.result-line {
+  font-size: 36rpx;
+  margin: 12rpx 0;
+}
+
+.result-line.ok {
+  color: var(--ok);
+  font-weight: 700;
+}
+
+.result-line.danger {
+  color: var(--danger);
+}
+
+.result button {
+  margin-top: 20rpx;
+}

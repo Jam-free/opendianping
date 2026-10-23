@@ -1,0 +1,10 @@
+/* v3 瑞士极简：纯白、发丝线、渐变仅用于激活态与底栏 */
+page {
+  --gradient: linear-gradient(90deg, #ff8a2b, #ff2d87);
+  --line: #e6e6e6;
+  --ink: #111111;
+  --sub: #777777;
+  --bg: #ffffff;
+  --card: #ffffff;
+  --placeholder: #ededed;
+}

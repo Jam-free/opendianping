@@ -1,0 +1,5 @@
+<view class="page pad">
+  <view class="h1">{{name}}</view>
+  <textarea class="input" placeholder="写点推荐理由…" maxlength="200" bindinput="onNote" value="{{note}}" />
+  <button class="btn-gradient block" loading="{{saving}}" bindtap="onSave">保存到圈子</button>
+</view>

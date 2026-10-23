@@ -1,0 +1,8 @@
+{
+  "navigationBarTitleText": "邀请加入圈子",
+  "navigationBarBackgroundColor": "#ffffff",
+  "navigationBarTextStyle": "black",
+  "usingComponents": {
+    "bottom-bar": "/components/bottom-bar/bottom-bar"
+  }
+}

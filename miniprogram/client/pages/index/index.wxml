@@ -1,0 +1,48 @@
+<view class="page">
+  <view class="circle-pick hairline" wx:if="{{circles.length > 1}}">
+    <picker mode="selector" range="{{circleNames}}" value="{{circleIndex}}" bindchange="onCirclePick">
+      <view class="circle-name">{{activeCircleName}} ▾</view>
+    </picker>
+  </view>
+
+  <view class="seg">
+    <view class="seg-item {{tab === 0 ? 'on' : ''}}" bindtap="switchTab" data-tab="0">店铺</view>
+    <view class="seg-item {{tab === 1 ? 'on' : ''}}" bindtap="switchTab" data-tab="1">朋友</view>
+  </view>
+
+  <view wx:if="{{locHint}}" class="toast">{{locHint}}</view>
+
+  <block wx:if="{{!activeCircleId}}">
+    <view class="empty pad">
+      <view class="h1">还没有收藏圈</view>
+      <view class="muted">创建圈子并邀请饭搭子，或接受好友邀请加入。</view>
+      <button class="btn-gradient block" bindtap="goCreateCircle">创建收藏圈</button>
+    </view>
+  </block>
+
+  <block wx:elif="{{tab === 0}}">
+    <block wx:for="{{shops}}" wx:key="poiKey">
+      <shop-row shop="{{item}}" bind:tap="openShop" />
+    </block>
+    <view wx:if="{{noCoordSection}}" class="sec hairline">无坐标的店</view>
+    <block wx:for="{{shopsNoCoord}}" wx:key="poiKey">
+      <shop-row shop="{{item}}" bind:tap="openShop" />
+    </block>
+    <view wx:if="{{!shops.length && !shopsNoCoord.length && !loading}}" class="empty pad muted">圈内还没有共享的店，先导入专辑吧。</view>
+  </block>
+
+  <block wx:else>
+    <block wx:for="{{members}}" wx:key="id">
+      <view class="row hairline" bindtap="openFriend" data-id="{{item.id}}" data-name="{{item.nickname}}">
+        <view class="av lg">{{item.initial}}</view>
+        <view class="info">
+          <view class="name">{{item.nickname || '圈友'}}</view>
+          <view class="meta muted">收藏 {{item.shared_shop_count}} 家</view>
+        </view>
+        <text class="chev">›</text>
+      </view>
+    </block>
+  </block>
+
+  <bottom-bar />
+</view>

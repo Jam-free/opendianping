@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "mcp": "tsx mcp-server/index.ts",
-    "test": "jest"
+    "test": "jest && npm test --prefix miniprogram"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",

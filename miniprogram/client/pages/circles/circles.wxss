@@ -1,0 +1,26 @@
+.page {
+  padding: 24rpx;
+}
+
+.create {
+  margin-bottom: 32rpx;
+}
+
+.empty {
+  padding: 48rpx 16rpx;
+  text-align: center;
+}
+
+.circle-card {
+  background: var(--card);
+  border-radius: 20rpx;
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+  box-shadow: 0 8rpx 24rpx rgba(255, 106, 61, 0.06);
+}
+
+.name {
+  font-size: 32rpx;
+  font-weight: 700;
+  margin-bottom: 8rpx;
+}

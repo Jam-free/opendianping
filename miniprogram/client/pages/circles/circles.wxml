@@ -1,0 +1,16 @@
+<view class="page">
+  <button class="btn-primary create" bindtap="createCircle">创建收藏圈</button>
+
+  <view wx:if="{{!items.length}}" class="empty muted">还没有圈。创建后分享到微信群，邀请群友加入。</view>
+
+  <view
+    class="circle-card"
+    wx:for="{{items}}"
+    wx:key="id"
+    data-id="{{item.id}}"
+    bindtap="openCircle"
+  >
+    <view class="name">{{item.name}}</view>
+    <view class="muted">{{item.member_count}} 人 · {{item.role === 'owner' ? '圈主' : '成员'}}</view>
+  </view>
+</view>

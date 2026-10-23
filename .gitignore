@@ -22,6 +22,7 @@
 
 # misc
 .DS_Store
+.npm-cache/
 *.pem
 
 # debug
@@ -32,6 +33,12 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+!miniprogram/.env.example
+
+# miniprogram local data
+miniprogram/data/
+miniprogram/node_modules/
 
 # vercel
 .vercel

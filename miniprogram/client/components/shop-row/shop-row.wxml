@@ -1,0 +1,25 @@
+<view class="row hairline" bindtap="onTap">
+  <view class="dist {{dist.na ? 'na' : ''}}">
+    <text class="num">{{dist.main}}</text>
+    <text class="unit" wx:if="{{dist.unit}}">{{dist.unit}}</text>
+  </view>
+  <image
+    wx:if="{{shop.headImgProxy}}"
+    class="thumb"
+    src="{{shop.headImgProxyFull}}"
+    mode="aspectFill"
+  />
+  <view wx:else class="thumb placeholder"></view>
+  <view class="info">
+    <view class="name">{{shop.name}}</view>
+    <view class="meta muted" wx:if="{{metaLine}}">{{metaLine}}</view>
+    <view class="avs">
+      <block wx:for="{{previewAvatars}}" wx:key="userId">
+        <image wx:if="{{item.avatar}}" class="av" src="{{item.avatar}}" />
+        <view wx:else class="av text">{{item.initial}}</view>
+      </block>
+      <view wx:if="{{extraCount > 0}}" class="av text">+{{extraCount}}</view>
+      <text class="rec muted">{{shop.recommendersLine}}</text>
+    </view>
+  </view>
+</view>

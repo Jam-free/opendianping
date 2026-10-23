@@ -1,0 +1,37 @@
+.bar {
+  position: fixed;
+  left: 50%;
+  bottom: 36rpx;
+  transform: translateX(-50%);
+  width: 686rpx;
+  height: 128rpx;
+  border-radius: 64rpx;
+  background: linear-gradient(90deg, #ff8a2b, #ff2d87);
+  display: flex;
+  align-items: stretch;
+  box-shadow: 0 12rpx 36rpx rgba(255, 60, 110, 0.25);
+  z-index: 99;
+}
+
+.item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 26rpx;
+  font-weight: 600;
+  gap: 4rpx;
+}
+
+.icon {
+  font-size: 36rpx;
+  line-height: 1;
+}
+
+.divider {
+  width: 1rpx;
+  background: rgba(255, 255, 255, 0.4);
+  margin: 24rpx 0;
+}

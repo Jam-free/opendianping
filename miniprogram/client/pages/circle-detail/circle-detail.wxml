@@ -1,0 +1,40 @@
+<view class="page" wx:if="{{circleId}}">
+  <view class="header">
+    <view class="section-title">{{name || '收藏圈'}}</view>
+    <view class="muted">成员共享的店 · 标明谁收藏</view>
+  </view>
+
+  <view class="filters">
+    <input class="filter" placeholder="城市" value="{{city}}" bindinput="onCity" />
+    <input class="filter" placeholder="品类" value="{{category}}" bindinput="onCategory" />
+    <button class="btn-ghost mini" size="mini" bindtap="loadShops">筛选</button>
+  </view>
+
+  <view class="ops" wx:if="{{isOwner}}">
+    <button class="btn-primary mini" size="mini" open-type="share">分享到群</button>
+    <button class="btn-ghost mini" size="mini" bindtap="resetInvite">重置邀请</button>
+    <button class="btn-ghost mini" size="mini" bindtap="dissolve">解散</button>
+  </view>
+  <view class="ops" wx:else>
+    <button class="btn-ghost mini" size="mini" bindtap="leave">退出圈子</button>
+  </view>
+
+  <view wx:if="{{!shops.length}}" class="empty muted">暂无共享店铺。把收藏设为「共享到圈」后会出现在这里。</view>
+
+  <view class="shop-card" wx:for="{{shops}}" wx:key="poiKey">
+    <view class="name">{{item.name}}</view>
+    <view class="meta" wx:if="{{item.avgPrice}}">{{item.avgPrice}}</view>
+    <view class="sub" wx:if="{{item.category || item.district}}">
+      <text wx:if="{{item.category}}">{{item.category}}</text>
+      <text wx:if="{{item.category && item.district}}"> · </text>
+      <text wx:if="{{item.district}}">{{item.district}}</text>
+    </view>
+    <view class="addr muted" wx:if="{{item.address}}">{{item.address}}</view>
+    <view class="collectors">
+      {{item.collectorCount}} 位圈友收藏：
+      <text wx:for="{{item.collectors}}" wx:for-item="c" wx:for-index="ci" wx:key="userId">
+        {{c.nickname || '圈友'}}{{ci + 1 < item.collectors.length ? '、' : ''}}
+      </text>
+    </view>
+  </view>
+</view>

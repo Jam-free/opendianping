@@ -2,15 +2,26 @@ import fs from 'fs';
 import path from 'path';
 import { DianpingAPIResponse } from './types';
 
+/** 兼容从仓库根或 miniprogram/ 启动时的 cwd */
+function uploadsDir(): string {
+  const candidates = [
+    path.join(process.cwd(), 'uploads'),
+    path.join(process.cwd(), '..', 'uploads'),
+  ];
+  for (const dir of candidates) {
+    if (fs.existsSync(dir)) return dir;
+  }
+  return candidates[0];
+}
+
 export function loadFixture(filename: string): any {
-  const uploadsDir = path.join(process.cwd(), 'uploads');
-  const filepath = path.join(uploadsDir, filename);
-  
+  const filepath = path.join(uploadsDir(), filename);
+
   if (fs.existsSync(filepath)) {
     const content = fs.readFileSync(filepath, 'utf-8');
     return JSON.parse(content);
   }
-  
+
   return null;
 }
 
@@ -24,7 +35,7 @@ export function getFixtureAlbumData(albumId: number): {
       noVersion: loadFixture('ep_noversion_1494.json')
     };
   }
-  
+
   return {
     withVersion: null,
     noVersion: null
@@ -33,7 +44,7 @@ export function getFixtureAlbumData(albumId: number): {
 
 export function getFixtureShopHTML(shopId: number): string | null {
   if (shopId === 1908397290) {
-    const filepath = path.join(process.cwd(), 'uploads', 'shop_1908397290_2380.html');
+    const filepath = path.join(uploadsDir(), 'shop_1908397290_2380.html');
     if (fs.existsSync(filepath)) {
       return fs.readFileSync(filepath, 'utf-8');
     }

@@ -1,0 +1,23 @@
+.pad {
+  padding: 32rpx;
+}
+
+.h1 {
+  font-size: 48rpx;
+  font-weight: 700;
+  margin-bottom: 24rpx;
+}
+
+.input {
+  width: 100%;
+  border: 2rpx solid var(--ink);
+  padding: 24rpx;
+  min-height: 200rpx;
+  font-size: 28rpx;
+  box-sizing: border-box;
+}
+
+.block {
+  margin-top: 32rpx;
+  width: 100%;
+}

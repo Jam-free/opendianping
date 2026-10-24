@@ -25,11 +25,12 @@ AppID：`wx219e6044fdb7a6cd`
 2. 按提示开通云托管（若尚未开通）
 3. **新建服务**，名称：`feimaocat-api`
 4. 部署方式选 **Dockerfile**
-5. GitHub 部署填写：
+5. GitHub 部署填写（要支持点评专辑链接，必须用仓库根 Dockerfile）：
    - 分支：`feat/miniprogram-import-circle`
-   - 目标目录：`miniprogram`
-   - Dockerfile：**有**，名称填 **`Dockerfile`**（不要填 Dockerfile.standalone；云托管会在目标目录下找这个文件名）
+   - 目标目录：**留空**（构建上下文 = 仓库根，才能带上 `lib/fetcher`）
+   - Dockerfile：**有**，名称填 **`Dockerfile`**（仓库根目录那个）
    - 端口：`80`
+   - `SOURCE_ADAPTER`：`opendianping`（可在环境变量里覆盖；根 Dockerfile 已默认）
 6. **环境变量**（控制台填写，勿提交仓库）：
 
 | 变量 | 值 |

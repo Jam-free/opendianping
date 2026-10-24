@@ -1,16 +1,20 @@
 <view class="bar">
-  <view class="item" bindtap="onImport">
-    <text class="icon">↓</text>
-    <text>导入</text>
-  </view>
-  <view class="divider"></view>
-  <view class="item" bindtap="onLocate">
-    <text class="icon">◎</text>
-    <text>记美食</text>
-  </view>
-  <view class="divider"></view>
-  <view class="item" bindtap="onInvite">
-    <text class="icon">+</text>
-    <text>邀请</text>
+  <view class="bar-inner">
+    <view class="side-item" hover-class="side-item--press" bindtap="onImport">
+      <view class="line-icon line-icon--import" aria-hidden="true"></view>
+      <text class="side-label">导入</text>
+    </view>
+
+    <view class="center-col">
+      <view class="fab" hover-class="fab--press" bindtap="onLocate">
+        <view class="fab-icon" aria-hidden="true"></view>
+      </view>
+      <text class="center-label">记美食</text>
+    </view>
+
+    <view class="side-item" hover-class="side-item--press" bindtap="onInvite">
+      <view class="line-icon line-icon--invite" aria-hidden="true"></view>
+      <text class="side-label">邀请</text>
+    </view>
   </view>
 </view>

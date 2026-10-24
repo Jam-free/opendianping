@@ -1,37 +1,155 @@
 .bar {
   position: fixed;
-  left: 32rpx;
-  right: 32rpx;
-  bottom: calc(24rpx + env(safe-area-inset-bottom));
-  width: auto;
-  height: 112rpx;
-  border-radius: 4rpx;
-  background: var(--gradient);
-  display: flex;
-  align-items: stretch;
-  border: 1rpx solid var(--line);
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 99;
+  background: #fff;
+  border-top: 1rpx solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+  box-sizing: border-box;
 }
 
-.item {
+.bar-inner {
+  display: flex;
+  align-items: flex-end;
+  height: 112rpx;
+  overflow: visible;
+}
+
+.side-item {
   flex: 1;
+  min-height: 96rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  font-size: 26rpx;
-  font-weight: 600;
-  gap: 4rpx;
+  gap: 8rpx;
 }
 
-.icon {
-  font-size: 36rpx;
-  line-height: 1;
+.side-item--press {
+  background: #f2f2f2;
 }
 
-.divider {
-  width: 1rpx;
-  background: rgba(255, 255, 255, 0.4);
-  margin: 24rpx 0;
+.side-label {
+  font-size: 24rpx;
+  color: #111;
+  line-height: 1.2;
+}
+
+.line-icon {
+  box-sizing: border-box;
+}
+
+/* 线框：向下导入 */
+.line-icon--import {
+  width: 28rpx;
+  height: 32rpx;
+  border: 2rpx solid #111;
+  border-radius: 0;
+  position: relative;
+}
+
+.line-icon--import::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 10rpx;
+  width: 2rpx;
+  height: 14rpx;
+  background: #111;
+  transform: translateX(-50%);
+}
+
+.line-icon--import::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 6rpx;
+  width: 12rpx;
+  height: 12rpx;
+  border-right: 2rpx solid #111;
+  border-bottom: 2rpx solid #111;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+/* 线框：加号邀请 */
+.line-icon--invite {
+  width: 32rpx;
+  height: 32rpx;
+  position: relative;
+}
+
+.line-icon--invite::before,
+.line-icon--invite::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: #111;
+  transform: translate(-50%, -50%);
+}
+
+.line-icon--invite::before {
+  width: 2rpx;
+  height: 28rpx;
+}
+
+.line-icon--invite::after {
+  width: 28rpx;
+  height: 2rpx;
+}
+
+.center-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding-bottom: 8rpx;
+  position: relative;
+}
+
+.fab {
+  width: 116rpx;
+  height: 116rpx;
+  margin-top: -40rpx;
+  border-radius: 50%;
+  background: var(--gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 8rpx #fff;
+}
+
+.fab--press {
+  opacity: 0.85;
+}
+
+.fab-icon {
+  width: 40rpx;
+  height: 40rpx;
+  border: 3rpx solid #fff;
+  border-radius: 50%;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.fab-icon::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 10rpx;
+  height: 10rpx;
+  background: #fff;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.center-label {
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: #111;
+  line-height: 1.2;
 }

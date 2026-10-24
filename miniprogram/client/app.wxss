@@ -6,7 +6,7 @@ page {
   font-size: 28rpx;
   line-height: 1.5;
   min-height: 100%;
-  padding-bottom: calc(200rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(220rpx + env(safe-area-inset-bottom));
 }
 
 .muted {
@@ -41,16 +41,56 @@ page {
   letter-spacing: 1rpx;
 }
 
+.btn-primary,
+.btn-ghost {
+  border-radius: 0;
+  font-weight: 600;
+  font-size: 28rpx;
+  line-height: 1.5;
+  padding: 0 32rpx;
+  min-height: 88rpx;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.btn-primary::after,
+.btn-ghost::after {
+  border: none;
+}
+
 .btn-primary {
   background: var(--gradient);
   color: #fff;
   border: none;
-  border-radius: 0;
-  font-weight: 600;
+}
+
+.btn-primary.button-hover {
+  opacity: 0.85;
+}
+
+.btn-ghost {
+  background: #fff;
+  color: #111;
+  border: 1rpx solid var(--line);
+}
+
+.btn-ghost.button-hover {
+  background: #f2f2f2;
+  color: #111;
+}
+
+.btn-primary.mini,
+.btn-ghost.mini {
+  min-height: auto;
+  font-size: 24rpx;
+  padding: 0 24rpx;
+  line-height: 1.4;
 }
 
 .page-with-bottom-bar {
   min-height: 100vh;
-  padding-bottom: calc(200rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(220rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
 }

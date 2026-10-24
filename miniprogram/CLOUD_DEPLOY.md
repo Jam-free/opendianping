@@ -25,9 +25,11 @@ AppID：`wx219e6044fdb7a6cd`
 2. 按提示开通云托管（若尚未开通）
 3. **新建服务**，名称：`feimaocat-api`
 4. 部署方式选 **Dockerfile**
-5. 代码上传二选一：
-   - **方式 1（推荐今日）**：构建目录选 `miniprogram/`，Dockerfile 用 `Dockerfile.standalone`（改名为部署用的 `Dockerfile`，或在控制台指定该文件）
-   - **方式 2**：构建上下文为整个 `opendianping/`，用 `miniprogram/Dockerfile`（可带 OpenDianping 适配器）
+5. GitHub 部署填写：
+   - 分支：`feat/miniprogram-import-circle`
+   - 目标目录：`miniprogram`
+   - Dockerfile：**有**，名称填 **`Dockerfile`**（不要填 Dockerfile.standalone；云托管会在目标目录下找这个文件名）
+   - 端口：`80`
 6. **环境变量**（控制台填写，勿提交仓库）：
 
 | 变量 | 值 |

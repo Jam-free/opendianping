@@ -1,5 +1,6 @@
 # 微信云托管：目标目录填 miniprogram，Dockerfile 名称填 Dockerfile
-FROM node:20-bookworm-slim
+# better-sqlite3@13 要求 Node >= 22
+FROM node:22-bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 make g++ \

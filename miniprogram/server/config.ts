@@ -23,7 +23,8 @@ export const config = {
   port: Number(process.env.PORT || 8787),
   rootDir,
   dbPath: path.resolve(rootDir, process.env.DB_PATH || './data/miniprogram.db'),
-  sourceAdapter: (process.env.SOURCE_ADAPTER || 'opendianping') as SourceAdapterName,
+  // 云托管默认 text_amap（无仓库根 lib）；本地有 lib 时可设 SOURCE_ADAPTER=opendianping
+  sourceAdapter: (process.env.SOURCE_ADAPTER || 'text_amap') as SourceAdapterName,
   importRateLimitPerMin: Number(process.env.IMPORT_RATE_LIMIT_PER_MIN || 5),
   importMaxShops: Number(process.env.IMPORT_MAX_SHOPS || 200),
   wechatAppId: process.env.WECHAT_APPID || 'touristappid',

@@ -14,6 +14,7 @@ Page({
         draftNickname: '',
         draftAvatar: '',
         savingProfile: false,
+        loginError: '',
     },
     onShow() {
         wx.showShareMenu({ withShareTicket: true, menus: ['shareAppMessage'] });
@@ -22,9 +23,19 @@ Page({
     onPullDownRefresh() {
         this.bootstrap().finally(() => wx.stopPullDownRefresh());
     },
+    async retryLogin() {
+        try {
+            await (0, api_1.ensureLogin)({ force: true });
+            this.setData({ loginError: '' });
+            await this.bootstrap();
+        }
+        catch (_a) {
+            /* ensureLogin 已弹窗 */
+        }
+    },
     async bootstrap() {
         var _a, _b, _c, _d;
-        this.setData({ loading: true });
+        this.setData({ loading: true, loginError: '' });
         try {
             const [me, net] = await Promise.all([
                 (0, api_1.request)('/api/me'),
@@ -41,11 +52,19 @@ Page({
                 draftNickname: ((_c = me.user) === null || _c === void 0 ? void 0 : _c.nickname) || '',
                 draftAvatar: ((_d = me.user) === null || _d === void 0 ? void 0 : _d.avatar) || '',
                 loading: false,
+                loginError: '',
             });
         }
         catch (err) {
-            this.setData({ loading: false });
-            wx.showToast({ title: err.message, icon: 'none' });
+            const msg = err.message || '加载失败';
+            this.setData({
+                loading: false,
+                loginError: msg.includes('登录') || msg.includes('401')
+                    ? '登录已失效，点此重新登录'
+                    : msg.includes('503') || msg.includes('不可用')
+                        ? '服务暂时繁忙，点此重试'
+                        : `${msg} · 点此重试`,
+            });
         }
     },
     onShareAppMessage() {

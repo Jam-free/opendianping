@@ -8,35 +8,74 @@ function getAppSafe(): WechatMiniprogram.App.Instance<{
   return getApp();
 }
 
-export async function ensureLogin(): Promise<string> {
+/** 清掉本地会话，下次 ensureLogin 会重新向云端换票 */
+export function clearSession(): void {
   const app = getAppSafe();
-  if (app.globalData.token) return app.globalData.token;
+  app.globalData.token = '';
+  app.globalData.userId = '';
+  try {
+    wx.removeStorageSync('session_token');
+  } catch {
+    /* ignore */
+  }
+}
 
-  const cached = wx.getStorageSync('session_token') as string;
-  if (cached) {
-    app.globalData.token = cached;
-    return cached;
+/**
+ * 保证已登录。失败时弹窗说明原因，可点「重新登录」再试，而不是只闪一句「请先登录」。
+ */
+export async function ensureLogin(opts?: { force?: boolean }): Promise<string> {
+  const app = getAppSafe();
+  if (!opts?.force && app.globalData.token) return app.globalData.token;
+
+  if (!opts?.force) {
+    const cached = wx.getStorageSync('session_token') as string;
+    if (cached) {
+      app.globalData.token = cached;
+      return cached;
+    }
+  } else {
+    clearSession();
   }
 
-  const loginRes = await new Promise<WechatMiniprogram.LoginSuccessCallbackResult>(
-    (resolve, reject) => {
-      wx.login({ success: resolve, fail: reject });
-    }
-  );
+  try {
+    const loginRes = await new Promise<WechatMiniprogram.LoginSuccessCallbackResult>(
+      (resolve, reject) => {
+        wx.login({ success: resolve, fail: reject });
+      }
+    );
 
-  const data = await request<{
-    token: string;
-    user: { id: string };
-  }>('/api/auth/login', {
-    method: 'POST',
-    data: { code: loginRes.code || 'dev' },
-    auth: false,
-  });
+    const data = await request<{
+      token: string;
+      user: { id: string };
+    }>('/api/auth/login', {
+      method: 'POST',
+      data: { code: loginRes.code || 'dev' },
+      auth: false,
+    });
 
-  app.globalData.token = data.token;
-  app.globalData.userId = data.user.id;
-  wx.setStorageSync('session_token', data.token);
-  return data.token;
+    app.globalData.token = data.token;
+    app.globalData.userId = data.user.id;
+    wx.setStorageSync('session_token', data.token);
+    return data.token;
+  } catch (err) {
+    const msg = (err as Error).message || '登录失败';
+    const retry = await new Promise<boolean>((resolve) => {
+      wx.showModal({
+        title: '还不能进入',
+        content:
+          msg.includes('503') || msg.includes('不可用')
+            ? '云服务刚醒来或在重启，请稍等几秒再试。'
+            : msg === '请先登录'
+              ? '登录凭证失效了，点下方重新登录即可。'
+              : `${msg}\n\n若多次失败，请检查网络，或稍后重试。`,
+        confirmText: '重新登录',
+        cancelText: '取消',
+        success: (r) => resolve(Boolean(r.confirm)),
+      });
+    });
+    if (retry) return ensureLogin({ force: true });
+    throw err;
+  }
 }
 
 export async function request<T>(
@@ -67,7 +106,14 @@ export async function request<T>(
           resolve(body);
           return;
         }
-        reject(new Error(body?.error || `请求失败(${status})`));
+        // 会话失效：清票后让上层走重新登录
+        if (status === 401 && auth) {
+          clearSession();
+        }
+        const errMsg =
+          body?.error ||
+          (status === 503 ? '服务暂时不可用(503)' : `请求失败(${status})`);
+        reject(new Error(errMsg));
       },
       fail(err) {
         reject(new Error(err.errMsg || '网络错误'));
@@ -94,7 +140,7 @@ export function openNavigation(shop: {
     success() {
       wx.showModal({
         title: '导航链接已复制',
-        content: '可粘贴到浏览器或高德 App 打开；小程序内也可使用下方地图选点。',
+        content: '可粘贴到浏览器或高德 App 打开；也可直接打开系统地图。',
         confirmText: '打开地图',
         success(r) {
           if (r.confirm) {
@@ -115,7 +161,6 @@ export function openNavigation(shop: {
 /**
  * 拼请求地址里 ? 后面的参数。
  * 小程序里没有浏览器的 URLSearchParams，直接 new 会在页面上报 ReferenceError。
- * 空值不写进地址，避免出现 lat=undefined。
  */
 export function buildQuery(
   params: Record<string, string | number | undefined | null>

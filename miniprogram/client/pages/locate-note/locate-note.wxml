@@ -1,14 +1,13 @@
 <view class="page">
   <view class="card block">
     <view class="h1">记美食</view>
-    <view class="muted tip">记下你现在的位置，可补拍照和备注；默认与美食好友共享。</view>
+    <view class="muted tip">记下你现在在哪，可补拍照和备注；默认与美食好友共享。</view>
 
     <view class="loc-card">
       <view class="loc-label muted">当前位置</view>
       <view class="loc-main" wx:if="{{locReady}}">
-        <view class="coords">{{latLabel}}, {{lngLabel}}</view>
-        <view class="addr muted" wx:if="{{address}}">{{address}}</view>
-        <view class="addr muted" wx:else>已获取坐标（可填写下方店名）</view>
+        <view class="addr-main">{{address || '定位成功'}}</view>
+        <view class="coords muted">{{latLabel}}, {{lngLabel}}</view>
       </view>
       <view class="loc-main muted" wx:elif="{{locError}}">{{locError}}</view>
       <view class="loc-main muted" wx:else>正在获取定位…</view>
@@ -19,7 +18,7 @@
       <view class="label">店名 / 地点</view>
       <input
         class="input"
-        placeholder="例如：巷口螺蛳粉"
+        placeholder="例如：巷口螺蛳粉（可改）"
         value="{{name}}"
         bindinput="onName"
         maxlength="40"

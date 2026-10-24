@@ -74,6 +74,17 @@ export function createApp() {
     res.json({ ok: true });
   });
 
+  app.get(
+    '/api/geo/reverse',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const { reverseGeocode } = await import('./services/geo.js');
+      const lat = Number(req.query.lat);
+      const lng = Number(req.query.lng);
+      res.json(await reverseGeocode(lat, lng));
+    })
+  );
+
   app.get('/api/media/proxy', async (req, res, next) => {
     try {
       const { fetchProxiedImage } = await import('./services/media-proxy.js');

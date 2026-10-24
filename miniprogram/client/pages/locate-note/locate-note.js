@@ -28,20 +28,43 @@ Page({
         this.setData({ note: e.detail.value });
     },
     async refreshLoc() {
-        this.setData({ locReady: false, locError: '' });
+        this.setData({ locReady: false, locError: '', address: '' });
         try {
             const res = await new Promise((resolve, reject) => {
                 wx.getLocation({ type: 'gcj02', success: resolve, fail: reject });
             });
+            const lat = res.latitude;
+            const lng = res.longitude;
             this.setData({
-                lat: res.latitude,
-                lng: res.longitude,
-                latLabel: res.latitude.toFixed(5),
-                lngLabel: res.longitude.toFixed(5),
+                lat,
+                lng,
+                latLabel: lat.toFixed(5),
+                lngLabel: lng.toFixed(5),
                 locReady: true,
+                address: '正在解析地址…',
             });
+            // 逆地理：把经纬度变成人能读的地址
+            try {
+                const qs = (0, api_1.buildQuery)({ lat, lng });
+                const geo = await (0, api_1.request)(`/api/geo/reverse?${qs}`);
+                const address = geo.address || '';
+                const patch = { address };
+                // 店名为空时，用商圈/地址末段预填，用户可改
+                if (!this.data.name.trim() && address) {
+                    const short = geo.district ||
+                        address.split(/省|市|区|县/).filter(Boolean).pop() ||
+                        address.slice(0, 20);
+                    patch.name = short.trim();
+                }
+                this.setData(patch);
+            }
+            catch (_a) {
+                this.setData({
+                    address: `已定位（${lat.toFixed(4)}, ${lng.toFixed(4)}）`,
+                });
+            }
         }
-        catch (_a) {
+        catch (_b) {
             this.setData({
                 locError: '无法获取定位，请在设置中开启位置权限后重试',
             });
@@ -74,10 +97,10 @@ Page({
             return;
         }
         const name = this.data.name.trim() ||
+            this.data.address ||
             `记下的位置 ${this.data.latLabel},${this.data.lngLabel}`;
         this.setData({ saving: true });
         try {
-            // 今日真机版：照片先留本地路径占位；上云后可改为 uploadFile
             await (0, api_1.request)('/api/me/checkins', {
                 method: 'POST',
                 data: {

@@ -1,4 +1,4 @@
-import { request } from '../../utils/api';
+import { request, ensureLogin } from '../../utils/api';
 import { avatarInitial } from '../../utils/format';
 import { setActiveCircleId } from '../../utils/circle';
 
@@ -21,6 +21,7 @@ Page({
     draftNickname: '',
     draftAvatar: '',
     savingProfile: false,
+    loginError: '',
   },
 
   onShow() {
@@ -32,8 +33,18 @@ Page({
     this.bootstrap().finally(() => wx.stopPullDownRefresh());
   },
 
+  async retryLogin() {
+    try {
+      await ensureLogin({ force: true });
+      this.setData({ loginError: '' });
+      await this.bootstrap();
+    } catch {
+      /* ensureLogin 已弹窗 */
+    }
+  },
+
   async bootstrap() {
-    this.setData({ loading: true });
+    this.setData({ loading: true, loginError: '' });
     try {
       const [me, net] = await Promise.all([
         request<{ user: { nickname?: string; avatar?: string } }>('/api/me'),
@@ -62,10 +73,18 @@ Page({
         draftNickname: me.user?.nickname || '',
         draftAvatar: me.user?.avatar || '',
         loading: false,
+        loginError: '',
       });
     } catch (err) {
-      this.setData({ loading: false });
-      wx.showToast({ title: (err as Error).message, icon: 'none' });
+      const msg = (err as Error).message || '加载失败';
+      this.setData({
+        loading: false,
+        loginError: msg.includes('登录') || msg.includes('401')
+          ? '登录已失效，点此重新登录'
+          : msg.includes('503') || msg.includes('不可用')
+            ? '服务暂时繁忙，点此重试'
+            : `${msg} · 点此重试`,
+      });
     }
   },
 

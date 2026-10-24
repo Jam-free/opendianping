@@ -25,14 +25,22 @@
       <text class="token">{{showToken ? plainToken : maskedToken}}</text>
       <text class="eye" bindtap="toggleToken">{{showToken ? '隐藏' : '显示'}}</text>
     </view>
-    <view class="token-box muted" wx:else>尚未生成 Token</view>
+    <view class="token-box muted" wx:else>还没有 Token，点下方生成</view>
 
-    <view class="token-actions">
-      <button class="btn-primary half" bindtap="copyToken" disabled="{{!plainToken}}">复制 Token</button>
-      <button class="btn-ghost half" loading="{{busy}}" bindtap="resetToken">
-        {{hasToken ? '重置 Token' : '生成 Token'}}
+    <view class="token-actions" wx:if="{{hasToken || plainToken}}">
+      <button class="btn-primary half" bindtap="copyToken" disabled="{{!plainToken}}">
+        复制 Token
       </button>
+      <button class="btn-ghost half" loading="{{busy}}" bindtap="resetToken">重置 Token</button>
     </view>
+    <button
+      wx:else
+      class="btn-primary btn-block"
+      loading="{{busy}}"
+      bindtap="resetToken"
+    >
+      生成 Token
+    </button>
     <view class="muted dates" wx:if="{{createdAt}}">
       创建于 {{createdAt}}<text wx:if="{{lastUsedAt}}"> · 最近使用 {{lastUsedAt}}</text>
     </view>

@@ -24,7 +24,12 @@
 
   <view class="empty card" wx:elif="{{!loading}}">
     <view class="empty-title">还没有店铺</view>
-    <view class="muted">从大众点评导入专辑，或点「记美食」记下当前位置。</view>
+    <view class="muted empty-desc">
+      从大众点评导入公开专辑，或点上面「记美食」记下你现在的位置。
+    </view>
     <button class="btn-primary btn-block" bindtap="goImport">导入点评收藏</button>
+    <button class="btn-ghost btn-block" style="margin-top: 16rpx;" bindtap="goLocate">
+      记一笔美食
+    </button>
   </view>
 </view>

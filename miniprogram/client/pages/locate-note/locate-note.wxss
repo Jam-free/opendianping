@@ -28,14 +28,16 @@
   margin-bottom: 8rpx;
 }
 
-.coords {
-  font-size: 28rpx;
+.addr-main {
+  font-size: 30rpx;
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+  margin-bottom: 8rpx;
 }
 
-.addr {
-  margin-top: 6rpx;
+.coords {
+  font-size: 22rpx;
+  font-variant-numeric: tabular-nums;
   margin-bottom: 16rpx;
 }
 

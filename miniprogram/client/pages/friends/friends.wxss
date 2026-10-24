@@ -21,13 +21,19 @@
   margin: 0;
 }
 
-.profile-tip {
+.profile-tip,
+.login-tip {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16rpx;
   padding: 24rpx 28rpx;
   margin-bottom: 24rpx;
   font-size: 26rpx;
+}
+
+.login-tip {
+  background: #fff8f0;
 }
 
 .link {

@@ -2,7 +2,14 @@
   <view class="hero card">
     <view class="brand">美食肥猫</view>
     <view class="sub muted">邀请过的朋友会出现在这里</view>
-    <button class="btn-primary btn-block invite" open-type="share">邀请好友</button>
+    <!-- 有好友时顶栏邀请；空态只在下方留一个按钮，避免两个「邀请好友」 -->
+    <button
+      wx:if="{{friends.length}}"
+      class="btn-primary btn-block invite"
+      open-type="share"
+    >
+      邀请好友
+    </button>
   </view>
 
   <view class="profile-tip card" wx:if="{{needProfile}}" bindtap="openProfile">
@@ -10,10 +17,20 @@
     <text class="link">去设置</text>
   </view>
 
+  <view class="login-tip card" wx:if="{{loginError}}" bindtap="retryLogin">
+    <text>{{loginError}}</text>
+    <text class="link">点此重新登录</text>
+  </view>
+
   <view class="list-wrap card" wx:if="{{friends.length}}">
     <view class="list-hd">美食好友 · {{friends.length}}</view>
     <block wx:for="{{friends}}" wx:key="id">
-      <view class="friend-row hairline" bindtap="openFriend" data-id="{{item.id}}" data-name="{{item.nickname}}">
+      <view
+        class="friend-row hairline"
+        bindtap="openFriend"
+        data-id="{{item.id}}"
+        data-name="{{item.nickname}}"
+      >
         <image wx:if="{{item.avatar}}" class="av" src="{{item.avatar}}" mode="aspectFill" />
         <view wx:else class="av text">{{item.initial}}</view>
         <view class="info">
@@ -25,13 +42,14 @@
     </block>
   </view>
 
-  <view class="empty card" wx:elif="{{!loading}}">
+  <view class="empty card" wx:elif="{{!loading && !loginError}}">
     <view class="empty-title">还没有美食好友</view>
-    <view class="muted empty-desc">把邀请发给微信好友。对方加入并导入收藏后，会出现在这里。微信不提供全量好友名单，只能看到通过邀请进来的人。</view>
+    <view class="muted empty-desc">
+      把邀请发给微信好友。对方加入并导入收藏后，会出现在这里。微信不提供全量好友名单，只能看到通过邀请进来的人。
+    </view>
     <button class="btn-primary btn-block" open-type="share">邀请好友</button>
   </view>
 
-  <!-- 头像昵称填写浮层 -->
   <view class="mask" wx:if="{{showProfile}}" bindtap="closeProfile"></view>
   <view class="sheet card" wx:if="{{showProfile}}">
     <view class="sheet-title">完善名片</view>
@@ -53,6 +71,8 @@
         bindinput="onNickInput"
       />
     </view>
-    <button class="btn-primary btn-block" loading="{{savingProfile}}" bindtap="saveProfile">保存</button>
+    <button class="btn-primary btn-block" loading="{{savingProfile}}" bindtap="saveProfile">
+      保存
+    </button>
   </view>
 </view>

@@ -4,6 +4,6 @@ exports.API_BASE = void 0;
 /**
  * API 根地址。
  * - 本地：http://127.0.0.1:8787
- * - 真机体验：改成微信云托管 HTTPS 域名（步骤见 CLOUD_DEPLOY.md）
+ * - 当前：微信云托管公网域名
  */
-exports.API_BASE = 'http://127.0.0.1:8787';
+exports.API_BASE = 'https://feimaocat-api-311874-12-1485452020.sh.run.tcloudbase.com';

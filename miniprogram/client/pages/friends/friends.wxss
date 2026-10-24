@@ -1,0 +1,163 @@
+.page {
+  padding: 24rpx 32rpx 48rpx;
+}
+
+.hero {
+  padding: 40rpx 32rpx 32rpx;
+  margin-bottom: 24rpx;
+}
+
+.brand {
+  font-size: 40rpx;
+  font-weight: 700;
+}
+
+.sub {
+  margin-top: 8rpx;
+  margin-bottom: 28rpx;
+}
+
+.invite {
+  margin: 0;
+}
+
+.profile-tip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24rpx 28rpx;
+  margin-bottom: 24rpx;
+  font-size: 26rpx;
+}
+
+.link {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.list-wrap {
+  padding: 8rpx 28rpx 8rpx;
+  overflow: hidden;
+}
+
+.list-hd {
+  padding: 20rpx 0 8rpx;
+  font-size: 24rpx;
+  color: var(--sub);
+}
+
+.friend-row {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 0;
+  gap: 20rpx;
+}
+
+.av {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 50%;
+  background: var(--placeholder);
+  flex: none;
+}
+
+.av.lg {
+  width: 96rpx;
+  height: 96rpx;
+}
+
+.av.text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: #555;
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.meta {
+  margin-top: 6rpx;
+}
+
+.chev {
+  font-size: 36rpx;
+}
+
+.empty {
+  padding: 48rpx 32rpx;
+}
+
+.empty-title {
+  font-size: 34rpx;
+  font-weight: 600;
+  margin-bottom: 12rpx;
+}
+
+.empty-desc {
+  margin-bottom: 32rpx;
+  line-height: 1.6;
+}
+
+.mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 20;
+}
+
+.sheet {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: calc(48rpx + env(safe-area-inset-bottom));
+  z-index: 21;
+  padding: 36rpx 32rpx;
+}
+
+.sheet-title {
+  font-size: 34rpx;
+  font-weight: 600;
+  margin-bottom: 28rpx;
+}
+
+.form-row {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  margin-bottom: 28rpx;
+}
+
+.label {
+  width: 80rpx;
+  color: var(--sub);
+  font-size: 26rpx;
+}
+
+.avatar-btn {
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  line-height: 1;
+}
+
+.avatar-btn::after {
+  border: none;
+}
+
+.nick-input {
+  flex: 1;
+  background: var(--bg);
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  font-size: 28rpx;
+}

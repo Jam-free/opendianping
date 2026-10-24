@@ -1,0 +1,115 @@
+.page {
+  padding: 24rpx 32rpx calc(48rpx + env(safe-area-inset-bottom));
+}
+
+.section-label {
+  font-size: 26rpx;
+  color: var(--sub);
+  margin: 8rpx 0 16rpx;
+  font-weight: 600;
+}
+
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin-bottom: 32rpx;
+}
+
+.cap {
+  width: calc(50% - 8rpx);
+  box-sizing: border-box;
+  padding: 28rpx 24rpx;
+}
+
+.cap-dot {
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  background: var(--primary);
+  margin-bottom: 16rpx;
+}
+
+.cap-title {
+  display: block;
+  font-size: 28rpx;
+  font-weight: 600;
+  margin-bottom: 8rpx;
+}
+
+.cap-desc {
+  font-size: 22rpx;
+  line-height: 1.4;
+}
+
+.block {
+  padding: 32rpx 28rpx;
+  margin-bottom: 24rpx;
+}
+
+.step {
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 8rpx;
+}
+
+.tip {
+  margin-bottom: 20rpx;
+  line-height: 1.5;
+}
+
+.code {
+  background: var(--bg);
+  border-radius: 12rpx;
+  padding: 24rpx;
+  font-size: 24rpx;
+  font-family: Menlo, monospace;
+  word-break: break-all;
+  margin-bottom: 20rpx;
+  color: #333;
+}
+
+.token-box {
+  background: var(--bg);
+  border-radius: 12rpx;
+  padding: 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+
+.token {
+  flex: 1;
+  font-size: 24rpx;
+  font-family: Menlo, monospace;
+  word-break: break-all;
+}
+
+.eye {
+  color: var(--primary);
+  font-size: 24rpx;
+  flex: none;
+}
+
+.token-actions {
+  display: flex;
+  gap: 16rpx;
+}
+
+.half {
+  flex: 1;
+  margin: 0;
+}
+
+.dates {
+  margin-top: 16rpx;
+  font-size: 22rpx;
+}
+
+.foot {
+  padding: 8rpx 8rpx 0;
+  line-height: 1.6;
+  font-size: 22rpx;
+}

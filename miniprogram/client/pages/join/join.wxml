@@ -1,14 +1,17 @@
 <view class="page">
-  <view class="section-title">{{info.name || '收藏圈邀请'}}</view>
-  <view class="muted" wx:if="{{info.member_count}}">当前 {{info.member_count}} 人</view>
-  <view class="desc">加入后可看到圈友共享的店铺，并标明是谁收藏的。不会自动加入，请确认后点击下方按钮。</view>
-
-  <button
-    class="btn-primary"
-    loading="{{joining}}"
-    disabled="{{!circleId || !token}}"
-    bindtap="onJoin"
-  >
-    加入收藏圈
-  </button>
+  <view class="card block">
+    <view class="h1">{{info.name || '美食好友邀请'}}</view>
+    <view class="muted" wx:if="{{info.member_count}}">当前 {{info.member_count}} 人</view>
+    <view class="desc muted">
+      加入后可看到对方共享的店铺，你导入或记下的店也会默认共享给美食好友。不会自动加入，请确认后点击下方按钮。
+    </view>
+    <button
+      class="btn-primary btn-block"
+      loading="{{joining}}"
+      disabled="{{!circleId || !token}}"
+      bindtap="onJoin"
+    >
+      加入美食朋友圈
+    </button>
+  </view>
 </view>

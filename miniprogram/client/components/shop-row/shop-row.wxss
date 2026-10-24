@@ -1,39 +1,16 @@
 .row {
   display: flex;
-  align-items: center;
-  padding: 28rpx 32rpx;
+  align-items: flex-start;
+  padding: 28rpx 0;
   gap: 20rpx;
 }
 
-.dist {
-  width: 140rpx;
-  flex: none;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: -1rpx;
-}
-
-.dist .num {
-  font-size: 72rpx;
-}
-
-.dist .unit {
-  font-size: 32rpx;
-  margin-left: 4rpx;
-}
-
-.dist.na .num {
-  font-size: 32rpx;
-  color: #bbb;
-  font-weight: 500;
-}
-
 .thumb {
-  width: 120rpx;
-  height: 120rpx;
+  width: 112rpx;
+  height: 112rpx;
   flex: none;
   background: var(--placeholder);
-  border-radius: 0;
+  border-radius: 12rpx;
 }
 
 .thumb.placeholder {
@@ -45,17 +22,32 @@
   min-width: 0;
 }
 
+.title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 16rpx;
+}
+
 .name {
-  font-size: 34rpx;
+  flex: 1;
+  min-width: 0;
+  font-size: 32rpx;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.dist {
+  flex: none;
+  font-size: 24rpx;
+  color: var(--sub);
+  font-weight: 500;
+}
+
 .meta {
-  margin: 6rpx 0 10rpx;
-  font-size: 26rpx;
+  margin-top: 8rpx;
+  font-size: 24rpx;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -64,31 +56,30 @@
 .avs {
   display: flex;
   align-items: center;
-  flex-wrap: nowrap;
+  margin-top: 12rpx;
   gap: 8rpx;
 }
 
 .av {
-  width: 40rpx;
-  height: 40rpx;
+  width: 36rpx;
+  height: 36rpx;
   border-radius: 50%;
   background: var(--placeholder);
   flex: none;
 }
 
 .av.text {
-  font-size: 22rpx;
+  font-size: 20rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #333;
+  color: #555;
   font-weight: 600;
 }
 
 .rec {
-  font-size: 24rpx;
+  font-size: 22rpx;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-left: 4rpx;
 }

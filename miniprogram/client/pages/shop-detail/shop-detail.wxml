@@ -1,40 +1,42 @@
 <view class="page" wx:if="{{shop}}">
-  <view class="hero pad">
+  <view class="card hero">
     <image wx:if="{{headImgFull}}" class="hero-img" src="{{headImgFull}}" mode="aspectFill" />
     <view wx:else class="hero-img placeholder"></view>
-    <view class="big-dist">
-      <text class="num">{{dist.main}}</text>
-      <text class="unit" wx:if="{{dist.unit}}">{{dist.unit}}</text>
+    <view class="title-row">
+      <view class="h1">{{shop.name}}</view>
+      <view class="dist muted" wx:if="{{!dist.na}}">{{dist.main}}{{dist.unit}}</view>
     </view>
-    <view class="h1">{{shop.name}}</view>
-    <view class="meta muted">{{metaLine}}</view>
+    <view class="meta muted" wx:if="{{metaLine}}">{{metaLine}}</view>
   </view>
 
-  <view class="kv hairline" wx:if="{{shop.avgPrice}}">
-    <text class="k muted">人均</text>
-    <text>{{shop.avgPrice}}</text>
-  </view>
-  <view class="kv hairline" wx:if="{{shop.address}}">
-    <text class="k muted">地址</text>
-    <text class="v">{{shop.address}}</text>
-  </view>
-  <view class="kv hairline">
-    <text class="k muted">来源</text>
-    <text>{{sourceLabel}}</text>
+  <view class="card block">
+    <view class="kv hairline" wx:if="{{shop.avgPrice}}">
+      <text class="k muted">人均</text>
+      <text>{{shop.avgPrice}}</text>
+    </view>
+    <view class="kv hairline" wx:if="{{shop.address}}">
+      <text class="k muted">地址</text>
+      <text class="v">{{shop.address}}</text>
+    </view>
+    <view class="kv">
+      <text class="k muted">来源</text>
+      <text>{{sourceLabel}}</text>
+    </view>
   </view>
 
-  <view class="sec hairline">{{shop.collectorCount}} 位朋友的备注</view>
-  <block wx:for="{{shop.collectors}}" wx:key="userId">
-    <view class="note hairline">
-      <view class="av lg">{{item.initial}}</view>
-      <view>
-        <view class="note-name">{{item.nickname || '圈友'}}</view>
-        <view class="note-text">{{item.note || '未写备注'}}</view>
+  <view class="card block" wx:if="{{shop.collectors.length}}">
+    <view class="sec">{{shop.collectorCount}} 位朋友的备注</view>
+    <block wx:for="{{shop.collectors}}" wx:key="userId">
+      <view class="note hairline">
+        <image wx:if="{{item.avatar}}" class="av" src="{{item.avatar}}" mode="aspectFill" />
+        <view wx:else class="av text">{{item.initial}}</view>
+        <view class="note-body">
+          <view class="note-name">{{item.nickname || '好友'}}</view>
+          <view class="note-text muted">{{item.note || '未写备注'}}</view>
+        </view>
       </view>
-    </view>
-  </block>
-
-  <view class="pad">
-    <button class="btn-outline block" bindtap="onNav">导航到这里</button>
+    </block>
   </view>
+
+  <button class="btn-primary btn-block nav" bindtap="onNav">导航到这里</button>
 </view>

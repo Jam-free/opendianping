@@ -1,11 +1,13 @@
 <view class="page">
-  <view class="hint muted">按离我距离排序</view>
-  <block wx:for="{{shops}}" wx:key="poiKey">
-    <shop-row shop="{{item}}" bind:tap="openShop" />
-  </block>
-  <view wx:if="{{noCoordSection}}" class="sec hairline">无坐标的店</view>
-  <block wx:for="{{shopsNoCoord}}" wx:key="poiKey">
-    <shop-row shop="{{item}}" bind:tap="openShop" />
-  </block>
-  <bottom-bar />
+  <view class="card list" wx:if="{{shops.length}}">
+    <block wx:for="{{shops}}" wx:key="poiKey">
+      <view class="item hairline">
+        <shop-row shop="{{item}}" bind:tap="openShop" />
+      </view>
+    </block>
+  </view>
+  <view class="card empty" wx:elif="{{!loading}}">
+    <view class="empty-title">TA 还没有共享店铺</view>
+    <view class="muted">等对方导入或记下美食后会出现在这里。</view>
+  </view>
 </view>

@@ -1,0 +1,19 @@
+{
+  "containerPort": 80,
+  "dockerfilePath": "miniprogram/Dockerfile",
+  "buildDir": "",
+  "minNum": 0,
+  "maxNum": 2,
+  "cpu": 0.5,
+  "mem": 1,
+  "policyType": "cpu",
+  "policyThreshold": 60,
+  "envParams": {
+    "PORT": "80",
+    "DB_PATH": "/data/miniprogram.db",
+    "DEV_AUTH_BYPASS": "false",
+    "SOURCE_ADAPTER": "opendianping"
+  },
+  "customLogs": "stdout",
+  "initialDelaySeconds": 4
+}

@@ -1,4 +1,4 @@
-import { request } from '../../utils/api';
+import { request, buildQuery } from '../../utils/api';
 import { getActiveCircleId, setActiveCircleId } from '../../utils/circle';
 import { getUserLocation } from '../../utils/location';
 import { avatarInitial } from '../../utils/format';
@@ -79,13 +79,13 @@ Page({
   },
 
   async loadShops(circleId: string, loc: { lat: number; lng: number } | null) {
-    const q = new URLSearchParams({ pageSize: '200' });
-    if (loc) {
-      q.set('lat', String(loc.lat));
-      q.set('lng', String(loc.lng));
-    }
+    const qs = buildQuery({
+      pageSize: '200',
+      lat: loc ? loc.lat : undefined,
+      lng: loc ? loc.lng : undefined,
+    });
     const res = await request<{ items: any[] }>(
-      `/api/circles/${circleId}/shops?${q.toString()}`
+      `/api/circles/${circleId}/shops?${qs}`
     );
     const items = res.items || [];
     const shops = items.filter((s) => s.hasCoords);

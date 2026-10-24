@@ -1,4 +1,4 @@
-import { request } from '../../utils/api';
+import { request, buildQuery } from '../../utils/api';
 import { getActiveCircleId } from '../../utils/circle';
 import { getUserLocation } from '../../utils/location';
 
@@ -28,13 +28,13 @@ Page({
       });
       return;
     }
-    const q = new URLSearchParams({
+    const qs = buildQuery({
       pageSize: '50',
-      lat: String(loc.lat),
-      lng: String(loc.lng),
+      lat: loc.lat,
+      lng: loc.lng,
     });
     const res = await request<{ items: any[] }>(
-      `/api/circles/${circleId}/shops?${q.toString()}`
+      `/api/circles/${circleId}/shops?${qs}`
     );
     const shops = (res.items || []).filter((s) => s.hasCoords).slice(0, 20);
     this.setData({ shops });

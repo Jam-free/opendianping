@@ -15,6 +15,7 @@ import {
   updateFavorite,
 } from './services/favorites.js';
 import * as circles from './services/circles.js';
+import * as network from './services/network.js';
 
 export type AuthedRequest = Request & {
   userId?: string;
@@ -37,6 +38,22 @@ function requireAuth(req: AuthedRequest, res: Response, next: NextFunction) {
   }
   req.userId = session.userId;
   req.openid = session.openid;
+  next();
+}
+
+function requireAgentAuth(
+  req: AuthedRequest,
+  res: Response,
+  next: NextFunction
+) {
+  const session = network.resolveAgentToken(
+    req.header('authorization') || undefined
+  );
+  if (!session) {
+    res.status(401).json({ error: '无效的 Agent Token' });
+    return;
+  }
+  req.userId = session.userId;
   next();
 }
 
@@ -79,6 +96,8 @@ export function createApp() {
     asyncHandler(async (req, res) => {
       const code = String(req.body?.code || '');
       const { token, user } = await loginWithWxCode(code);
+      // 登录后静默确保个人美食网，前端不再出现「创建圈子」
+      const net = await network.ensurePersonalNetwork(user.id);
       res.json({
         token,
         user: {
@@ -86,7 +105,111 @@ export function createApp() {
           nickname: user.nickname,
           avatar: user.avatar,
         },
+        networkId: net.id,
       });
+    })
+  );
+
+  app.get(
+    '/api/me',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const profile = network.getUserProfile(req.userId!);
+      const net = await network.ensurePersonalNetwork(req.userId!);
+      res.json({ user: profile, networkId: net.id });
+    })
+  );
+
+  app.patch(
+    '/api/me/profile',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const user = network.updateUserProfile(req.userId!, {
+        nickname: req.body?.nickname ? String(req.body.nickname) : undefined,
+        avatar: req.body?.avatar ? String(req.body.avatar) : undefined,
+      });
+      res.json({ user });
+    })
+  );
+
+  app.get(
+    '/api/me/network',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      res.json(await network.listFoodFriends(req.userId!));
+    })
+  );
+
+  app.get(
+    '/api/me/shops',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const lat = req.query.lat ? Number(req.query.lat) : undefined;
+      const lng = req.query.lng ? Number(req.query.lng) : undefined;
+      res.json(
+        await network.listMyShops(req.userId!, {
+          lat: Number.isFinite(lat) ? lat : undefined,
+          lng: Number.isFinite(lng) ? lng : undefined,
+          userCity: req.query.userCity ? String(req.query.userCity) : undefined,
+        })
+      );
+    })
+  );
+
+  app.post(
+    '/api/me/checkins',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const result = await network.createCheckin(req.userId!, {
+        name: String(req.body?.name || ''),
+        note: req.body?.note ? String(req.body.note) : undefined,
+        lat: Number(req.body?.lat),
+        lng: Number(req.body?.lng),
+        address: req.body?.address ? String(req.body.address) : undefined,
+        photoUrl: req.body?.photoUrl ? String(req.body.photoUrl) : undefined,
+      });
+      res.json(result);
+    })
+  );
+
+  app.get(
+    '/api/agent-tokens',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const meta = network.getAgentTokenMeta(req.userId!);
+      res.json({ token: meta || null });
+    })
+  );
+
+  app.post(
+    '/api/agent-tokens',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      res.json(network.issueAgentToken(req.userId!));
+    })
+  );
+
+  app.post(
+    '/api/agent-tokens/reset',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      res.json(network.issueAgentToken(req.userId!));
+    })
+  );
+
+  app.get(
+    '/api/agent/shops',
+    requireAgentAuth,
+    asyncHandler(async (req, res) => {
+      res.json(await network.listAgentShops(req.userId!));
+    })
+  );
+
+  app.get(
+    '/api/agent/friends',
+    requireAgentAuth,
+    asyncHandler(async (req, res) => {
+      res.json(await network.listAgentFriends(req.userId!));
     })
   );
 
@@ -116,8 +239,9 @@ export function createApp() {
       const selectedIndexes = Array.isArray(req.body?.selectedIndexes)
         ? req.body.selectedIndexes.map((n: unknown) => Number(n))
         : [];
+      // 默认对美食好友可见；显式传 private 才仅自己
       const visibility =
-        req.body?.visibility === 'circles' ? 'circles' : 'private';
+        req.body?.visibility === 'private' ? 'private' : 'circles';
       const shareToCircleIds = Array.isArray(req.body?.shareToCircleIds)
         ? req.body.shareToCircleIds.map(String)
         : undefined;

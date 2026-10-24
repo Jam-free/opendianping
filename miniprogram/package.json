@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "tsx watch server/index.ts",
     "start": "tsx server/index.ts",
+    "build:mp": "tsc -p client/tsconfig.json",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.config.cjs",
     "typecheck": "tsc --noEmit"
   },

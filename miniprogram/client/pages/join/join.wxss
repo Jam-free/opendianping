@@ -1,9 +1,18 @@
 .page {
-  padding: 48rpx 40rpx;
+  padding: 48rpx 32rpx;
+}
+
+.block {
+  padding: 40rpx 32rpx;
+}
+
+.h1 {
+  font-size: 40rpx;
+  font-weight: 700;
+  margin-bottom: 8rpx;
 }
 
 .desc {
-  margin: 32rpx 0 48rpx;
-  color: var(--sub);
+  margin: 24rpx 0 36rpx;
   line-height: 1.6;
 }

@@ -1,16 +1,17 @@
 .page {
-  min-height: 100vh;
-  padding-bottom: calc(220rpx + env(safe-area-inset-bottom));
-  box-sizing: border-box;
+  padding: 24rpx 32rpx calc(48rpx + env(safe-area-inset-bottom));
 }
 
-.hint {
-  padding: 16rpx 32rpx 8rpx;
+.list {
+  padding: 8rpx 28rpx;
 }
 
-.sec {
-  font-size: 24rpx;
-  color: var(--sub);
-  padding: 36rpx 32rpx 12rpx;
-  letter-spacing: 2rpx;
+.empty {
+  padding: 48rpx 32rpx;
+}
+
+.empty-title {
+  font-size: 34rpx;
+  font-weight: 600;
+  margin-bottom: 12rpx;
 }

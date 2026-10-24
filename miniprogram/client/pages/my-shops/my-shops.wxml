@@ -1,0 +1,30 @@
+<view class="page">
+  <view class="actions card">
+    <view class="action" bindtap="goImport">
+      <view class="icon import"></view>
+      <text>导入</text>
+    </view>
+    <view class="action muted-action" bindtap="goConnectAi">
+      <view class="icon ai"></view>
+      <text>连接 AI</text>
+    </view>
+    <view class="action" bindtap="goLocate">
+      <view class="icon locate"></view>
+      <text>记美食</text>
+    </view>
+  </view>
+
+  <view class="list card" wx:if="{{shops.length}}">
+    <block wx:for="{{shops}}" wx:key="poiKey">
+      <view class="item hairline">
+        <shop-row shop="{{item}}" source-tag="{{item.sourceTag}}" bind:tap="openShop" />
+      </view>
+    </block>
+  </view>
+
+  <view class="empty card" wx:elif="{{!loading}}">
+    <view class="empty-title">还没有店铺</view>
+    <view class="muted">从大众点评导入专辑，或点「记美食」记下当前位置。</view>
+    <button class="btn-primary btn-block" bindtap="goImport">导入点评收藏</button>
+  </view>
+</view>

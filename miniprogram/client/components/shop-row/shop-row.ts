@@ -4,16 +4,17 @@ import { splitDistance, avatarInitial } from '../../utils/format';
 Component({
   properties: {
     shop: { type: Object, value: {} },
+    /** 覆盖推荐行文案，如「我导入」「来自小王」 */
+    sourceTag: { type: String, value: '' },
   },
   data: {
-    dist: { main: '—', unit: '', na: true },
+    dist: { main: '', unit: '', na: true },
     metaLine: '',
     previewAvatars: [] as Array<{
       userId: string;
       avatar?: string;
       initial: string;
     }>,
-    extraCount: 0,
     headImgProxyFull: '',
   },
   observers: {
@@ -22,7 +23,6 @@ Component({
       const dist = splitDistance(shop.distanceLabel as string | undefined);
       const parts = [shop.category, shop.district].filter(Boolean);
       const preview = ((shop.collectors as any[]) || []).slice(0, 3);
-      const total = (shop.collectorCount as number) || preview.length;
       const proxy = shop.headImgProxy as string | undefined;
       this.setData({
         dist,
@@ -32,7 +32,6 @@ Component({
           avatar: c.avatar || '',
           initial: avatarInitial(c.nickname),
         })),
-        extraCount: Math.max(0, total - 3),
         headImgProxyFull: proxy ? `${API_BASE}${proxy}` : '',
       });
     },

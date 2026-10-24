@@ -1,5 +1,4 @@
 {
-  "navigationBarTitleText": "写备注",
-  "navigationBarBackgroundColor": "#ffffff",
-  "navigationBarTextStyle": "black"
+  "navigationBarTitleText": "记美食",
+  "usingComponents": {}
 }

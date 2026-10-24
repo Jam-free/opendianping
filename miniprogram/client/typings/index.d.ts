@@ -3,6 +3,10 @@ declare namespace WechatMiniprogram {
   interface LoginSuccessCallbackResult {
     code: string;
   }
+  interface GetLocationSuccessCallbackResult {
+    latitude: number;
+    longitude: number;
+  }
   interface Input {
     detail: { value: string };
   }
@@ -14,6 +18,9 @@ declare namespace WechatMiniprogram {
   }
   interface TouchEvent {
     currentTarget: { dataset: Record<string, string | number | undefined> };
+  }
+  interface CustomEvent {
+    detail: any;
   }
   interface ShowModalSuccessCallbackResult {
     confirm: boolean;
@@ -29,6 +36,7 @@ declare namespace WechatMiniprogram {
 
 declare const App: (options: Record<string, any>) => void;
 declare const Page: (options: Record<string, any>) => void;
+declare const Component: (options: Record<string, any>) => void;
 declare const getApp: <T = any>() => T;
 declare const wx: {
   login: (opts: any) => void;
@@ -38,10 +46,17 @@ declare const wx: {
   showModal: (opts: any) => void;
   navigateTo: (opts: any) => void;
   redirectTo: (opts: any) => void;
+  switchTab: (opts: any) => void;
   navigateBack: (opts?: any) => void;
   setStorageSync: (k: string, v: any) => void;
   getStorageSync: (k: string) => any;
+  removeStorageSync: (k: string) => void;
   setClipboardData: (opts: any) => void;
   openLocation: (opts: any) => void;
+  getLocation: (opts: any) => void;
+  chooseMedia: (opts: any) => void;
+  previewImage: (opts: any) => void;
+  setNavigationBarTitle: (opts: any) => void;
+  stopPullDownRefresh: () => void;
   getGroupEnterInfo?: (opts: any) => void;
 };

@@ -1,5 +1,65 @@
-<view class="page pad">
-  <view class="h1">{{name}}</view>
-  <textarea class="input" placeholder="写点推荐理由…" maxlength="200" bindinput="onNote" value="{{note}}" />
-  <button class="btn-gradient block" loading="{{saving}}" bindtap="onSave">保存到圈子</button>
+<view class="page">
+  <view class="card block">
+    <view class="h1">记美食</view>
+    <view class="muted tip">记下你现在的位置，可补拍照和备注；默认与美食好友共享。</view>
+
+    <view class="loc-card">
+      <view class="loc-label muted">当前位置</view>
+      <view class="loc-main" wx:if="{{locReady}}">
+        <view class="coords">{{latLabel}}, {{lngLabel}}</view>
+        <view class="addr muted" wx:if="{{address}}">{{address}}</view>
+        <view class="addr muted" wx:else>已获取坐标（可填写下方店名）</view>
+      </view>
+      <view class="loc-main muted" wx:elif="{{locError}}">{{locError}}</view>
+      <view class="loc-main muted" wx:else>正在获取定位…</view>
+      <button class="btn-ghost mini" size="mini" bindtap="refreshLoc">重新定位</button>
+    </view>
+
+    <view class="field">
+      <view class="label">店名 / 地点</view>
+      <input
+        class="input"
+        placeholder="例如：巷口螺蛳粉"
+        value="{{name}}"
+        bindinput="onName"
+        maxlength="40"
+      />
+    </view>
+
+    <view class="field">
+      <view class="label">拍照（可选）</view>
+      <view class="photos">
+        <image
+          wx:if="{{photoPath}}"
+          class="photo"
+          src="{{photoPath}}"
+          mode="aspectFill"
+          bindtap="previewPhoto"
+        />
+        <view class="add-photo" bindtap="pickPhoto" wx:if="{{!photoPath}}">+</view>
+        <view class="remove muted" wx:if="{{photoPath}}" bindtap="clearPhoto">清除</view>
+      </view>
+    </view>
+
+    <view class="field">
+      <view class="label">备注（可选）</view>
+      <textarea
+        class="textarea"
+        placeholder="口味、推荐菜、避雷…"
+        maxlength="200"
+        value="{{note}}"
+        bindinput="onNote"
+        auto-height
+      />
+    </view>
+
+    <button
+      class="btn-primary btn-block"
+      loading="{{saving}}"
+      disabled="{{!locReady}}"
+      bindtap="onSave"
+    >
+      记下来
+    </button>
+  </view>
 </view>

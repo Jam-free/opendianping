@@ -13,29 +13,18 @@ interface PreviewShop {
 Page({
   data: {
     step: 'input' as 'input' | 'preview' | 'result',
-    text: 'https://h5.dianping.com/app/commonplatform-collection-static/album.html?albumid=12498807',
-    useFixtures: true,
+    text: '',
     loading: false,
     saving: false,
     previewId: '',
     shops: [] as PreviewShop[],
     message: '',
     selectedCount: 0,
-    visLabels: ['仅自己可见', '共享到收藏圈'],
-    visIndex: 1,
     result: { success: 0, duplicate: 0, failed: 0, batchId: '' },
   },
 
   onText(e: WechatMiniprogram.Input) {
     this.setData({ text: e.detail.value });
-  },
-
-  onFixtures(e: WechatMiniprogram.SwitchChange) {
-    this.setData({ useFixtures: e.detail.value });
-  },
-
-  onVis(e: WechatMiniprogram.PickerChange) {
-    this.setData({ visIndex: Number(e.detail.value) });
   },
 
   async onParse() {
@@ -53,10 +42,18 @@ Page({
         method: 'POST',
         data: {
           text: this.data.text,
-          useFixtures: this.data.useFixtures,
+          useFixtures: false,
         },
       });
-      const shops = res.shops.map((s) => ({ ...s, checked: true }));
+      const shops = (res.shops || []).map((s) => ({ ...s, checked: true }));
+      if (!shops.length) {
+        this.setData({ loading: false });
+        wx.showModal({
+          title: '没有解析到店铺',
+          content: res.message || '请确认链接是公开专辑，或换一条再试',
+        });
+        return;
+      }
       this.setData({
         step: 'preview',
         previewId: res.previewId,
@@ -113,13 +110,12 @@ Page({
         duplicate: number;
         failed: number;
         batchId: string;
-        message: string;
       }>('/api/import/save', {
         method: 'POST',
         data: {
           previewId: this.data.previewId,
           selectedIndexes,
-          visibility: this.data.visIndex === 1 ? 'circles' : 'private',
+          visibility: 'circles',
         },
       });
       this.setData({
@@ -138,20 +134,8 @@ Page({
     }
   },
 
-  async undoBatch() {
-    const batchId = this.data.result.batchId;
-    if (!batchId) return;
-    try {
-      await request(`/api/import/batches/${batchId}`, { method: 'DELETE' });
-      wx.showToast({ title: '已撤销' });
-      this.reset();
-    } catch (err) {
-      wx.showToast({ title: (err as Error).message, icon: 'none' });
-    }
-  },
-
-  goFavorites() {
-    wx.redirectTo({ url: '/pages/favorites/favorites' });
+  goMyShops() {
+    wx.switchTab({ url: '/pages/my-shops/my-shops' });
   },
 
   reset() {
@@ -161,6 +145,7 @@ Page({
       shops: [],
       message: '',
       selectedCount: 0,
+      text: '',
     });
   },
 });

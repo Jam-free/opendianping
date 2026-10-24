@@ -1,25 +1,48 @@
 {
   "pages": [
-    "pages/index/index",
-    "pages/friend-shops/friend-shops",
-    "pages/shop-detail/shop-detail",
-    "pages/import/import",
-    "pages/locate/locate",
-    "pages/locate-note/locate-note",
-    "pages/invite/invite",
+    "pages/friends/friends",
+    "pages/my-shops/my-shops",
     "pages/join/join",
-    "pages/favorites/favorites",
-    "pages/circles/circles",
-    "pages/circle-detail/circle-detail"
+    "pages/import/import",
+    "pages/locate-note/locate-note",
+    "pages/connect-ai/connect-ai",
+    "pages/shop-detail/shop-detail",
+    "pages/friend-shops/friend-shops"
   ],
   "window": {
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTitleText": "美食肥猫",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#ffffff",
+    "backgroundColor": "#f5f5f5",
     "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#8a8a8a",
+    "selectedColor": "#3d7eff",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/friends/friends",
+        "text": "朋友圈",
+        "iconPath": "assets/tab/friends.png",
+        "selectedIconPath": "assets/tab/friends-active.png"
+      },
+      {
+        "pagePath": "pages/my-shops/my-shops",
+        "text": "我的店",
+        "iconPath": "assets/tab/shops.png",
+        "selectedIconPath": "assets/tab/shops-active.png"
+      }
+    ]
   },
   "style": "v2",
   "sitemapLocation": "sitemap.json",
-  "lazyCodeLoading": "requiredComponents"
+  "lazyCodeLoading": "requiredComponents",
+  "permission": {
+    "scope.userLocation": {
+      "desc": "用于计算你和店铺的距离，并在记美食时记录位置"
+    }
+  },
+  "requiredPrivateInfos": ["getLocation"]
 }

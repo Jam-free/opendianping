@@ -1,29 +1,44 @@
 .page {
-  padding: 24rpx 24rpx calc(200rpx + env(safe-area-inset-bottom));
+  padding: 24rpx 32rpx calc(48rpx + env(safe-area-inset-bottom));
 }
 
-.panel {
-  background: transparent;
+.block {
+  padding: 36rpx 28rpx;
+}
+
+.h1 {
+  font-size: 36rpx;
+  font-weight: 700;
+  margin-bottom: 12rpx;
+}
+
+.intro {
+  line-height: 1.6;
+  margin-bottom: 28rpx;
+}
+
+.steps {
+  background: var(--bg);
+  border-radius: 12rpx;
+  padding: 20rpx 24rpx;
+  margin-bottom: 24rpx;
+}
+
+.s {
+  font-size: 26rpx;
+  color: #444;
+  line-height: 1.7;
 }
 
 .input {
-  margin-top: 24rpx;
   width: 100%;
-  min-height: 200rpx;
+  min-height: 160rpx;
+  background: var(--bg);
+  border-radius: 12rpx;
   padding: 24rpx;
   box-sizing: border-box;
-  background: #fff;
-  border-radius: 0;
-  border: 1rpx solid var(--line);
-}
-
-.check-row {
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-  margin: 24rpx 0;
-  color: var(--sub);
-  font-size: 24rpx;
+  margin-bottom: 24rpx;
+  font-size: 26rpx;
 }
 
 .toolbar {
@@ -39,10 +54,9 @@
 }
 
 .link {
-  color: var(--ink);
+  color: var(--primary);
   font-size: 26rpx;
   font-weight: 600;
-  text-decoration: underline;
 }
 
 .tip {
@@ -50,27 +64,33 @@
 }
 
 .shop-card {
-  background: var(--card);
-  border-radius: 0;
-  padding: 28rpx;
-  margin-bottom: 0;
-  border: 1rpx solid var(--line);
-  border-bottom: none;
-}
-
-.shop-card:last-child {
+  padding: 24rpx 0;
   border-bottom: 1rpx solid var(--line);
 }
 
-.shop-card.checked {
-  border-color: var(--line);
-  background: var(--accent-soft);
+.shop-card.checked .check.on {
+  background: var(--primary);
+  border-color: var(--primary);
 }
 
 .card-top {
   display: flex;
-  align-items: flex-start;
   gap: 16rpx;
+  align-items: flex-start;
+}
+
+.check {
+  width: 36rpx;
+  height: 36rpx;
+  border-radius: 50%;
+  border: 2rpx solid #ccc;
+  margin-top: 6rpx;
+  flex: none;
+  box-sizing: border-box;
+}
+
+.check.on {
+  box-shadow: inset 0 0 0 6rpx #fff;
 }
 
 .card-main {
@@ -79,83 +99,32 @@
 }
 
 .name {
-  font-size: 32rpx;
-  font-weight: 700;
-  color: var(--ink);
+  font-size: 30rpx;
+  font-weight: 600;
 }
 
 .meta {
   margin-top: 6rpx;
-  color: var(--ink);
-  font-size: 26rpx;
-  font-weight: 600;
-}
-
-.source-tag {
-  font-size: 20rpx;
-  color: var(--sub);
-  background: transparent;
-  padding: 4rpx 12rpx;
-  border-radius: 0;
-  border: 1rpx solid var(--line);
-  white-space: nowrap;
-}
-
-.sub {
-  margin-top: 12rpx;
-  margin-left: 56rpx;
-  color: var(--sub);
   font-size: 24rpx;
 }
 
-.addr {
-  margin-top: 8rpx;
-  margin-left: 56rpx;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.save-bar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 20rpx 24rpx calc(20rpx + env(safe-area-inset-bottom));
-  background: var(--bg);
-  display: flex;
-  gap: 16rpx;
-  align-items: center;
-  border-top: 1rpx solid var(--line);
-}
-
-.vis {
-  padding: 16rpx 20rpx;
-  background: #fff;
-  border-radius: 0;
-  border: 1rpx solid var(--line);
-  color: var(--sub);
-  font-size: 24rpx;
-}
-
-.save-btn {
-  flex: 1;
+.save {
+  margin-top: 28rpx;
 }
 
 .result-line {
-  font-size: 36rpx;
+  font-size: 30rpx;
   margin: 12rpx 0;
 }
 
-.result-line.ok {
-  color: var(--success);
-  font-weight: 700;
-}
-
-.result-line.danger {
+.danger {
   color: var(--danger);
 }
 
-.result button {
-  margin-top: 20rpx;
+.result .btn-ghost {
+  margin-top: 16rpx;
+}
+
+.result .btn-primary {
+  margin-top: 28rpx;
 }

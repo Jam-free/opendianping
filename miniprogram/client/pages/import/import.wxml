@@ -1,72 +1,76 @@
 <view class="page">
-  <view class="panel" wx:if="{{step === 'input'}}">
-    <view class="section-title">粘贴公开专辑链接</view>
-    <view class="muted">含 albumid 的分享链接；也可粘贴多行店名（文本兜底）</view>
-    <textarea
-      class="input"
-      placeholder="例如 https://h5.dianping.com/...album.html?albumid=12498807"
-      value="{{text}}"
-      bindinput="onText"
-      maxlength="2000"
-      auto-height
-    />
-    <label class="check-row">
-      <switch checked="{{useFixtures}}" bindchange="onFixtures" color="#FF6A3D" />
-      <text>离线样本（开发演示）</text>
-    </label>
-    <button class="btn-primary" loading="{{loading}}" bindtap="onParse">导入</button>
-  </view>
+  <block wx:if="{{step === 'guide' || step === 'input'}}">
+    <view class="card block">
+      <view class="h1">导入大众点评收藏</view>
+      <view class="muted intro">把公开专辑或店铺链接粘贴过来，选中后加入「我的店」，默认与美食好友共享。</view>
 
-  <view class="panel" wx:if="{{step === 'preview'}}">
-    <view class="toolbar">
-      <text class="section-title">预览 {{shops.length}} 家</text>
-      <view class="toolbar-actions">
-        <text class="link" bindtap="selectAll">全选</text>
-        <text class="link" bindtap="selectNone">清空</text>
+      <view class="steps">
+        <view class="s">1. 打开大众点评 → 我的 → 收藏</view>
+        <view class="s">2. 打开专辑 → 分享 → 复制链接</view>
+        <view class="s">3. 粘贴到下方，点「开始导入」</view>
       </view>
-    </view>
-    <view class="muted tip" wx:if="{{message}}">{{message}}</view>
 
-    <view
-      class="shop-card {{item.checked ? 'checked' : ''}}"
-      wx:for="{{shops}}"
-      wx:key="index"
-      data-index="{{index}}"
-      bindtap="toggle"
-    >
-      <view class="card-top">
-        <checkbox checked="{{item.checked}}" color="#FF6A3D" />
-        <view class="card-main">
-          <view class="name">{{item.name}}</view>
-          <view class="meta" wx:if="{{item.avgPrice}}">{{item.avgPrice}}</view>
-        </view>
-        <view class="source-tag">{{item.sourceLabel}}</view>
-      </view>
-      <view class="sub" wx:if="{{item.category || item.district}}">
-        <text wx:if="{{item.category}}">{{item.category}}</text>
-        <text wx:if="{{item.category && item.district}}"> · </text>
-        <text wx:if="{{item.district}}">{{item.district}}</text>
-      </view>
-      <view class="addr muted" wx:if="{{item.address}}">{{item.address}}</view>
-    </view>
+      <textarea
+        class="input"
+        placeholder="粘贴专辑或店铺链接，例如 https://h5.dianping.com/..."
+        value="{{text}}"
+        bindinput="onText"
+        maxlength="2000"
+        auto-height
+      />
 
-    <view class="save-bar">
-      <picker range="{{visLabels}}" value="{{visIndex}}" bindchange="onVis">
-        <view class="vis">共享：{{visLabels[visIndex]}}</view>
-      </picker>
-      <button class="btn-primary save-btn" loading="{{saving}}" bindtap="onSave">
-        保存已选（{{selectedCount}}）
+      <button class="btn-primary btn-block" loading="{{loading}}" bindtap="onParse">
+        开始导入
       </button>
     </view>
-  </view>
+  </block>
 
-  <view class="panel result" wx:if="{{step === 'result'}}">
-    <view class="section-title">导入完成</view>
-    <view class="result-line ok">成功 {{result.success}}</view>
-    <view class="result-line">重复 {{result.duplicate}}</view>
-    <view class="result-line danger" wx:if="{{result.failed}}">失败 {{result.failed}}</view>
-    <button class="btn-primary" bindtap="goFavorites">查看收藏</button>
-    <button class="btn-ghost" bindtap="undoBatch" wx:if="{{result.batchId}}">撤销本批</button>
-    <button class="btn-ghost" bindtap="reset">再导一批</button>
-  </view>
+  <block wx:if="{{step === 'preview'}}">
+    <view class="card block">
+      <view class="toolbar">
+        <view class="h1">确认加入 {{selectedCount}} 家</view>
+        <view class="toolbar-actions">
+          <text class="link" bindtap="selectAll">全选</text>
+          <text class="link" bindtap="selectNone">清空</text>
+        </view>
+      </view>
+      <view class="muted tip" wx:if="{{message}}">{{message}}</view>
+
+      <view
+        class="shop-card {{item.checked ? 'checked' : ''}}"
+        wx:for="{{shops}}"
+        wx:key="index"
+        data-index="{{index}}"
+        bindtap="toggle"
+      >
+        <view class="card-top">
+          <view class="check {{item.checked ? 'on' : ''}}"></view>
+          <view class="card-main">
+            <view class="name">{{item.name}}</view>
+            <view class="meta muted" wx:if="{{item.avgPrice || item.category}}">
+              <text wx:if="{{item.avgPrice}}">{{item.avgPrice}}</text>
+              <text wx:if="{{item.avgPrice && item.category}}"> · </text>
+              <text wx:if="{{item.category}}">{{item.category}}</text>
+              <text wx:if="{{item.district}}"> · {{item.district}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <button class="btn-primary btn-block save" loading="{{saving}}" bindtap="onSave">
+        加入我的店（{{selectedCount}}）
+      </button>
+    </view>
+  </block>
+
+  <block wx:if="{{step === 'result'}}">
+    <view class="card block result">
+      <view class="h1">导入完成</view>
+      <view class="result-line">成功 {{result.success}} 家</view>
+      <view class="result-line muted" wx:if="{{result.duplicate}}">重复 {{result.duplicate}}</view>
+      <view class="result-line danger" wx:if="{{result.failed}}">失败 {{result.failed}}</view>
+      <button class="btn-primary btn-block" bindtap="goMyShops">去看看</button>
+      <button class="btn-ghost btn-block" bindtap="reset">再导一批</button>
+    </view>
+  </block>
 </view>

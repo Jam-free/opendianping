@@ -111,3 +111,22 @@ export function openNavigation(shop: {
     },
   });
 }
+
+/**
+ * 拼请求地址里 ? 后面的参数。
+ * 小程序里没有浏览器的 URLSearchParams，直接 new 会在页面上报 ReferenceError。
+ * 空值不写进地址，避免出现 lat=undefined。
+ */
+export function buildQuery(
+  params: Record<string, string | number | undefined | null>
+): string {
+  const parts: string[] = [];
+  Object.keys(params).forEach((key) => {
+    const value = params[key];
+    if (value === undefined || value === null || value === '') return;
+    parts.push(
+      `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`
+    );
+  });
+  return parts.join('&');
+}

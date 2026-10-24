@@ -1,0 +1,106 @@
+.page {
+  padding: 24rpx 32rpx calc(32rpx + env(safe-area-inset-bottom));
+}
+
+.actions {
+  display: flex;
+  padding: 28rpx 12rpx;
+  margin-bottom: 24rpx;
+}
+
+.action {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.muted-action {
+  color: var(--sub);
+  font-weight: 500;
+}
+
+.icon {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 20rpx;
+  background: #eef4ff;
+  position: relative;
+}
+
+.icon.import::before,
+.icon.import::after,
+.icon.ai::before,
+.icon.locate::before,
+.icon.locate::after {
+  content: '';
+  position: absolute;
+  background: var(--primary);
+}
+
+.icon.import::before {
+  width: 28rpx;
+  height: 4rpx;
+  left: 22rpx;
+  top: 34rpx;
+}
+.icon.import::after {
+  width: 4rpx;
+  height: 28rpx;
+  left: 34rpx;
+  top: 22rpx;
+}
+
+.icon.ai {
+  background: #f3f3f3;
+}
+.icon.ai::before {
+  width: 28rpx;
+  height: 28rpx;
+  border-radius: 50%;
+  left: 22rpx;
+  top: 22rpx;
+  background: #b0b0b0;
+}
+
+.icon.locate::before {
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 50%;
+  left: 26rpx;
+  top: 20rpx;
+}
+.icon.locate::after {
+  width: 4rpx;
+  height: 18rpx;
+  left: 34rpx;
+  top: 38rpx;
+  border-radius: 2rpx;
+}
+
+.list {
+  padding: 8rpx 28rpx;
+}
+
+.item:last-child .row {
+  border-bottom: none;
+}
+
+.empty {
+  padding: 48rpx 32rpx;
+}
+
+.empty-title {
+  font-size: 34rpx;
+  font-weight: 600;
+  margin-bottom: 12rpx;
+}
+
+.empty .muted {
+  margin-bottom: 32rpx;
+  line-height: 1.6;
+}

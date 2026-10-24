@@ -1,0 +1,7 @@
+{
+  "navigationBarTitleText": "我的店",
+  "enablePullDownRefresh": true,
+  "usingComponents": {
+    "shop-row": "/components/shop-row/shop-row"
+  }
+}

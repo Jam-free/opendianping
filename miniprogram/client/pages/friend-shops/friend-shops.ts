@@ -1,4 +1,4 @@
-import { request } from '../../utils/api';
+import { request, buildQuery } from '../../utils/api';
 import { getUserLocation } from '../../utils/location';
 
 Page({
@@ -6,8 +6,7 @@ Page({
     circleId: '',
     memberId: '',
     shops: [] as any[],
-    shopsNoCoord: [] as any[],
-    noCoordSection: false,
+    loading: true,
   },
 
   onLoad(query: Record<string, string | undefined>) {
@@ -20,25 +19,26 @@ Page({
   },
 
   async load() {
-    const loc = await getUserLocation();
-    const q = new URLSearchParams({
-      pageSize: '200',
-      memberId: this.data.memberId,
-    });
-    if (loc) {
-      q.set('lat', String(loc.lat));
-      q.set('lng', String(loc.lng));
+    this.setData({ loading: true });
+    try {
+      const loc = await getUserLocation();
+      const qs = buildQuery({
+        pageSize: '200',
+        memberId: this.data.memberId,
+        lat: loc ? loc.lat : undefined,
+        lng: loc ? loc.lng : undefined,
+      });
+      const res = await request<{ items: any[] }>(
+        `/api/circles/${this.data.circleId}/shops?${qs}`
+      );
+      this.setData({
+        shops: res.items || [],
+        loading: false,
+      });
+    } catch (err) {
+      this.setData({ loading: false });
+      wx.showToast({ title: (err as Error).message, icon: 'none' });
     }
-    const res = await request<{ items: any[] }>(
-      `/api/circles/${this.data.circleId}/shops?${q.toString()}`
-    );
-    const items = res.items || [];
-    this.setData({
-      shops: items.filter((s) => s.hasCoords),
-      shopsNoCoord: items.filter((s) => !s.hasCoords),
-      noCoordSection:
-        items.some((s) => s.hasCoords) && items.some((s) => !s.hasCoords),
-    });
   },
 
   openShop(e: WechatMiniprogram.CustomEvent) {

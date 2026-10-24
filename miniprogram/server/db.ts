@@ -136,6 +136,16 @@ function initSchema(database: Database.Database): void {
       FOREIGN KEY (favorite_id) REFERENCES favorites(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS agent_tokens (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL UNIQUE,
+      token_hash TEXT NOT NULL,
+      token_prefix TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      last_used_at TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
     CREATE INDEX IF NOT EXISTS idx_favorites_visibility ON favorites(visibility);
     CREATE INDEX IF NOT EXISTS idx_shops_source ON shops(source_shop_id);
@@ -147,10 +157,29 @@ function initSchema(database: Database.Database): void {
 
 /** 兼容已有磁盘库：补列不破坏数据 */
 function migrateSchema(database: Database.Database): void {
-  const cols = database
+  const shopCols = database
     .prepare(`PRAGMA table_info(shops)`)
     .all() as Array<{ name: string }>;
-  if (!cols.some((c) => c.name === 'head_img')) {
+  if (!shopCols.some((c) => c.name === 'head_img')) {
     database.exec(`ALTER TABLE shops ADD COLUMN head_img TEXT`);
   }
+
+  const favCols = database
+    .prepare(`PRAGMA table_info(favorites)`)
+    .all() as Array<{ name: string }>;
+  if (!favCols.some((c) => c.name === 'photo_url')) {
+    database.exec(`ALTER TABLE favorites ADD COLUMN photo_url TEXT`);
+  }
+
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS agent_tokens (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL UNIQUE,
+      token_hash TEXT NOT NULL,
+      token_prefix TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      last_used_at TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+  `);
 }

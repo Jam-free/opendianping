@@ -6,7 +6,7 @@ page {
   font-size: 28rpx;
   line-height: 1.5;
   min-height: 100%;
-  padding-bottom: calc(220rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
 }
 
 .muted {
@@ -14,39 +14,25 @@ page {
   font-size: 24rpx;
 }
 
-.hairline {
-  border-bottom: 1rpx solid var(--line);
-}
-
-.btn-outline {
-  background: #fff;
-  color: var(--ink);
-  border: 2rpx solid var(--ink);
-  border-radius: 0;
-  font-weight: 600;
-}
-
-.btn-gradient {
-  background: var(--gradient);
-  color: #fff;
-  border: none;
-  border-radius: 0;
-  font-weight: 600;
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
 }
 
 .section-title {
-  font-size: 32rpx;
-  font-weight: 700;
+  font-size: 34rpx;
+  font-weight: 600;
   color: var(--ink);
-  letter-spacing: 1rpx;
 }
 
 .btn-primary,
-.btn-ghost {
-  border-radius: 0;
+.btn-ghost,
+.btn-outline {
+  border-radius: 16rpx;
   font-weight: 600;
-  font-size: 28rpx;
-  line-height: 1.5;
+  font-size: 30rpx;
+  line-height: 1.4;
   padding: 0 32rpx;
   min-height: 88rpx;
   display: inline-flex;
@@ -56,41 +42,45 @@ page {
 }
 
 .btn-primary::after,
-.btn-ghost::after {
+.btn-ghost::after,
+.btn-outline::after {
   border: none;
 }
 
 .btn-primary {
-  background: var(--gradient);
+  background: var(--primary);
   color: #fff;
   border: none;
 }
 
 .btn-primary.button-hover {
-  opacity: 0.85;
+  background: var(--primary-press);
 }
 
 .btn-ghost {
   background: #fff;
-  color: #111;
+  color: var(--ink);
   border: 1rpx solid var(--line);
 }
 
 .btn-ghost.button-hover {
-  background: #f2f2f2;
-  color: #111;
+  background: #f7f7f7;
 }
 
-.btn-primary.mini,
-.btn-ghost.mini {
-  min-height: auto;
-  font-size: 24rpx;
-  padding: 0 24rpx;
-  line-height: 1.4;
+.btn-outline {
+  background: #fff;
+  color: var(--primary);
+  border: 2rpx solid var(--primary);
 }
 
-.page-with-bottom-bar {
-  min-height: 100vh;
-  padding-bottom: calc(220rpx + env(safe-area-inset-bottom));
-  box-sizing: border-box;
+.btn-block {
+  width: 100%;
+}
+
+.page-pad {
+  padding: 24rpx 32rpx;
+}
+
+.hairline {
+  border-bottom: 1rpx solid var(--line);
 }

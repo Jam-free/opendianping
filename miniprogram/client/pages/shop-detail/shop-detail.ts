@@ -1,4 +1,4 @@
-import { request, openNavigation } from '../../utils/api';
+import { request, openNavigation, buildQuery } from '../../utils/api';
 import { API_BASE } from '../../utils/config';
 import { splitDistance, avatarInitial } from '../../utils/format';
 import { getUserLocation } from '../../utils/location';
@@ -24,12 +24,11 @@ Page({
 
   async load() {
     const loc = await getUserLocation();
-    const q = new URLSearchParams();
-    if (loc) {
-      q.set('lat', String(loc.lat));
-      q.set('lng', String(loc.lng));
-    }
-    const qs = q.toString() ? `?${q.toString()}` : '';
+    const query = buildQuery({
+      lat: loc ? loc.lat : undefined,
+      lng: loc ? loc.lng : undefined,
+    });
+    const qs = query ? `?${query}` : '';
     const res = await request<{ shop: any }>(
       `/api/circles/${this.data.circleId}/shops/${encodeURIComponent(this.data.poiKey)}${qs}`
     );
@@ -43,6 +42,8 @@ Page({
       dianping_album: '点评专辑',
       amap: '高德匹配',
       text: '文本识别',
+      locate: '记美食',
+      photo: '拍照记下',
     };
     const title = shop.name || '店铺详情';
     wx.setNavigationBarTitle({ title });

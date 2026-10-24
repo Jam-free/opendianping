@@ -1,0 +1,22 @@
+# 仅 miniprogram 目录作为构建上下文时使用（云托管「代码包」选本目录）
+FROM node:20-bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci || npm install
+
+COPY . .
+
+ENV NODE_ENV=production
+ENV PORT=80
+ENV DB_PATH=/data/miniprogram.db
+ENV DEV_AUTH_BYPASS=false
+# 无仓库根 lib 时用文本+高德兜底；有父级 OpenDianping 时改为 opendianping
+ENV SOURCE_ADAPTER=text_amap
+
+EXPOSE 80
+CMD ["npx", "tsx", "server/index.ts"]

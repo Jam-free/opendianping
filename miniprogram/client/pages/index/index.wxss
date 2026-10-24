@@ -38,7 +38,7 @@
 .toast {
   margin: 16rpx 32rpx;
   padding: 16rpx 20rpx;
-  border-left: 6rpx solid #ff2d87;
+  border-left: 6rpx solid var(--accent);
   font-size: 26rpx;
   background: #fafafa;
 }

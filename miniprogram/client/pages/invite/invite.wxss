@@ -11,7 +11,7 @@
 
 .top {
   padding: 36rpx;
-  background: linear-gradient(90deg, #ff8a2b, #ff2d87);
+  background: var(--gradient);
   color: #fff;
   min-height: 240rpx;
 }

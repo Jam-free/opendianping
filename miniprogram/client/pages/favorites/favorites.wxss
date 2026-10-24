@@ -70,8 +70,10 @@
 }
 
 .link {
-  color: var(--accent);
+  color: var(--ink);
   font-size: 26rpx;
+  font-weight: 600;
+  text-decoration: underline;
 }
 
 .link.danger {

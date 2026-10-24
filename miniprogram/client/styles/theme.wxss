@@ -1,13 +1,13 @@
-/* v3 瑞士极简：纯白、发丝线、渐变仅用于激活态与底栏 */
+/* v3 瑞士极简：纯白、发丝线；主题 D 墨黑荧光 */
 page {
-  --gradient: linear-gradient(90deg, #ff8a2b, #ff2d87);
+  --gradient: #111111;
   --line: #e6e6e6;
   --ink: #111111;
   --sub: #777777;
   --bg: #ffffff;
   --card: #ffffff;
   --placeholder: #ededed;
-  --accent: #ff2d87;
+  --accent: #C6F500;
   --accent-soft: #f7f7f7;
   --success: #1a7f4b;
   --danger: #b00020;

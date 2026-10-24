@@ -115,11 +115,11 @@
   height: 116rpx;
   margin-top: -40rpx;
   border-radius: 50%;
-  background: var(--gradient);
+  background: #111111;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 0 8rpx #fff;
+  box-shadow: 0 0 0 8rpx #fff, 0 0 0 12rpx #D4FF3A;
 }
 
 .fab--press {

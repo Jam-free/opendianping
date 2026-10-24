@@ -1,15 +1,15 @@
 .bar {
   position: fixed;
-  left: 50%;
-  bottom: 36rpx;
-  transform: translateX(-50%);
-  width: 686rpx;
-  height: 128rpx;
-  border-radius: 64rpx;
-  background: linear-gradient(90deg, #ff8a2b, #ff2d87);
+  left: 32rpx;
+  right: 32rpx;
+  bottom: calc(24rpx + env(safe-area-inset-bottom));
+  width: auto;
+  height: 112rpx;
+  border-radius: 4rpx;
+  background: var(--gradient);
   display: flex;
   align-items: stretch;
-  box-shadow: 0 12rpx 36rpx rgba(255, 60, 110, 0.25);
+  border: 1rpx solid var(--line);
   z-index: 99;
 }
 

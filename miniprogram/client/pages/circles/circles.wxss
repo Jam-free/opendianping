@@ -13,10 +13,15 @@
 
 .circle-card {
   background: var(--card);
-  border-radius: 20rpx;
+  border-radius: 0;
   padding: 28rpx;
-  margin-bottom: 20rpx;
-  box-shadow: 0 8rpx 24rpx rgba(255, 106, 61, 0.06);
+  margin-bottom: 0;
+  border: 1rpx solid var(--line);
+  border-bottom: none;
+}
+
+.circle-card:last-child {
+  border-bottom: 1rpx solid var(--line);
 }
 
 .name {

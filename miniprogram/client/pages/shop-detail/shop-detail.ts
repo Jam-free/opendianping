@@ -44,6 +44,8 @@ Page({
       amap: '高德匹配',
       text: '文本识别',
     };
+    const title = shop.name || '店铺详情';
+    wx.setNavigationBarTitle({ title });
     this.setData({
       shop: { ...shop, collectors },
       dist: splitDistance(shop.distanceLabel),

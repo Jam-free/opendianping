@@ -1,5 +1,5 @@
 .page {
-  padding: 24rpx;
+  padding: 24rpx 24rpx calc(40rpx + env(safe-area-inset-bottom));
 }
 
 .empty {
@@ -9,10 +9,15 @@
 
 .shop-card {
   background: var(--card);
-  border-radius: 20rpx;
+  border-radius: 0;
   padding: 28rpx;
-  margin-bottom: 20rpx;
-  box-shadow: 0 8rpx 24rpx rgba(255, 106, 61, 0.06);
+  margin-bottom: 0;
+  border: 1rpx solid var(--line);
+  border-bottom: none;
+}
+
+.shop-card:last-child {
+  border-bottom: 1rpx solid var(--line);
 }
 
 .card-top {
@@ -31,22 +36,23 @@
 
 .meta {
   margin-top: 6rpx;
-  color: var(--orange-deep);
+  color: var(--ink);
   font-weight: 600;
 }
 
 .source-tag {
   font-size: 20rpx;
-  color: var(--orange);
-  background: var(--orange-soft);
+  color: var(--sub);
+  background: transparent;
   padding: 4rpx 12rpx;
-  border-radius: 8rpx;
+  border-radius: 0;
+  border: 1rpx solid var(--line);
   height: fit-content;
 }
 
 .sub {
   margin-top: 12rpx;
-  color: var(--muted);
+  color: var(--sub);
   font-size: 24rpx;
 }
 
@@ -64,7 +70,7 @@
 }
 
 .link {
-  color: var(--orange);
+  color: var(--accent);
   font-size: 26rpx;
 }
 

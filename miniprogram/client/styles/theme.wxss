@@ -7,4 +7,8 @@ page {
   --bg: #ffffff;
   --card: #ffffff;
   --placeholder: #ededed;
+  --accent: #ff2d87;
+  --accent-soft: #f7f7f7;
+  --success: #1a7f4b;
+  --danger: #b00020;
 }

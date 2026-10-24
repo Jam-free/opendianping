@@ -1,3 +1,9 @@
+.page {
+  min-height: 100vh;
+  padding-bottom: calc(200rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
 .card {
   margin: 32rpx;
   border: 1rpx solid var(--line);

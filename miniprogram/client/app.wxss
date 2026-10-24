@@ -6,7 +6,7 @@ page {
   font-size: 28rpx;
   line-height: 1.5;
   min-height: 100%;
-  padding-bottom: 160rpx;
+  padding-bottom: calc(200rpx + env(safe-area-inset-bottom));
 }
 
 .muted {
@@ -32,4 +32,25 @@ page {
   border: none;
   border-radius: 0;
   font-weight: 600;
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 1rpx;
+}
+
+.btn-primary {
+  background: var(--gradient);
+  color: #fff;
+  border: none;
+  border-radius: 0;
+  font-weight: 600;
+}
+
+.page-with-bottom-bar {
+  min-height: 100vh;
+  padding-bottom: calc(200rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
 }

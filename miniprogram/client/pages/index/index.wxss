@@ -1,5 +1,7 @@
 .page {
   min-height: 100vh;
+  padding-bottom: calc(200rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
 }
 
 .circle-pick {
@@ -12,24 +14,23 @@
 }
 
 .seg {
-  margin: 16rpx auto 8rpx;
-  width: 480rpx;
+  margin: 16rpx 32rpx 8rpx;
   display: flex;
   border: 1rpx solid var(--line);
-  border-radius: 24rpx;
-  padding: 6rpx;
+  border-radius: 0;
+  padding: 0;
 }
 
 .seg-item {
   flex: 1;
   text-align: center;
   padding: 16rpx 0;
-  border-radius: 18rpx;
+  border-radius: 0;
   font-size: 32rpx;
 }
 
 .seg-item.on {
-  background: linear-gradient(90deg, #ff8a2b, #ff2d87);
+  background: var(--gradient);
   color: #fff;
   font-weight: 600;
 }

@@ -4,6 +4,6 @@
 
 .desc {
   margin: 32rpx 0 48rpx;
-  color: var(--muted);
+  color: var(--sub);
   line-height: 1.6;
 }

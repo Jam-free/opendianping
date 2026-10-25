@@ -1,5 +1,6 @@
 import { API_BASE } from '../../utils/config';
 import { splitDistance, avatarInitial } from '../../utils/format';
+import { SHOP_PLACEHOLDER, shopImageSrc } from '../../utils/media';
 
 Component({
   properties: {
@@ -15,7 +16,7 @@ Component({
       avatar?: string;
       initial: string;
     }>,
-    headImgProxyFull: '',
+    displaySrc: SHOP_PLACEHOLDER,
   },
   observers: {
     shop(shop: Record<string, unknown>) {
@@ -32,13 +33,19 @@ Component({
           avatar: c.avatar || '',
           initial: avatarInitial(c.nickname),
         })),
-        headImgProxyFull: proxy ? `${API_BASE}${proxy}` : '',
+        // 无 headImgProxy 也直接用兜底，不留空灰块
+        displaySrc: shopImageSrc(API_BASE, proxy),
       });
     },
   },
   methods: {
     onTap() {
       this.triggerEvent('tap', { shop: this.properties.shop });
+    },
+    /** 代理/CDN 失败时切本地兜底，只切一次避免循环 */
+    onImgError() {
+      if (this.data.displaySrc === SHOP_PLACEHOLDER) return;
+      this.setData({ displaySrc: SHOP_PLACEHOLDER });
     },
   },
 });

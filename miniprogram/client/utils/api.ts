@@ -2,28 +2,123 @@ import { API_BASE } from './config';
 
 type Json = Record<string, unknown>;
 
+type SessionUser = {
+  id: string;
+  nickname?: string | null;
+  avatar?: string | null;
+};
+
 function getAppSafe(): WechatMiniprogram.App.Instance<{
-  globalData: { token: string; userId: string };
+  globalData: { token: string; userId: string; user: SessionUser | null };
 }> {
   return getApp();
 }
 
-/** 清掉本地会话，下次 ensureLogin 会重新向云端换票 */
+const USER_KEY = 'session_user';
+
+/** 是否已有本地登录票（未验服务端） */
+export function hasSession(): boolean {
+  const app = getAppSafe();
+  if (app.globalData.token) return true;
+  try {
+    return Boolean(wx.getStorageSync('session_token'));
+  } catch {
+    return false;
+  }
+}
+
+export function peekCachedUser(): SessionUser | null {
+  const app = getAppSafe();
+  if (app.globalData.user) return app.globalData.user;
+  try {
+    const raw = wx.getStorageSync(USER_KEY) as SessionUser | '';
+    if (raw && typeof raw === 'object') {
+      app.globalData.user = raw;
+      return raw;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+export function saveCachedUser(user: SessionUser): void {
+  const app = getAppSafe();
+  app.globalData.user = user;
+  app.globalData.userId = user.id || '';
+  try {
+    wx.setStorageSync(USER_KEY, user);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 清掉本地会话，下次需重新走登录引导页 */
 export function clearSession(): void {
   const app = getAppSafe();
   app.globalData.token = '';
   app.globalData.userId = '';
+  app.globalData.user = null;
   try {
     wx.removeStorageSync('session_token');
+    wx.removeStorageSync(USER_KEY);
   } catch {
     /* ignore */
   }
 }
 
 /**
- * 保证已登录。失败时弹窗说明原因，可点「重新登录」再试，而不是只闪一句「请先登录」。
+ * 跳回登录门禁（退出 / 票失效）。
+ * 若当前在邀请页，先记下参数，登录成功后回到加入流程。
  */
-export async function ensureLogin(opts?: { force?: boolean }): Promise<string> {
+export function goLoginGate(): void {
+  try {
+    const pages = getCurrentPages();
+    const cur = pages[pages.length - 1] as
+      | { route?: string; options?: Record<string, string> }
+      | undefined;
+    if (cur?.route === 'pages/join/join' && cur.options) {
+      wx.setStorageSync('pending_join', {
+        c: cur.options.c || '',
+        t: cur.options.t || '',
+      });
+    }
+  } catch {
+    /* ignore */
+  }
+  clearSession();
+  wx.reLaunch({ url: '/pages/login/login' });
+}
+
+/** 登录成功后的去向：有未完成的邀请则回加入页，否则进「我的店」 */
+export function enterAppAfterLogin(): void {
+  try {
+    const pending = wx.getStorageSync('pending_join') as
+      | { c?: string; t?: string }
+      | '';
+    if (pending && pending.c) {
+      wx.removeStorageSync('pending_join');
+      wx.redirectTo({
+        url: `/pages/join/join?c=${pending.c}&t=${pending.t || ''}`,
+      });
+      return;
+    }
+  } catch {
+    /* ignore */
+  }
+  wx.switchTab({ url: '/pages/my-shops/my-shops' });
+}
+
+/**
+ * 保证已登录。
+ * - 有本地票：直接返回（由业务接口 401 再踢回登录页）
+ * - 无票且非 interactive：不静默登录，抛错（强制门禁）
+ * - interactive（登录页按钮）：走 wx.login 换票
+ */
+export async function ensureLogin(opts?: {
+  force?: boolean;
+  interactive?: boolean;
+}): Promise<string> {
   const app = getAppSafe();
   if (!opts?.force && app.globalData.token) return app.globalData.token;
 
@@ -37,6 +132,10 @@ export async function ensureLogin(opts?: { force?: boolean }): Promise<string> {
     clearSession();
   }
 
+  if (!opts?.interactive && !opts?.force) {
+    throw new Error('请先登录');
+  }
+
   try {
     const loginRes = await new Promise<WechatMiniprogram.LoginSuccessCallbackResult>(
       (resolve, reject) => {
@@ -46,7 +145,7 @@ export async function ensureLogin(opts?: { force?: boolean }): Promise<string> {
 
     const data = await request<{
       token: string;
-      user: { id: string };
+      user: SessionUser;
     }>('/api/auth/login', {
       method: 'POST',
       data: { code: loginRes.code || 'dev' },
@@ -55,9 +154,13 @@ export async function ensureLogin(opts?: { force?: boolean }): Promise<string> {
 
     app.globalData.token = data.token;
     app.globalData.userId = data.user.id;
+    saveCachedUser(data.user);
     wx.setStorageSync('session_token', data.token);
     return data.token;
   } catch (err) {
+    // 登录页自己展示错误；其它场景弹窗可重试
+    if (opts?.interactive) throw err;
+
     const msg = (err as Error).message || '登录失败';
     const retry = await new Promise<boolean>((resolve) => {
       wx.showModal({
@@ -68,14 +171,29 @@ export async function ensureLogin(opts?: { force?: boolean }): Promise<string> {
             : msg === '请先登录'
               ? '登录凭证失效了，点下方重新登录即可。'
               : `${msg}\n\n若多次失败，请检查网络，或稍后重试。`,
-        confirmText: '重新登录',
+        confirmText: '去登录',
         cancelText: '取消',
         success: (r) => resolve(Boolean(r.confirm)),
       });
     });
-    if (retry) return ensureLogin({ force: true });
+    if (retry) {
+      goLoginGate();
+      throw err;
+    }
     throw err;
   }
+}
+
+/**
+ * 退出登录 / 撤销授权：通知服务端废票 + 清本地，回到登录引导。
+ */
+export async function logoutAndLeave(): Promise<void> {
+  try {
+    await request('/api/auth/logout', { method: 'POST' });
+  } catch {
+    /* 即使服务端失败，本地也必须清干净 */
+  }
+  goLoginGate();
 }
 
 export async function request<T>(
@@ -88,7 +206,13 @@ export async function request<T>(
 ): Promise<T> {
   const auth = options.auth !== false;
   let token = '';
-  if (auth) token = await ensureLogin();
+  if (auth) {
+    if (!hasSession()) {
+      goLoginGate();
+      throw new Error('请先登录');
+    }
+    token = await ensureLogin();
+  }
 
   return new Promise((resolve, reject) => {
     wx.request({
@@ -106,9 +230,8 @@ export async function request<T>(
           resolve(body);
           return;
         }
-        // 会话失效：清票后让上层走重新登录
         if (status === 401 && auth) {
-          clearSession();
+          goLoginGate();
         }
         const errMsg =
           body?.error ||

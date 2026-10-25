@@ -1,5 +1,41 @@
 .page {
-  padding: 24rpx 32rpx calc(32rpx + env(safe-area-inset-bottom));
+  padding: 8rpx 32rpx calc(32rpx + env(safe-area-inset-bottom));
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8rpx 4rpx 20rpx;
+}
+
+.topbar-hint {
+  font-size: 26rpx;
+}
+
+.avatar-entry {
+  padding: 4rpx;
+}
+
+.avatar-hover {
+  opacity: 0.75;
+}
+
+.me-av {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  background: var(--placeholder);
+  border: 1rpx solid var(--line);
+}
+
+.me-av.text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #555;
 }
 
 .actions {
@@ -90,8 +126,18 @@
   border-bottom: none;
 }
 
-.empty {
-  padding: 48rpx 32rpx;
+/* 空态：卡片内居中，避免内容贴左上 */
+.empty-stage {
+  min-height: 52vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx 40rpx;
+}
+
+.empty-inner {
+  width: 100%;
+  text-align: center;
 }
 
 .empty-title {
@@ -100,7 +146,12 @@
   margin-bottom: 12rpx;
 }
 
-.empty .muted {
-  margin-bottom: 32rpx;
+.empty-desc {
+  margin-bottom: 36rpx;
   line-height: 1.6;
+  text-align: center;
+}
+
+.empty-secondary {
+  margin-top: 16rpx;
 }

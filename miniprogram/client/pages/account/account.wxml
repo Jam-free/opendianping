@@ -1,0 +1,22 @@
+<view class="page page-stage">
+  <view class="card profile-card">
+    <image
+      wx:if="{{avatar}}"
+      class="avatar"
+      src="{{avatar}}"
+      mode="aspectFill"
+    />
+    <view wx:else class="avatar text">{{initial}}</view>
+    <view class="nickname">{{nickname || '未设置昵称'}}</view>
+    <view class="muted tip">头像与昵称来自你在本应用内的名片设置</view>
+  </view>
+
+  <view class="card actions-card">
+    <button class="btn-ghost btn-block danger-btn" loading="{{busy}}" bindtap="onLogout">
+      退出登录 / 撤销授权
+    </button>
+    <view class="muted foot">
+      将清除本机登录状态。下次使用需重新登录；不影响已导入的店铺数据。
+    </view>
+  </view>
+</view>

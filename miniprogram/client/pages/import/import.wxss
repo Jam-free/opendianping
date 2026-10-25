@@ -1,9 +1,25 @@
 .page {
   padding: 24rpx 32rpx calc(48rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+/* 完成态：垂直居中一张结果卡，消除「贴左上 + 大片空白」 */
+.page-stage {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: stretch;
+  padding-top: 0;
+  padding-bottom: calc(80rpx + env(safe-area-inset-bottom));
 }
 
 .block {
   padding: 36rpx 28rpx;
+}
+
+.stack-card .h1 {
+  text-align: left;
 }
 
 .h1 {
@@ -84,7 +100,7 @@
   height: 36rpx;
   border-radius: 50%;
   border: 2rpx solid #ccc;
-  margin-top: 6rpx;
+  margin-top: 38rpx;
   flex: none;
   box-sizing: border-box;
 }
@@ -93,9 +109,19 @@
   box-shadow: inset 0 0 0 6rpx #fff;
 }
 
+.preview-thumb {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 12rpx;
+  flex: none;
+  background: var(--placeholder);
+  border: 1rpx solid var(--line);
+}
+
 .card-main {
   flex: 1;
   min-width: 0;
+  padding-top: 8rpx;
 }
 
 .name {
@@ -112,19 +138,45 @@
   margin-top: 28rpx;
 }
 
+/* —— 导入完成：居中完整卡片 —— */
+.result-card {
+  padding: 72rpx 48rpx 56rpx;
+  text-align: center;
+}
+
+.result-mark {
+  width: 96rpx;
+  height: 96rpx;
+  margin: 0 auto 28rpx;
+  border-radius: 50%;
+  background: #e8f2ff;
+  color: var(--primary);
+  font-size: 48rpx;
+  font-weight: 700;
+  line-height: 96rpx;
+}
+
+.result-card .h1 {
+  margin-bottom: 16rpx;
+}
+
 .result-line {
   font-size: 30rpx;
-  margin: 12rpx 0;
+  margin: 8rpx 0;
 }
 
 .danger {
   color: var(--danger);
 }
 
-.result .btn-ghost {
-  margin-top: 16rpx;
+.result-actions {
+  margin-top: 48rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
 }
 
-.result .btn-primary {
-  margin-top: 28rpx;
+.result-actions .btn-ghost,
+.result-actions .btn-primary {
+  margin: 0;
 }

@@ -101,6 +101,15 @@ export function resolveSession(
 }
 
 /**
+ * 撤销指定会话票。
+ * 产品意图：「退出登录 / 撤销授权」后，这台设备上的票立刻作废，不能再调需登录接口。
+ */
+export function revokeSession(token: string): void {
+  if (!token) return;
+  getDb().prepare('DELETE FROM sessions WHERE token = ?').run(token);
+}
+
+/**
  * 内容安全占位：有密钥时可接 msgSecCheck；测试/无密钥时放行。
  * 产品意图：圈名/昵称/备注上线前走微信审核接口。
  */

@@ -1,9 +1,11 @@
 {
   "pages": [
-    "pages/friends/friends",
+    "pages/login/login",
     "pages/my-shops/my-shops",
+    "pages/friends/friends",
     "pages/join/join",
     "pages/import/import",
+    "pages/account/account",
     "pages/locate-note/locate-note",
     "pages/connect-ai/connect-ai",
     "pages/shop-detail/shop-detail",
@@ -23,16 +25,16 @@
     "borderStyle": "black",
     "list": [
       {
-        "pagePath": "pages/friends/friends",
-        "text": "朋友圈",
-        "iconPath": "assets/tab/friends.png",
-        "selectedIconPath": "assets/tab/friends-active.png"
-      },
-      {
         "pagePath": "pages/my-shops/my-shops",
         "text": "我的店",
         "iconPath": "assets/tab/shops.png",
         "selectedIconPath": "assets/tab/shops-active.png"
+      },
+      {
+        "pagePath": "pages/friends/friends",
+        "text": "朋友圈",
+        "iconPath": "assets/tab/friends.png",
+        "selectedIconPath": "assets/tab/friends-active.png"
       }
     ]
   },

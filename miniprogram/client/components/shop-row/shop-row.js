@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const config_1 = require("../../utils/config");
 const format_1 = require("../../utils/format");
+const media_1 = require("../../utils/media");
 Component({
     properties: {
         shop: { type: Object, value: {} },
@@ -12,7 +13,7 @@ Component({
         dist: { main: '', unit: '', na: true },
         metaLine: '',
         previewAvatars: [],
-        headImgProxyFull: '',
+        displaySrc: media_1.SHOP_PLACEHOLDER,
     },
     observers: {
         shop(shop) {
@@ -30,13 +31,20 @@ Component({
                     avatar: c.avatar || '',
                     initial: (0, format_1.avatarInitial)(c.nickname),
                 })),
-                headImgProxyFull: proxy ? `${config_1.API_BASE}${proxy}` : '',
+                // 无 headImgProxy 也直接用兜底，不留空灰块
+                displaySrc: (0, media_1.shopImageSrc)(config_1.API_BASE, proxy),
             });
         },
     },
     methods: {
         onTap() {
             this.triggerEvent('tap', { shop: this.properties.shop });
+        },
+        /** 代理/CDN 失败时切本地兜底，只切一次避免循环 */
+        onImgError() {
+            if (this.data.displaySrc === media_1.SHOP_PLACEHOLDER)
+                return;
+            this.setData({ displaySrc: media_1.SHOP_PLACEHOLDER });
         },
     },
 });

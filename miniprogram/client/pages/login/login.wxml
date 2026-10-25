@@ -1,0 +1,26 @@
+<view class="page page-stage">
+  <view class="hero">
+    <view class="mark" aria-hidden="true"></view>
+    <view class="brand">美食肥猫</view>
+    <view class="pitch muted">
+      把大众点评收藏搬进来，记美食、看自己的店，再和好友慢慢共享。
+    </view>
+  </view>
+
+  <view class="actions">
+    <button
+      class="btn-primary btn-block"
+      loading="{{busy}}"
+      bindtap="onLogin"
+    >
+      {{bypass ? '一键进入' : '微信登录'}}
+    </button>
+    <view class="hint muted" wx:if="{{bypass}}">
+      开发模式：点上方即可进入，无需真实微信授权。
+    </view>
+    <view class="hint muted" wx:else>
+      登录后才能导入收藏与使用「我的店」。我们不会自动读取你的微信好友。
+    </view>
+    <view class="err" wx:if="{{error}}">{{error}}</view>
+  </view>
+</view>

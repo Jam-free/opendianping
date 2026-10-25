@@ -1,0 +1,56 @@
+.page-stage {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 48rpx 32rpx calc(48rpx + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.profile-card {
+  padding: 56rpx 40rpx 48rpx;
+  text-align: center;
+}
+
+.avatar {
+  width: 144rpx;
+  height: 144rpx;
+  border-radius: 50%;
+  margin: 0 auto 24rpx;
+  background: var(--placeholder);
+  display: block;
+}
+
+.avatar.text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #555;
+}
+
+.nickname {
+  font-size: 36rpx;
+  font-weight: 700;
+}
+
+.tip {
+  margin-top: 12rpx;
+  line-height: 1.5;
+}
+
+.actions-card {
+  padding: 36rpx 32rpx;
+}
+
+.danger-btn {
+  color: var(--danger);
+  border-color: #f0c8c8;
+}
+
+.foot {
+  margin-top: 24rpx;
+  text-align: center;
+  line-height: 1.55;
+}

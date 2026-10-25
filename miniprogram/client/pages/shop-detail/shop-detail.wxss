@@ -13,9 +13,6 @@
   height: 320rpx;
   background: var(--placeholder);
   display: block;
-}
-
-.hero-img.placeholder {
   border-bottom: 1rpx solid var(--line);
 }
 

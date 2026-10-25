@@ -1,11 +1,11 @@
 <view class="row" bindtap="onTap">
+  <!-- 无头图或代理失败：统一本地兜底，避免灰块 -->
   <image
-    wx:if="{{shop.headImgProxy}}"
     class="thumb"
-    src="{{headImgProxyFull}}"
+    src="{{displaySrc}}"
     mode="aspectFill"
+    binderror="onImgError"
   />
-  <view wx:else class="thumb placeholder"></view>
 
   <view class="info">
     <view class="title-row">

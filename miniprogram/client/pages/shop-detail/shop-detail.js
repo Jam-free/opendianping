@@ -4,6 +4,7 @@ const api_1 = require("../../utils/api");
 const config_1 = require("../../utils/config");
 const format_1 = require("../../utils/format");
 const location_1 = require("../../utils/location");
+const media_1 = require("../../utils/media");
 Page({
     data: {
         circleId: '',
@@ -11,7 +12,7 @@ Page({
         shop: null,
         dist: { main: '—', unit: '', na: true },
         metaLine: '',
-        headImgFull: '',
+        displaySrc: media_1.SHOP_PLACEHOLDER,
         sourceLabel: '',
     },
     onLoad(query) {
@@ -45,9 +46,14 @@ Page({
             shop: Object.assign(Object.assign({}, shop), { collectors }),
             dist: (0, format_1.splitDistance)(shop.distanceLabel),
             metaLine: parts.join(' · '),
-            headImgFull: shop.headImgProxy ? `${config_1.API_BASE}${shop.headImgProxy}` : '',
+            displaySrc: (0, media_1.shopImageSrc)(config_1.API_BASE, shop.headImgProxy),
             sourceLabel: labels[shop.sourceType] || shop.sourceType,
         });
+    },
+    onImgError() {
+        if (this.data.displaySrc === media_1.SHOP_PLACEHOLDER)
+            return;
+        this.setData({ displaySrc: media_1.SHOP_PLACEHOLDER });
     },
     onNav() {
         (0, api_1.openNavigation)(this.data.shop);

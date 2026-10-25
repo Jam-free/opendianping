@@ -1,0 +1,73 @@
+.page-stage {
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 0 48rpx calc(80rpx + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding-top: 80rpx;
+}
+
+.mark {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 36rpx;
+  background: linear-gradient(145deg, #3d7eff 0%, #6ba3ff 100%);
+  margin-bottom: 36rpx;
+  position: relative;
+  box-shadow: 0 12rpx 32rpx rgba(61, 126, 255, 0.28);
+}
+
+.mark::after {
+  content: '';
+  position: absolute;
+  left: 36rpx;
+  top: 44rpx;
+  width: 48rpx;
+  height: 28rpx;
+  border: 6rpx solid #fff;
+  border-radius: 0 0 28rpx 28rpx;
+  border-top: none;
+  box-sizing: border-box;
+}
+
+.brand {
+  font-size: 52rpx;
+  font-weight: 700;
+  letter-spacing: 2rpx;
+  color: var(--ink);
+}
+
+.pitch {
+  margin-top: 20rpx;
+  font-size: 28rpx;
+  line-height: 1.65;
+  max-width: 520rpx;
+}
+
+.actions {
+  padding-bottom: 24rpx;
+}
+
+.hint {
+  margin-top: 24rpx;
+  text-align: center;
+  line-height: 1.55;
+  font-size: 24rpx;
+}
+
+.err {
+  margin-top: 20rpx;
+  text-align: center;
+  color: var(--danger);
+  font-size: 26rpx;
+}

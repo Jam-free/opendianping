@@ -4,6 +4,7 @@ import express, {
   type Response,
 } from 'express';
 import { loginWithWxCode, resolveSession } from './auth.js';
+import { config } from './config.js';
 import {
   parseImport,
   saveImportSelection,
@@ -86,21 +87,30 @@ export function createApp() {
     })
   );
 
+  /**
+   * 图片代理：上游失败也返回 200 占位图，避免小程序 image 反复 404 刷屏。
+   * 产品意图：图挂了就静默浅色块，列表仍可读；客户端另有本地兜底图。
+   */
   app.get('/api/media/proxy', async (req, res, next) => {
     try {
-      const { fetchProxiedImage } = await import('./services/media-proxy.js');
+      const {
+        fetchProxiedImage,
+        fallbackPlaceholderImage,
+      } = await import('./services/media-proxy.js');
       const raw = String(req.query.url || '');
-      const image = await fetchProxiedImage(raw);
-      if (!image) {
-        res.status(404).end();
-        return;
-      }
+      const image =
+        (await fetchProxiedImage(raw)) || fallbackPlaceholderImage();
       res.setHeader('Content-Type', image.contentType);
       res.setHeader('Cache-Control', 'public, max-age=86400');
-      res.send(image.buffer);
+      res.status(200).send(image.buffer);
     } catch (err) {
       next(err);
     }
+  });
+
+  /** 登录页用来区分「微信登录」vs「一键进入」文案；不鉴权 */
+  app.get('/api/auth/bootstrap', (_req, res) => {
+    res.json({ bypass: config.devAuthBypass });
   });
 
   app.post(
@@ -119,6 +129,19 @@ export function createApp() {
         },
         networkId: net.id,
       });
+    })
+  );
+
+  /** 撤销本机会话：清服务端 token，客户端再清本地票 */
+  app.post(
+    '/api/auth/logout',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const { revokeSession } = await import('./auth.js');
+      const authHeader = req.header('authorization') || '';
+      const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+      revokeSession(token);
+      res.json({ ok: true });
     })
   );
 

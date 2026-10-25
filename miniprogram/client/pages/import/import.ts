@@ -1,4 +1,6 @@
 import { request } from '../../utils/api';
+import { API_BASE } from '../../utils/config';
+import { SHOP_PLACEHOLDER, shopImageSrc } from '../../utils/media';
 
 interface PreviewShop {
   name: string;
@@ -7,6 +9,8 @@ interface PreviewShop {
   district?: string;
   address?: string;
   sourceLabel: string;
+  headImgProxy?: string | null;
+  displaySrc: string;
   checked: boolean;
 }
 
@@ -36,7 +40,7 @@ Page({
     try {
       const res = await request<{
         previewId: string;
-        shops: Omit<PreviewShop, 'checked'>[];
+        shops: Omit<PreviewShop, 'checked' | 'displaySrc'>[];
         message?: string;
       }>('/api/import/parse', {
         method: 'POST',
@@ -45,7 +49,11 @@ Page({
           useFixtures: false,
         },
       });
-      const shops = (res.shops || []).map((s) => ({ ...s, checked: true }));
+      const shops = (res.shops || []).map((s) => ({
+        ...s,
+        checked: true,
+        displaySrc: shopImageSrc(API_BASE, s.headImgProxy),
+      }));
       if (!shops.length) {
         this.setData({ loading: false });
         wx.showModal({
@@ -79,6 +87,16 @@ Page({
     this.setData({ [key]: checked } as any);
     this.refreshCount();
   },
+
+  /** 预览缩略图失败 → 本地兜底；catchtap 已阻止误触勾选 */
+  onPreviewImgError(e: WechatMiniprogram.TouchEvent) {
+    const index = Number(e.currentTarget.dataset.index);
+    if (Number.isNaN(index)) return;
+    if (this.data.shops[index]?.displaySrc === SHOP_PLACEHOLDER) return;
+    this.setData({ [`shops[${index}].displaySrc`]: SHOP_PLACEHOLDER } as any);
+  },
+
+  noop() {},
 
   selectAll() {
     const shops = this.data.shops.map((s) => ({ ...s, checked: true }));

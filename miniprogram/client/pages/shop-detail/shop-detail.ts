@@ -2,6 +2,7 @@ import { request, openNavigation, buildQuery } from '../../utils/api';
 import { API_BASE } from '../../utils/config';
 import { splitDistance, avatarInitial } from '../../utils/format';
 import { getUserLocation } from '../../utils/location';
+import { SHOP_PLACEHOLDER, shopImageSrc } from '../../utils/media';
 
 Page({
   data: {
@@ -10,7 +11,7 @@ Page({
     shop: null as any,
     dist: { main: '—', unit: '', na: true },
     metaLine: '',
-    headImgFull: '',
+    displaySrc: SHOP_PLACEHOLDER,
     sourceLabel: '',
   },
 
@@ -51,9 +52,14 @@ Page({
       shop: { ...shop, collectors },
       dist: splitDistance(shop.distanceLabel),
       metaLine: parts.join(' · '),
-      headImgFull: shop.headImgProxy ? `${API_BASE}${shop.headImgProxy}` : '',
+      displaySrc: shopImageSrc(API_BASE, shop.headImgProxy),
       sourceLabel: labels[shop.sourceType] || shop.sourceType,
     });
+  },
+
+  onImgError() {
+    if (this.data.displaySrc === SHOP_PLACEHOLDER) return;
+    this.setData({ displaySrc: SHOP_PLACEHOLDER });
   },
 
   onNav() {

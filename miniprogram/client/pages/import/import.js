@@ -1,6 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const api_1 = require("../../utils/api");
+const config_1 = require("../../utils/config");
+const media_1 = require("../../utils/media");
 Page({
     data: {
         step: 'input',
@@ -30,7 +32,7 @@ Page({
                     useFixtures: false,
                 },
             });
-            const shops = (res.shops || []).map((s) => (Object.assign(Object.assign({}, s), { checked: true })));
+            const shops = (res.shops || []).map((s) => (Object.assign(Object.assign({}, s), { checked: true, displaySrc: (0, media_1.shopImageSrc)(config_1.API_BASE, s.headImgProxy) })));
             if (!shops.length) {
                 this.setData({ loading: false });
                 wx.showModal({
@@ -64,6 +66,17 @@ Page({
         this.setData({ [key]: checked });
         this.refreshCount();
     },
+    /** 预览缩略图失败 → 本地兜底；catchtap 已阻止误触勾选 */
+    onPreviewImgError(e) {
+        var _a;
+        const index = Number(e.currentTarget.dataset.index);
+        if (Number.isNaN(index))
+            return;
+        if (((_a = this.data.shops[index]) === null || _a === void 0 ? void 0 : _a.displaySrc) === media_1.SHOP_PLACEHOLDER)
+            return;
+        this.setData({ [`shops[${index}].displaySrc`]: media_1.SHOP_PLACEHOLDER });
+    },
+    noop() { },
     selectAll() {
         const shops = this.data.shops.map((s) => (Object.assign(Object.assign({}, s), { checked: true })));
         this.setData({ shops, selectedCount: shops.length });

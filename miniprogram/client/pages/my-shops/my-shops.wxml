@@ -1,4 +1,13 @@
 <view class="page">
+  <!-- 顶栏右侧头像：点进账号页可退出/撤权；标题仍用系统导航「我的店」 -->
+  <view class="topbar">
+    <view class="topbar-hint muted">你的收藏</view>
+    <view class="avatar-entry" bindtap="goAccount" hover-class="avatar-hover">
+      <image wx:if="{{avatar}}" class="me-av" src="{{avatar}}" mode="aspectFill" />
+      <view wx:else class="me-av text">{{initial}}</view>
+    </view>
+  </view>
+
   <view class="actions card">
     <view class="action" bindtap="goImport">
       <view class="icon import"></view>
@@ -22,14 +31,16 @@
     </block>
   </view>
 
-  <view class="empty card" wx:elif="{{!loading}}">
-    <view class="empty-title">还没有店铺</view>
-    <view class="muted empty-desc">
-      从大众点评导入公开专辑，或点上面「记美食」记下你现在的位置。
+  <view class="empty card empty-stage" wx:elif="{{!loading}}">
+    <view class="empty-inner">
+      <view class="empty-title">还没有店铺</view>
+      <view class="muted empty-desc">
+        从大众点评导入公开专辑，或点上面「记美食」记下你现在的位置。
+      </view>
+      <button class="btn-primary btn-block" bindtap="goImport">导入点评收藏</button>
+      <button class="btn-ghost btn-block empty-secondary" bindtap="goLocate">
+        记一笔美食
+      </button>
     </view>
-    <button class="btn-primary btn-block" bindtap="goImport">导入点评收藏</button>
-    <button class="btn-ghost btn-block" style="margin-top: 16rpx;" bindtap="goLocate">
-      记一笔美食
-    </button>
   </view>
 </view>

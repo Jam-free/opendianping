@@ -1,7 +1,11 @@
 <view class="page" wx:if="{{shop}}">
   <view class="card hero">
-    <image wx:if="{{headImgFull}}" class="hero-img" src="{{headImgFull}}" mode="aspectFill" />
-    <view wx:else class="hero-img placeholder"></view>
+    <image
+      class="hero-img"
+      src="{{displaySrc}}"
+      mode="aspectFill"
+      binderror="onImgError"
+    />
     <view class="title-row">
       <view class="h1">{{shop.name}}</view>
       <view class="dist muted" wx:if="{{!dist.na}}">{{dist.main}}{{dist.unit}}</view>

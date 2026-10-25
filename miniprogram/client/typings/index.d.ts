@@ -38,6 +38,10 @@ declare const App: (options: Record<string, any>) => void;
 declare const Page: (options: Record<string, any>) => void;
 declare const Component: (options: Record<string, any>) => void;
 declare const getApp: <T = any>() => T;
+declare const getCurrentPages: () => Array<{
+  route?: string;
+  options?: Record<string, string>;
+}>;
 declare const wx: {
   login: (opts: any) => void;
   request: (opts: any) => void;
@@ -46,6 +50,7 @@ declare const wx: {
   showModal: (opts: any) => void;
   navigateTo: (opts: any) => void;
   redirectTo: (opts: any) => void;
+  reLaunch: (opts: any) => void;
   switchTab: (opts: any) => void;
   navigateBack: (opts?: any) => void;
   setStorageSync: (k: string, v: any) => void;

@@ -5,6 +5,7 @@ import { SlidingWindowRateLimiter } from '../rate-limit.js';
 import { parseUserInput } from '../adapters/index.js';
 import type { ParseInput } from '../adapters/types.js';
 import type { FavoriteVisibility, ParsedShop, SourceType } from '../types.js';
+import { buildProxyPath } from './media-proxy.js';
 
 export const importRateLimiter = new SlidingWindowRateLimiter(
   config.importRateLimitPerMin
@@ -58,9 +59,15 @@ export async function parseImport(
     expiresAt: Date.now() + 30 * 60_000,
   });
 
+  // 预览卡片与「我的店」列表统一走代理路径，客户端不拼外链域名
+  const shopsForClient = parsed.shops.map((s) => ({
+    ...s,
+    headImgProxy: s.headImg ? buildProxyPath(s.headImg) : null,
+  }));
+
   return {
     previewId,
-    shops: parsed.shops,
+    shops: shopsForClient,
     adapter: parsed.adapter,
     truncated: parsed.truncated,
     message: parsed.message,

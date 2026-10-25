@@ -1,19 +1,60 @@
-import { request, buildQuery } from '../../utils/api';
+import {
+  request,
+  buildQuery,
+  peekCachedUser,
+  saveCachedUser,
+  hasSession,
+  goLoginGate,
+} from '../../utils/api';
 import { getUserLocation } from '../../utils/location';
 import { getActiveCircleId } from '../../utils/circle';
+import { avatarInitial } from '../../utils/format';
 
+/**
+ * 「我的店」：默认主页。核心路径是导入/看收藏；顶栏头像进账号可撤权。
+ */
 Page({
   data: {
     loading: true,
     shops: [] as any[],
+    avatar: '',
+    initial: '?',
   },
 
   onShow() {
+    if (!hasSession()) {
+      goLoginGate();
+      return;
+    }
+    this.hydrateMe();
     this.load();
   },
 
   onPullDownRefresh() {
     this.load().finally(() => wx.stopPullDownRefresh());
+  },
+
+  hydrateMe() {
+    const cached = peekCachedUser();
+    if (cached) {
+      this.setData({
+        avatar: cached.avatar || '',
+        initial: avatarInitial(cached.nickname),
+      });
+    }
+    request<{
+      user: { id: string; nickname?: string | null; avatar?: string | null };
+    }>('/api/me')
+      .then((me) => {
+        saveCachedUser(me.user);
+        this.setData({
+          avatar: me.user.avatar || '',
+          initial: avatarInitial(me.user.nickname),
+        });
+      })
+      .catch(() => {
+        /* 401 会踢回登录 */
+      });
   },
 
   async load() {
@@ -32,6 +73,10 @@ Page({
       this.setData({ loading: false });
       wx.showToast({ title: (err as Error).message, icon: 'none' });
     }
+  },
+
+  goAccount() {
+    wx.navigateTo({ url: '/pages/account/account' });
   },
 
   goImport() {

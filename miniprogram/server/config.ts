@@ -33,6 +33,8 @@ export const config = {
   devAuthBypass: envBool('DEV_AUTH_BYPASS', true),
   devOpenIdPrefix: process.env.DEV_OPENID_PREFIX || 'dev_',
   amapKey: process.env.AMAP_KEY || '',
+  /** 腾讯位置服务 Key（逆地理 / 文本补 POI）；与 AMAP_KEY 二选一即可 */
+  tencentMapKey: process.env.TENCENT_MAP_KEY || '',
   /** 邀请 token 有效天数 */
   inviteTokenDays: 7,
   circleMemberLimit: 200,

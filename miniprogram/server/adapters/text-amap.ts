@@ -24,18 +24,26 @@ export class TextAmapAdapter implements SourceAdapter {
     const truncated = names.length > max;
     const slice = truncated ? names.slice(0, max) : names;
 
+    const hasMapKey = Boolean(config.amapKey || config.tencentMapKey);
     const shops: ParsedShop[] = [];
     for (const name of slice) {
+      // 有高德用高德；否则用腾讯。字段仍写入 amapPoiId 槽位（通用 POI id）
       const matched = config.amapKey
         ? await matchAmapPoi(name, config.amapKey)
-        : null;
+        : config.tencentMapKey
+          ? await matchTencentPoi(name, config.tencentMapKey)
+          : null;
 
       const shop: ParsedShop = {
         name: matched?.name || name,
         sourceType: matched ? 'amap' : 'text',
-        sourceLabel: matched ? '高德匹配' : '文本识别',
+        sourceLabel: matched
+          ? config.amapKey
+            ? '高德匹配'
+            : '腾讯地图匹配'
+          : '文本识别',
       };
-      // 只有高德真正返回的字段才写入；禁止占位假数据
+      // 只有地图服务真正返回的字段才写入；禁止占位假数据
       if (matched?.address) shop.address = matched.address;
       if (matched?.avgPrice) shop.avgPrice = matched.avgPrice;
       if (matched?.category) shop.category = matched.category;
@@ -54,8 +62,8 @@ export class TextAmapAdapter implements SourceAdapter {
       truncated,
       message: truncated
         ? `识别到超过 ${max} 家，已截断`
-        : !config.amapKey
-          ? '未配置 AMAP_KEY：仅返回店名，未匹配 POI'
+        : !hasMapKey
+          ? '未配置地图 Key：仅返回店名，未匹配 POI'
           : undefined,
     };
   }
@@ -142,6 +150,51 @@ async function matchAmapPoi(
       city: poi.cityname || undefined,
       lat: Number.isFinite(lat) ? lat : undefined,
       lng: Number.isFinite(lng) ? lng : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** 腾讯地点搜索；配额用尽时静默返回 null，不阻断导入 */
+async function matchTencentPoi(
+  name: string,
+  key: string
+): Promise<AmapMatch | null> {
+  const url = new URL('https://apis.map.qq.com/ws/place/v1/search');
+  url.searchParams.set('keyword', name);
+  url.searchParams.set('boundary', 'region(全国,0)');
+  url.searchParams.set('page_size', '1');
+  url.searchParams.set('page_index', '1');
+  url.searchParams.set('key', key);
+
+  try {
+    const res = await fetch(url.toString(), {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      status?: number;
+      data?: Array<{
+        id?: string;
+        title?: string;
+        address?: string;
+        category?: string;
+        ad_info?: { city?: string; district?: string };
+        location?: { lat?: number; lng?: number };
+      }>;
+    };
+    if (data.status !== 0 || !data.data?.[0]?.id) return null;
+    const poi = data.data[0];
+    return {
+      name: poi.title || name,
+      amapPoiId: poi.id,
+      address: poi.address || undefined,
+      category: poi.category || undefined,
+      district: poi.ad_info?.district,
+      city: poi.ad_info?.city,
+      lat: poi.location?.lat,
+      lng: poi.location?.lng,
     };
   } catch {
     return null;

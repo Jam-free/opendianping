@@ -2,11 +2,10 @@ import { config } from '../config.js';
 import type { SourceAdapterName } from '../config.js';
 import type { ParseInput, ParseResult, SourceAdapter } from './types.js';
 import { TextAmapAdapter, extractShopNames } from './text-amap.js';
+import { parseAlbumId } from './album-fetch.js';
 
 /**
- * 懒加载适配器：云托管镜像不含仓库根 lib/fetcher，
- * 若启动时静态 import OpenDianpingAdapter 会直接崩溃。
- * 仅在真正选用 opendianping 时再动态加载。
+ * 懒加载：有专辑链接时强制走 opendianping（内置 album-fetch，不依赖根目录 lib）。
  */
 const cache: Partial<Record<SourceAdapterName, SourceAdapter>> = {
   text_amap: new TextAmapAdapter(),
@@ -17,17 +16,9 @@ async function loadAdapter(name: SourceAdapterName): Promise<SourceAdapter> {
   if (hit) return hit;
 
   if (name === 'opendianping') {
-    try {
-      const mod = await import('./opendianping.js');
-      cache.opendianping = new mod.OpenDianpingAdapter();
-      return cache.opendianping;
-    } catch (err) {
-      console.warn(
-        '[adapter] opendianping 不可用（缺少 lib/fetcher），回退 text_amap',
-        err
-      );
-      return cache.text_amap!;
-    }
+    const mod = await import('./opendianping.js');
+    cache.opendianping = new mod.OpenDianpingAdapter();
+    return cache.opendianping;
   }
 
   return cache.text_amap!;
@@ -39,21 +30,23 @@ export async function getAdapter(
   return loadAdapter(name);
 }
 
-/**
- * 解析入口：主适配器失败且输入像「纯文本」时，自动降级到方案 B。
- */
 export async function parseUserInput(
   input: ParseInput,
   preferred?: SourceAdapterName
 ): Promise<ParseResult & { adapter: string }> {
-  const primaryName = preferred || config.sourceAdapter;
+  // 用户贴了专辑链接：必须走方案 A，不能被 text_amap 剥掉链接
+  const hasAlbum = Boolean(parseAlbumId(input.text));
+  const primaryName: SourceAdapterName = hasAlbum
+    ? 'opendianping'
+    : preferred || config.sourceAdapter;
+
   const primary = await getAdapter(primaryName);
   const result = await primary.parse(input);
 
   if (
     result.shops.length === 0 &&
     primaryName === 'opendianping' &&
-    !/albumid[=:]\d+/i.test(input.text)
+    !hasAlbum
   ) {
     const names = extractShopNames(input.text);
     const looksLikeList = names.length >= 2 || /\n/.test(input.text);

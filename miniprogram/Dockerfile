@@ -16,7 +16,7 @@ ENV NODE_ENV=production
 ENV PORT=80
 ENV DB_PATH=/data/miniprogram.db
 ENV DEV_AUTH_BYPASS=false
-ENV SOURCE_ADAPTER=text_amap
+ENV SOURCE_ADAPTER=opendianping
 
 EXPOSE 80
 CMD ["npx", "tsx", "server/index.ts"]

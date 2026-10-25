@@ -71,7 +71,8 @@ export function createApp() {
   app.use(express.json({ limit: '1mb' }));
 
   app.get('/health', (_req, res) => {
-    res.json({ ok: true });
+    // albumImport=true 表示本镜像可解析点评公开专辑（不依赖根目录 lib）
+    res.json({ ok: true, albumImport: true });
   });
 
   app.get(

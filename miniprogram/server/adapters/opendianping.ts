@@ -1,18 +1,17 @@
-import { parseAlbumUrl, fetchAlbumData } from '../../../lib/fetcher.js';
 import { config } from '../config.js';
 import type { ParsedShop } from '../types.js';
 import type { ParseInput, ParseResult, SourceAdapter } from './types.js';
+import { fetchAlbumShops, parseAlbumId } from './album-fetch.js';
 
 /**
- * 方案 A：复用仓库 lib/fetcher 的公开专辑导入能力。
- * 产品决策：只读用户主动分享的公开专辑；不登录、不绕验证。
- * shopId 仅透传接口返回值，本地不生成点评 shopId。
+ * 方案 A：解析大众点评公开专辑链接。
+ * 云托管版内置 album-fetch，不依赖仓库根 lib/fetcher。
  */
 export class OpenDianpingAdapter implements SourceAdapter {
   readonly name = 'opendianping';
 
   async parse(input: ParseInput): Promise<ParseResult> {
-    const albumId = parseAlbumUrl(input.text);
+    const albumId = parseAlbumId(input.text);
     if (!albumId) {
       return {
         shops: [],
@@ -23,43 +22,54 @@ export class OpenDianpingAdapter implements SourceAdapter {
       };
     }
 
-    const { album, shops: rawShops } = await fetchAlbumData(
-      albumId,
-      Boolean(input.useFixtures)
-    );
+    let title = `专辑${albumId}`;
+    let rawShops: Awaited<ReturnType<typeof fetchAlbumShops>>['shops'] = [];
+    try {
+      const data = await fetchAlbumShops(albumId);
+      title = data.title;
+      rawShops = data.shops;
+    } catch (err) {
+      console.error('[opendianping] fetch album failed', err);
+      return {
+        shops: [],
+        sourceType: 'dianping_album',
+        truncated: false,
+        message: `专辑拉取失败：${(err as Error).message || '网络错误'}。请确认链接公开可访问后重试。`,
+      };
+    }
 
     const max = config.importMaxShops;
     const truncated = rawShops.length > max;
     const slice = truncated ? rawShops.slice(0, max) : rawShops;
 
-    const shops: ParsedShop[] = slice
-      .filter((s) => Boolean(s.shopId) && Boolean(s.title))
-      .map((s) => {
-        const shop: ParsedShop = {
-          name: String(s.title),
-          sourceType: 'dianping_album',
-          sourceLabel: '点评专辑',
-          sourceShopId: String(s.shopId),
-        };
-        if (s.avgPrice) shop.avgPrice = String(s.avgPrice);
-        if (s.category) shop.category = String(s.category);
-        if (s.region) shop.district = String(s.region);
-        if (s.city) shop.city = String(s.city);
-        if (s.webUrl) shop.sourceUrl = String(s.webUrl);
-        if (typeof s.lat === 'number' && s.lat !== 0) shop.lat = s.lat;
-        if (typeof s.lng === 'number' && s.lng !== 0) shop.lng = s.lng;
-        if (s.headImg) shop.headImg = String(s.headImg);
-        return shop;
-      });
+    const shops: ParsedShop[] = slice.map((s) => {
+      const shop: ParsedShop = {
+        name: s.title,
+        sourceType: 'dianping_album',
+        sourceLabel: '点评专辑',
+        sourceShopId: s.shopId,
+      };
+      if (s.avgPrice) shop.avgPrice = s.avgPrice;
+      if (s.category) shop.category = s.category;
+      if (s.region) shop.district = s.region;
+      if (s.city) shop.city = s.city;
+      if (s.webUrl) shop.sourceUrl = s.webUrl;
+      if (s.lat) shop.lat = s.lat;
+      if (s.lng) shop.lng = s.lng;
+      if (s.headImg) shop.headImg = s.headImg;
+      return shop;
+    });
 
     return {
       shops,
-      albumId: String(album.albumId),
+      albumId: String(albumId),
       sourceType: 'dianping_album',
       truncated,
       message: truncated
-        ? `专辑「${album.title}」超过 ${max} 家，已截断；可分批导入`
-        : undefined,
+        ? `专辑「${title}」超过 ${max} 家，已截断；可分批导入`
+        : shops.length
+          ? undefined
+          : `专辑「${title}」里没有可导入的店铺（可能非公开或已失效）`,
     };
   }
 }

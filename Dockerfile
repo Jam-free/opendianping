@@ -1,6 +1,6 @@
 # 微信云托管（仓库根为构建上下文）
 # 控制台：目标目录留空；Dockerfile 名称填 Dockerfile
-# 含 lib/fetcher，可解析大众点评公开专辑链接
+# 专辑解析已内置 miniprogram/server/adapters/album-fetch.ts，不再依赖根目录 lib
 FROM node:22-bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -9,16 +9,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# 根目录依赖：lib/fetcher 需要 node-html-parser 等
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev || npm install --omit=dev
-
 COPY miniprogram/package.json miniprogram/package-lock.json ./miniprogram/
 WORKDIR /app/miniprogram
 RUN npm ci || npm install
 
 WORKDIR /app
-COPY lib ./lib
 COPY miniprogram ./miniprogram
 
 WORKDIR /app/miniprogram

@@ -7,7 +7,13 @@
 }
 
 .empty {
-  padding: 48rpx 32rpx;
+  padding: 64rpx 40rpx;
+  text-align: center;
+  min-height: 40vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 .empty-title {

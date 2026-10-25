@@ -99,7 +99,13 @@
 }
 
 .empty {
-  padding: 48rpx 32rpx;
+  padding: 64rpx 40rpx;
+  text-align: center;
+  min-height: 42vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 .empty-title {
@@ -111,6 +117,7 @@
 .empty-desc {
   margin-bottom: 32rpx;
   line-height: 1.6;
+  text-align: center;
 }
 
 .mask {

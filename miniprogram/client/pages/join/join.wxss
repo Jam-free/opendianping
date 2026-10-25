@@ -1,9 +1,15 @@
 .page {
-  padding: 48rpx 32rpx;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 48rpx 32rpx calc(48rpx + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .block {
-  padding: 40rpx 32rpx;
+  padding: 48rpx 36rpx;
+  text-align: center;
 }
 
 .h1 {
@@ -13,6 +19,7 @@
 }
 
 .desc {
-  margin: 24rpx 0 36rpx;
-  line-height: 1.6;
+  margin: 28rpx 0 40rpx;
+  line-height: 1.65;
+  text-align: left;
 }

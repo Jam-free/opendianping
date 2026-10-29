@@ -149,7 +149,7 @@
   height: 96rpx;
   margin: 0 auto 28rpx;
   border-radius: 50%;
-  background: #e8f2ff;
+  background: var(--primary-soft);
   color: var(--primary);
   font-size: 48rpx;
   font-weight: 700;
@@ -173,10 +173,12 @@
   margin-top: 48rpx;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 16rpx;
 }
 
 .result-actions .btn-ghost,
 .result-actions .btn-primary {
   margin: 0;
+  width: 100%;
 }

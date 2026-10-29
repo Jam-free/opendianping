@@ -12,6 +12,7 @@ exports.request = request;
 exports.openNavigation = openNavigation;
 exports.buildQuery = buildQuery;
 const config_1 = require("./config");
+const cloud_1 = require("./cloud");
 function getAppSafe() {
     return getApp();
 }
@@ -192,14 +193,18 @@ async function request(path, options = {}) {
         }
         token = await ensureLogin();
     }
+    // 资源复用：必须用带 resourceAppid 的 Cloud 实例，不能直接 wx.cloud.callContainer
+    const cloud = await (0, cloud_1.getSharedCloud)();
     return new Promise((resolve, reject) => {
-        wx.request({
-            url: `${config_1.API_BASE}${path}`,
+        cloud.callContainer({
+            config: { env: config_1.CLOUD_ENV },
+            path,
             method: options.method || 'GET',
+            header: Object.assign({ 'X-WX-SERVICE': config_1.CLOUD_SERVICE, 'content-type': 'application/json' }, (token ? { Authorization: `Bearer ${token}` } : {})),
             data: options.data,
-            header: Object.assign({ 'content-type': 'application/json' }, (token ? { Authorization: `Bearer ${token}` } : {})),
+            timeout: 15000,
             success(res) {
-                const status = res.statusCode || 0;
+                const status = res.statusCode || res.status || 0;
                 const body = res.data;
                 if (status >= 200 && status < 300) {
                     resolve(body);
@@ -208,12 +213,21 @@ async function request(path, options = {}) {
                 if (status === 401 && auth) {
                     goLoginGate();
                 }
-                const errMsg = (body === null || body === void 0 ? void 0 : body.error) ||
+                const errMsg = (body && body.error) ||
                     (status === 503 ? '服务暂时不可用(503)' : `请求失败(${status})`);
                 reject(new Error(errMsg));
             },
             fail(err) {
-                reject(new Error(err.errMsg || '网络错误'));
+                const raw = (err === null || err === void 0 ? void 0 : err.errMsg) || '';
+                if (/resourceAppid|Authorization mismatch|Invalid AppId/i.test(raw)) {
+                    reject(new Error('还没连上美食探索的云，请确认资源复用已关联'));
+                    return;
+                }
+                if (/invalid_host|102002|service|not exist/i.test(raw)) {
+                    reject(new Error('云服务名对不上，请确认是 feimaocat-api'));
+                    return;
+                }
+                reject(new Error(raw || '网络错误'));
             },
         });
     });

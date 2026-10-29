@@ -1,7 +1,7 @@
 <view class="page">
   <view class="card" wx:if="{{circle}}">
     <view class="top">
-      <view class="sub">美食肥猫 · 小程序</view>
+      <view class="sub">我和我爱吃的朋友们</view>
       <view class="title">来「{{circle.name}}」<text>\n</text>一起收藏好店</view>
     </view>
     <view class="kv">

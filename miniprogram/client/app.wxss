@@ -26,6 +26,7 @@ page {
   color: var(--ink);
 }
 
+/* 微信 button 自带 margin / 收缩宽度，不强制拉满就会靠左 */
 .btn-primary,
 .btn-ghost,
 .btn-outline {
@@ -35,9 +36,11 @@ page {
   line-height: 1.4;
   padding: 0 32rpx;
   min-height: 88rpx;
-  display: inline-flex;
+  margin: 0;
+  display: flex;
   align-items: center;
   justify-content: center;
+  text-align: center;
   box-sizing: border-box;
 }
 
@@ -74,7 +77,10 @@ page {
 }
 
 .btn-block {
-  width: 100%;
+  width: 100% !important;
+  display: flex;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
 .page-pad {

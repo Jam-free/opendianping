@@ -1,4 +1,5 @@
-import { API_BASE } from './config';
+import { CLOUD_ENV, CLOUD_SERVICE } from './config';
+import { getSharedCloud } from './cloud';
 
 type Json = Record<string, unknown>;
 
@@ -214,17 +215,23 @@ export async function request<T>(
     token = await ensureLogin();
   }
 
+  // 资源复用：必须用带 resourceAppid 的 Cloud 实例，不能直接 wx.cloud.callContainer
+  const cloud = await getSharedCloud();
+
   return new Promise((resolve, reject) => {
-    wx.request({
-      url: `${API_BASE}${path}`,
+    cloud.callContainer({
+      config: { env: CLOUD_ENV },
+      path,
       method: options.method || 'GET',
-      data: options.data,
       header: {
+        'X-WX-SERVICE': CLOUD_SERVICE,
         'content-type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      success(res) {
-        const status = res.statusCode || 0;
+      data: options.data,
+      timeout: 15000,
+      success(res: { statusCode?: number; status?: number; data?: { error?: string } & T }) {
+        const status = res.statusCode || res.status || 0;
         const body = res.data as { error?: string } & T;
         if (status >= 200 && status < 300) {
           resolve(body);
@@ -234,12 +241,21 @@ export async function request<T>(
           goLoginGate();
         }
         const errMsg =
-          body?.error ||
+          (body && body.error) ||
           (status === 503 ? '服务暂时不可用(503)' : `请求失败(${status})`);
         reject(new Error(errMsg));
       },
-      fail(err) {
-        reject(new Error(err.errMsg || '网络错误'));
+      fail(err: { errMsg?: string }) {
+        const raw = err?.errMsg || '';
+        if (/resourceAppid|Authorization mismatch|Invalid AppId/i.test(raw)) {
+          reject(new Error('还没连上美食探索的云，请确认资源复用已关联'));
+          return;
+        }
+        if (/invalid_host|102002|service|not exist/i.test(raw)) {
+          reject(new Error('云服务名对不上，请确认是 feimaocat-api'));
+          return;
+        }
+        reject(new Error(raw || '网络错误'));
       },
     });
   });

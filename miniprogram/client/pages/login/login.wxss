@@ -1,43 +1,25 @@
 .page-stage {
   min-height: 100vh;
   box-sizing: border-box;
-  padding: 0 48rpx calc(80rpx + env(safe-area-inset-bottom));
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.hero {
-  flex: 1;
+  padding: 0 64rpx calc(48rpx + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   justify-content: center;
+}
+
+.hero {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   text-align: center;
-  padding-top: 80rpx;
 }
 
 .mark {
-  width: 120rpx;
-  height: 120rpx;
-  border-radius: 36rpx;
-  background: linear-gradient(145deg, #3d7eff 0%, #6ba3ff 100%);
-  margin-bottom: 36rpx;
-  position: relative;
-  box-shadow: 0 12rpx 32rpx rgba(61, 126, 255, 0.28);
-}
-
-.mark::after {
-  content: '';
-  position: absolute;
-  left: 36rpx;
-  top: 44rpx;
-  width: 48rpx;
-  height: 28rpx;
-  border: 6rpx solid #fff;
-  border-radius: 0 0 28rpx 28rpx;
-  border-top: none;
-  box-sizing: border-box;
+  width: 200rpx;
+  height: 200rpx;
+  border-radius: 44rpx;
+  margin-bottom: 40rpx;
 }
 
 .brand {
@@ -54,8 +36,27 @@
   max-width: 520rpx;
 }
 
-.actions {
-  padding-bottom: 24rpx;
+/* 微信按钮默认会缩成内容宽度并靠左，这里拉满并跟头像用同一种珊瑚红 */
+.login-btn {
+  width: 100%;
+  margin: 56rpx 0 0;
+  padding: 0;
+  height: 96rpx;
+  line-height: 96rpx;
+  background: #ff6b4a;
+  color: #fff;
+  border: none;
+  border-radius: 16rpx;
+  font-size: 32rpx;
+  font-weight: 600;
+}
+
+.login-btn::after {
+  border: none;
+}
+
+.login-btn.button-hover {
+  background: #e85a3c;
 }
 
 .hint {

@@ -1,7 +1,15 @@
 {
-  "description": "开放点评 · 导入收藏 + 共享收藏圈",
+  "description": "我和我爱吃的朋友们 · 导入收藏 + 和朋友共享好店",
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      { "type": "folder", "value": "pages/index" },
+      { "type": "folder", "value": "pages/invite" },
+      { "type": "folder", "value": "pages/locate" },
+      { "type": "folder", "value": "pages/circles" },
+      { "type": "folder", "value": "pages/circle-detail" },
+      { "type": "folder", "value": "pages/favorites" },
+      { "type": "folder", "value": "components/bottom-bar" }
+    ],
     "include": []
   },
   "setting": {

@@ -104,8 +104,14 @@
   min-height: 42vh;
   display: flex;
   flex-direction: column;
+  align-items: center;
   justify-content: center;
   box-sizing: border-box;
+}
+
+.empty .btn-block {
+  width: 100%;
+  max-width: 560rpx;
 }
 
 .empty-title {

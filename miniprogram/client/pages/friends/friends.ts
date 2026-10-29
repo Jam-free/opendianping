@@ -91,10 +91,10 @@ Page({
   onShareAppMessage() {
     const { networkId, inviteToken } = this.data;
     if (!networkId || !inviteToken) {
-      return { title: '美食肥猫 · 一起收藏好店', path: '/pages/friends/friends' };
+      return { title: '我和我爱吃的朋友们 · 一起收藏好店', path: '/pages/friends/friends' };
     }
     return {
-      title: '来美食肥猫，一起共享收藏的店',
+      title: '来我和我爱吃的朋友们，一起共享收藏的店',
       path: `/pages/join/join?c=${networkId}&t=${inviteToken}`,
     };
   },

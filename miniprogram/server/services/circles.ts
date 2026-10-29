@@ -282,6 +282,8 @@ type CircleShopRow = {
   collector_avatar: string | null;
   note: string | null;
   favorited_at: string;
+  source_url: string | null;
+  source_shop_id: string | null;
 };
 
 export type AggregatedCircleShop = {
@@ -296,6 +298,8 @@ export type AggregatedCircleShop = {
   lat?: number;
   lng?: number;
   sourceType: string;
+  sourceUrl?: string;
+  sourceShopId?: string;
   headImg?: string;
   headImgProxy?: string;
   collectorCount: number;
@@ -306,7 +310,11 @@ export type AggregatedCircleShop = {
     avatar: string | null;
     note: string | null;
     favoritedAt: string;
+    favoriteId?: string;
   }>;
+  /** 当前用户在这家店上的收藏（用于改自己的备注） */
+  myFavoriteId?: string;
+  myNote?: string;
   distanceMeters?: number;
   distanceLabel?: string;
   hasCoords: boolean;
@@ -331,6 +339,8 @@ function queryCircleShopRows(
       s.lat,
       s.lng,
       s.source_type,
+      s.source_url,
+      s.source_shop_id,
       s.head_img,
       f.id AS favorite_id,
       f.user_id AS collector_id,
@@ -397,14 +407,22 @@ function aggregateCircleShops(rows: CircleShopRow[]): AggregatedCircleShop[] {
         agg.lat = r.lat;
         agg.lng = r.lng;
       }
+      if (r.source_url) agg.sourceUrl = r.source_url;
+      if (r.source_shop_id) agg.sourceShopId = r.source_shop_id;
       if (r.head_img) {
         agg.headImg = r.head_img;
         agg.headImgProxy = buildProxyPath(r.head_img);
       }
       map.set(r.poi_key, agg);
-    } else if (!agg.headImg && r.head_img) {
-      agg.headImg = r.head_img;
-      agg.headImgProxy = buildProxyPath(r.head_img);
+    } else {
+      if (!agg.headImg && r.head_img) {
+        agg.headImg = r.head_img;
+        agg.headImgProxy = buildProxyPath(r.head_img);
+      }
+      if (!agg.sourceUrl && r.source_url) agg.sourceUrl = r.source_url;
+      if (!agg.sourceShopId && r.source_shop_id) {
+        agg.sourceShopId = r.source_shop_id;
+      }
     }
 
     const existing = agg.collectors.find((c) => c.userId === r.collector_id);
@@ -415,6 +433,7 @@ function aggregateCircleShops(rows: CircleShopRow[]): AggregatedCircleShop[] {
         avatar: r.collector_avatar,
         note: r.note,
         favoritedAt: r.favorited_at,
+        favoriteId: r.favorite_id,
       });
     }
   }
@@ -540,6 +559,22 @@ export function getCircleShopDetail(
       shopCity: shop.city,
     });
   }
+
+  const mine = shop.collectors.find((c) => c.userId === userId);
+  if (mine) {
+    shop.myFavoriteId = mine.favoriteId;
+    shop.myNote = mine.note || '';
+  } else {
+    shop.myNote = '';
+  }
+  // 朋友备注列表里不重复展示「我」——我的备注单独编辑
+  shop.collectors = shop.collectors.filter((c) => c.userId !== userId);
+  shop.collectorCount = shop.collectors.length;
+  shop.recommendersLine = formatRecommendersLine(
+    shop.collectors,
+    shop.collectorCount
+  );
+
   return shop;
 }
 

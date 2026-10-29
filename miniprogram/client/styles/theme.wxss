@@ -1,12 +1,13 @@
-/* 微信读书风：浅灰底、白卡片、蓝色主操作 */
+/* 暖色主操作：跟登录页、头像同一套珊瑚红 */
 page {
   --bg: #f5f5f5;
   --card: #ffffff;
   --ink: #111111;
   --sub: #8a8a8a;
   --line: #eeeeee;
-  --primary: #3d7eff;
-  --primary-press: #2f6ae6;
+  --primary: #ff6b4a;
+  --primary-press: #e85a3c;
+  --primary-soft: #fff0ec;
   --placeholder: #f0f0f0;
   --success: #1a7f4b;
   --danger: #e05a5a;

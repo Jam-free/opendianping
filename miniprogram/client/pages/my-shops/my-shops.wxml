@@ -13,7 +13,7 @@
       <view class="icon import"></view>
       <text>导入</text>
     </view>
-    <view class="action muted-action" bindtap="goConnectAi">
+    <view class="action" bindtap="goConnectAi">
       <view class="icon ai"></view>
       <text>连接 AI</text>
     </view>

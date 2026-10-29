@@ -10,6 +10,13 @@
 .block {
   padding: 48rpx 36rpx;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.block .btn-block {
+  width: 100%;
 }
 
 .h1 {

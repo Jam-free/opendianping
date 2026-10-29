@@ -28,9 +28,30 @@
     </view>
   </view>
 
-  <view class="card block" wx:if="{{shop.collectors.length}}">
-    <view class="sec">{{shop.collectorCount}} 位朋友的备注</view>
-    <block wx:for="{{shop.collectors}}" wx:key="userId">
+  <view class="card block note-edit">
+    <view class="sec">我的备注</view>
+    <view class="muted tip">写给自己和朋友看：推荐菜、避雷、什么时候去合适……</view>
+    <textarea
+      class="note-input"
+      maxlength="200"
+      placeholder="还没有备注，点这里写一句"
+      value="{{draftNote}}"
+      bindinput="onNoteInput"
+      auto-height
+    />
+    <button
+      class="btn-primary btn-block"
+      loading="{{savingNote}}"
+      bindtap="saveNote"
+    >
+      保存备注
+    </button>
+  </view>
+
+  <view class="card block" wx:if="{{friendNotes.length}}">
+    <view class="sec">{{friendNotes.length}} 位朋友的备注</view>
+    <view class="muted tip">只能看朋友写的，改不了别人的字。</view>
+    <block wx:for="{{friendNotes}}" wx:key="userId">
       <view class="note hairline">
         <image wx:if="{{item.avatar}}" class="av" src="{{item.avatar}}" mode="aspectFill" />
         <view wx:else class="av text">{{item.initial}}</view>
@@ -42,5 +63,12 @@
     </block>
   </view>
 
+  <button
+    wx:if="{{dianpingUrl}}"
+    class="btn-ghost btn-block dianping"
+    bindtap="openDianping"
+  >
+    在大众点评打开
+  </button>
   <button class="btn-primary btn-block nav" bindtap="onNav">导航到这里</button>
 </view>

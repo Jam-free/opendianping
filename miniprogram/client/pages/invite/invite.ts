@@ -31,7 +31,7 @@ Page({
   onShareAppMessage() {
     const { circle, inviteToken } = this.data;
     if (!circle || !inviteToken) {
-      return { title: '美食肥猫 · 一起收藏好店', path: '/pages/index/index' };
+      return { title: '我和我爱吃的朋友们 · 一起收藏好店', path: '/pages/index/index' };
     }
     return {
       title: `邀请你加入「${circle.name}」`,

@@ -43,6 +43,17 @@ declare const getCurrentPages: () => Array<{
   options?: Record<string, string>;
 }>;
 declare const wx: {
+  cloud?: {
+    init: (opts?: { env?: string; traceUser?: boolean }) => void;
+    callContainer: (opts: any) => void;
+    Cloud?: new (opts: {
+      resourceAppid: string;
+      resourceEnv: string;
+    }) => {
+      init: () => Promise<void> | void;
+      callContainer: (opts: any) => void;
+    };
+  };
   login: (opts: any) => void;
   request: (opts: any) => void;
   showShareMenu: (opts: any) => void;

@@ -1,6 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const cloud_1 = require("./utils/cloud");
 /**
  * 小程序入口。
  * 设计决策：启动不再静默登录——首屏是登录门禁；有票由登录页验过后进「我的店」。
+ * 云要尽早就绪：肥猫借用美食探索的云托管，初始化比本机环境多一步。
  * withShareTicket：分享到群后，打开者可拿到群信息用于「仅本群可加入」校验。
  */
 App({
@@ -10,6 +14,7 @@ App({
         user: null,
     },
     onLaunch() {
+        (0, cloud_1.warmCloud)();
         wx.showShareMenu({
             withShareTicket: true,
             menus: ['shareAppMessage', 'shareTimeline'],

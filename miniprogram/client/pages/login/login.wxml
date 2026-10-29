@@ -1,18 +1,11 @@
 <view class="page page-stage">
   <view class="hero">
-    <view class="mark" aria-hidden="true"></view>
-    <view class="brand">美食肥猫</view>
+    <image class="mark" src="/assets/app-icon.jpg" mode="aspectFill" />
+    <view class="brand">我和我爱吃的朋友们</view>
     <view class="pitch muted">
       把大众点评收藏搬进来，记美食、看自己的店，再和好友慢慢共享。
     </view>
-  </view>
-
-  <view class="actions">
-    <button
-      class="btn-primary btn-block"
-      loading="{{busy}}"
-      bindtap="onLogin"
-    >
+    <button class="login-btn" loading="{{busy}}" bindtap="onLogin">
       {{bypass ? '一键进入' : '微信登录'}}
     </button>
     <view class="hint muted" wx:if="{{bypass}}">

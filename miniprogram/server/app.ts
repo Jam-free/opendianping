@@ -3,7 +3,11 @@ import express, {
   type Request,
   type Response,
 } from 'express';
-import { loginWithWxCode, resolveSession } from './auth.js';
+import {
+  loginWithWxCode,
+  readWxGatewayIdentity,
+  resolveSession,
+} from './auth.js';
 import { config } from './config.js';
 import {
   parseImport,
@@ -134,7 +138,9 @@ export function createApp() {
     '/api/auth/login',
     asyncHandler(async (req, res) => {
       const code = String(req.body?.code || '');
-      const { token, user } = await loginWithWxCode(code);
+      // 小程序 callContainer 会带上网关身份；公网 curl 没有这些头，再走 code 换票
+      const gateway = readWxGatewayIdentity((name) => req.header(name));
+      const { token, user } = await loginWithWxCode(code, { gateway });
       // 登录后静默确保个人美食网，前端不再出现「创建圈子」
       const net = await network.ensurePersonalNetwork(user.id);
       res.json({

@@ -2,46 +2,44 @@
   <view class="intro card">
     <view class="intro-title">把你的店交给 AI 助手</view>
     <view class="muted intro-desc">
-      生成专属口令后，你的 AI 只能读取你的店和朋友共享给你的店，不能改写。
+      一键复制完整指令（已含专属口令），粘贴给你的 AI。它只能读你的店和朋友共享的店，不能改写。
     </view>
   </view>
 
-  <view class="section-label">按两步完成</view>
-
   <view class="block card">
-    <view class="step">1. 生成 API Token</view>
-    <view class="muted tip">绑定你的账号，可随时重置；旧 Token 立刻失效。</view>
-
-    <view class="token-box" wx:if="{{hasToken}}">
-      <text class="token">{{showToken ? plainToken : maskedToken}}</text>
-      <text class="eye" bindtap="toggleToken">{{showToken ? '隐藏' : '显示'}}</text>
+    <view class="step">发给 AI 的完整指令</view>
+    <view class="muted tip">
+      点下方一次即可：自动生成/带上 Token，整段复制。若本页还没有明文口令，会重新签发（旧口令立刻失效）。
     </view>
-    <view class="token-box muted" wx:else>还没有 Token</view>
-
-    <view class="token-actions" wx:if="{{hasToken || plainToken}}">
-      <button class="btn-primary half" bindtap="copyToken" disabled="{{!plainToken}}">
-        复制 Token
-      </button>
-      <button class="btn-ghost half" loading="{{busy}}" bindtap="resetToken">重置</button>
-    </view>
+    <view class="code">{{installCmd}}</view>
     <button
-      wx:else
       class="btn-primary btn-block"
       loading="{{busy}}"
-      bindtap="resetToken"
+      bindtap="copyInstall"
     >
-      生成 Token
+      一键复制完整指令
     </button>
+  </view>
+
+  <view class="block card">
+    <view class="step">Token 状态</view>
+    <view class="muted tip">一般不用单独管；丢了或泄露就点重置。</view>
+
+    <view class="token-box" wx:if="{{hasToken}}">
+      <text class="token">{{showToken && plainToken ? plainToken : maskedToken}}</text>
+      <text class="eye" bindtap="toggleToken">{{showToken ? '隐藏' : '显示'}}</text>
+    </view>
+    <view class="token-box muted" wx:else>还没有 Token（点上方一键复制会生成）</view>
+
+    <view class="token-actions" wx:if="{{hasToken || plainToken}}">
+      <button class="btn-ghost half" bindtap="copyToken" disabled="{{!plainToken}}">
+        只复制 Token
+      </button>
+      <button class="btn-ghost half" loading="{{busy}}" bindtap="resetToken">重置 Token</button>
+    </view>
     <view class="muted dates" wx:if="{{createdAt}}">
       创建于 {{createdAt}}<text wx:if="{{lastUsedAt}}"> · 最近使用 {{lastUsedAt}}</text>
     </view>
-  </view>
-
-  <view class="block card">
-    <view class="step">2. 复制安装指令给 AI</view>
-    <view class="muted tip">粘贴给你的 AI 助手，按说明安装后即可读取美食数据。</view>
-    <view class="code">{{installCmd}}</view>
-    <button class="btn-primary btn-block" bindtap="copyInstall">复制指令</button>
   </view>
 
   <view class="section-label">AI 能帮你做什么</view>
@@ -54,6 +52,6 @@
   </view>
 
   <view class="foot muted">
-    AI 只能读取，不能改写。重置 Token 后，旧口令立即失效。
+    仓库公开。外部 Agent 若装不了 GitHub Skill，直接用指令里的两个 GET 即可。重置后旧口令立即失效。
   </view>
 </scroll-view>

@@ -2,15 +2,24 @@
 
 把用户在「我和我爱吃的朋友们」小程序里导入 / 记下 / 好友共享的店，开放给你的 AI（只读），用于出行规划与美食筛选。
 
-## 安装
+## 安装（任选一种）
 
-1. 用户在小程序「连接 AI」页生成并复制 Token（`fm_…`）
-2. 把本目录 `skills/feimaocat-cloud/` 放到 agent 的 skills 位置（或克隆仓库后指向该目录）
-3. 配置环境变量（域名以小程序「连接 AI」页复制内容为准）：
+### A. 用户粘贴「一键复制」内容（推荐，Grok / 任意 Bot 都适用）
+
+小程序「连接 AI」→ **一键复制完整指令** → 粘贴给你。  
+里面已有 `FEIMAOCAT_API_BASE`、真实 `FEIMAOCAT_TOKEN` 和下面两个接口；**不必再装 npm 包，也不必能访问 GitHub 才开始工作**。
+
+### B. 从公开仓库读取本说明
+
+仓库公开：https://github.com/Jam-free/opendianping  
+本文件在 **默认分支 main**：
+
+- 目录：https://github.com/Jam-free/opendianping/tree/main/skills/feimaocat-cloud  
+- 原文：https://raw.githubusercontent.com/Jam-free/opendianping/main/skills/feimaocat-cloud/SKILL.md  
 
 ```bash
 export FEIMAOCAT_API_BASE="https://feimaocat-api-311874-12-1485452020.sh.run.tcloudbase.com"
-export FEIMAOCAT_TOKEN="fm_……"
+export FEIMAOCAT_TOKEN="fm_……"   # 以用户粘贴为准
 ```
 
 不要使用 `npx skills add feimaocat/food-network`——该包不存在。
@@ -30,7 +39,7 @@ export FEIMAOCAT_TOKEN="fm_……"
 | `origin: imported` | 从大众点评专辑导入 |
 | `origin: checkin` | 用户自己「记美食」落下的店 |
 | `origin: from_friend` | 从好友清单加到自己名下 |
-| `note` | 用户或导入时留下的短备注（评论流另有多条，当前网关以 note / 列表为主） |
+| `note` | 用户或导入时留下的短备注 |
 | `friendsShared` | 美食网里朋友共享、但未必在自己列表里的店 |
 
 **推荐用法**

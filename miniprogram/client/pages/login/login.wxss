@@ -106,8 +106,14 @@
   background: #e85a3c;
 }
 
-.repick {
+.nick-hint,
+.busy-hint {
   margin-top: 20rpx;
+  font-size: 24rpx;
+}
+
+.repick {
+  margin-top: 24rpx;
   font-size: 24rpx;
   color: var(--primary);
 }

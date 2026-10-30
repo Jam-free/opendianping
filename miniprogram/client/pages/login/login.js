@@ -37,8 +37,8 @@ const api_1 = require("../../utils/api");
 const config_1 = require("../../utils/config");
 const photo_upload_1 = require("../../utils/photo-upload");
 /**
- * 登录：点「进入」→ 选头像 → 填昵称 → 进应用。
- * 微信不允许代码主动弹头像/昵称授权窗，只能挂在 button/input 上由用户点。
+ * 登录：点进入 → 选头像 → 选昵称后自动进入。
+ * type=nickname 不能用受控 value，否则微信昵称点选经常进不了 data。
  */
 Page({
     data: {
@@ -75,7 +75,6 @@ Page({
                 (0, api_1.enterAppAfterLogin)();
                 return;
             }
-            // 缺一项：有头像就走到昵称步，否则从头像步开始
             if (av && !nick) {
                 this.setData({
                     busy: false,
@@ -116,27 +115,44 @@ Page({
             step: 'avatar',
             nickFocus: false,
             error: '',
+            draftNickname: '',
         });
     },
     onNickInput(e) {
-        this.setData({ draftNickname: e.detail.value, error: '' });
+        const nickname = (e.detail.value || '').trim();
+        this.setData({ draftNickname: nickname, error: '' });
+        // 点选微信昵称时，input 往往会带上完整值，直接进
+        if (nickname) {
+            this.tryEnterWithNickname(nickname);
+        }
     },
     onNickBlur(e) {
-        this.setData({ draftNickname: e.detail.value, nickFocus: false });
+        const nickname = (e.detail.value || '').trim();
+        this.setData({ draftNickname: nickname, nickFocus: false });
+        if (nickname) {
+            this.tryEnterWithNickname(nickname);
+        }
     },
-    async onConfirmEnter() {
+    onNickConfirm(e) {
+        const nickname = (e.detail.value || this.data.draftNickname || '').trim();
+        if (nickname)
+            this.tryEnterWithNickname(nickname);
+    },
+    tryEnterWithNickname(nickname) {
         if (this.data.busy)
             return;
-        const nickname = this.data.draftNickname.trim();
         if (!this.data.draftAvatar) {
             this.setData({ step: 'avatar', error: '请先选择头像' });
             return;
         }
-        if (!nickname) {
-            this.setData({ error: '请点输入框选择或填写昵称', nickFocus: true });
+        if (!nickname.trim())
             return;
-        }
-        this.setData({ busy: true, error: '' });
+        this.enterApp(nickname.trim());
+    },
+    async enterApp(nickname) {
+        if (this.data.busy)
+            return;
+        this.setData({ busy: true, error: '', draftNickname: nickname });
         try {
             await (0, api_1.ensureLogin)({ force: true, interactive: true });
             const avatarUrl = await persistAvatarIfNeeded(this.data.draftAvatar);
@@ -156,7 +172,6 @@ Page({
         }
     },
 });
-/** 把微信/网络的生硬英文翻成用户能看懂的话 */
 function friendlyError(err) {
     const raw = ((err === null || err === void 0 ? void 0 : err.message) || String(err || '')).trim();
     if (!raw)
@@ -208,7 +223,7 @@ async function persistAvatarIfNeeded(path) {
     }
     catch (err) {
         const msg = err.message || '';
-        if (/太大|606001|上传|网络|失败|404|不存在/i.test(msg)) {
+        if (/太大|606001|上传|网络|失败|404|不存在|fetch failed/i.test(msg)) {
             return await (0, photo_upload_1.uploadPhotoPublic)(base64, token);
         }
         throw err;

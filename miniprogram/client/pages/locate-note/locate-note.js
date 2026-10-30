@@ -4,6 +4,13 @@ const api_1 = require("../../utils/api");
 const config_1 = require("../../utils/config");
 const media_1 = require("../../utils/media");
 const photo_upload_1 = require("../../utils/photo-upload");
+function shortCategory(category) {
+    if (!category)
+        return '';
+    // 腾讯「美食:火锅」/ 高德「餐饮服务;中餐厅;火锅」→ 末段
+    const parts = category.split(/[:;｜|]/).map((s) => s.trim()).filter(Boolean);
+    return parts[parts.length - 1] || '';
+}
 /**
  * 上传照片换持久路径。
  * 200KB 相册图对手机很小，但对 callContainer（约 100KiB）太大——
@@ -143,7 +150,7 @@ Page({
                 const qs = (0, api_1.buildQuery)({ lat, lng });
                 const geo = await (0, api_1.request)(`/api/geo/reverse?${qs}`);
                 const address = geo.address || '';
-                const pois = (geo.pois || []).map((p) => (Object.assign(Object.assign({}, p), { distanceLabel: formatPoiDistance(p.distance) })));
+                const pois = (geo.pois || []).map((p) => (Object.assign(Object.assign({}, p), { categoryLabel: shortCategory(p.category), distanceLabel: formatPoiDistance(p.distance) })));
                 const patch = { address, pois };
                 if (!this.data.name.trim() && pois[0]) {
                     patch.name = pois[0].title;

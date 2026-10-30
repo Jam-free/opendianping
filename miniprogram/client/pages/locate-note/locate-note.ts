@@ -12,11 +12,21 @@ type PoiItem = {
   id: string;
   title: string;
   address: string;
+  category?: string;
+  /** 展示用短类目，如「火锅」 */
+  categoryLabel?: string;
   distance?: number;
   distanceLabel?: string;
   lat?: number;
   lng?: number;
 };
+
+function shortCategory(category?: string): string {
+  if (!category) return '';
+  // 腾讯「美食:火锅」/ 高德「餐饮服务;中餐厅;火锅」→ 末段
+  const parts = category.split(/[:;｜|]/).map((s) => s.trim()).filter(Boolean);
+  return parts[parts.length - 1] || '';
+}
 
 /**
  * 上传照片换持久路径。
@@ -179,6 +189,7 @@ Page({
             id: string;
             title: string;
             address: string;
+            category?: string;
             distance?: number;
             lat?: number;
             lng?: number;
@@ -187,6 +198,7 @@ Page({
         const address = geo.address || '';
         const pois: PoiItem[] = (geo.pois || []).map((p) => ({
           ...p,
+          categoryLabel: shortCategory(p.category),
           distanceLabel: formatPoiDistance(p.distance),
         }));
         const patch: Record<string, unknown> = { address, pois };

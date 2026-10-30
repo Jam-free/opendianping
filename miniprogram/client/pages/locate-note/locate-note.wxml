@@ -17,7 +17,7 @@
     </view>
 
     <view class="field" wx:if="{{!editing && pois.length}}">
-      <view class="label">附近的店（点选）</view>
+      <view class="label">附近的餐饮店（点选）</view>
       <scroll-view scroll-y class="poi-list">
         <view
           wx:for="{{pois}}"
@@ -28,11 +28,15 @@
         >
           <view class="poi-title">{{item.title}}</view>
           <view class="poi-meta muted">
+            <text wx:if="{{item.categoryLabel}}">{{item.categoryLabel}} · </text>
             <text wx:if="{{item.distanceLabel}}">{{item.distanceLabel}} · </text>
             <text>{{item.address || '附近'}}</text>
           </view>
         </view>
       </scroll-view>
+    </view>
+    <view class="muted tip-inline" wx:elif="{{!editing && locReady && !pois.length}}">
+      附近没识别到餐饮店，也可以自己填写店名。
     </view>
 
     <view class="field">

@@ -111,6 +111,12 @@
   line-height: 1.4;
 }
 
+.tip-inline {
+  margin: -8rpx 0 24rpx;
+  font-size: 24rpx;
+  line-height: 1.4;
+}
+
 .photos {
   display: flex;
   align-items: center;

@@ -4,23 +4,24 @@ import { splitDistance, avatarInitial } from '../../utils/format';
 import { getUserLocation } from '../../utils/location';
 import { SHOP_PLACEHOLDER, shopImageSrc } from '../../utils/media';
 
-/** 拼点评店铺页；优先接口里的真实链接，否则用店铺 ID 兜底 */
+/**
+ * 有真实点评链接才返回；自己记下的店（locate/photo）没有链接，不要硬拼。
+ * 避免用内部 UUID 冒充点评 shopId，否则会误显示点评图标。
+ */
 function buildDianpingUrl(shop: {
   sourceUrl?: string | null;
   sourceShopId?: string | null;
-  poiKey?: string;
   sourceType?: string;
 }): string {
+  if (shop.sourceType === 'locate' || shop.sourceType === 'photo') {
+    return '';
+  }
   if (shop.sourceUrl && /^https?:\/\//i.test(shop.sourceUrl)) {
     return shop.sourceUrl;
   }
-  const id = shop.sourceShopId || shop.poiKey || '';
-  if (
-    id &&
-    (shop.sourceType === 'dianping_album' ||
-      /^\d+$/.test(id) ||
-      /^[A-Za-z0-9_-]+$/.test(id))
-  ) {
+  // 仅点评导入且带有来源店铺 ID 时才拼移动站链接
+  const id = (shop.sourceShopId || '').trim();
+  if (shop.sourceType === 'dianping_album' && id) {
     return `https://m.dianping.com/shop/${encodeURIComponent(id)}`;
   }
   return '';

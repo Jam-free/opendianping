@@ -41,6 +41,8 @@ AppID：`wx219e6044fdb7a6cd`
 | `SOURCE_ADAPTER` | `opendianping`（贴专辑链接时也会自动走专辑解析） |
 | `TENCENT_MAP_KEY` | 腾讯位置服务 Key（推荐；记美食逆地理） |
 | `AMAP_KEY` | 高德 Key（可选；与腾讯二选一即可） |
+| `AGENT_SHOP_WRITE_PER_MIN` | 可选，默认 `30`（Agent 写店每用户每分钟） |
+| `AGENT_SHOP_WRITE_PER_DAY` | 可选，默认 `200`（Agent 写店每用户每天） |
 
 7. **持久盘**：挂载路径 `/data`，容量 1GB 即可（存 SQLite）
 8. 监听端口：`80`

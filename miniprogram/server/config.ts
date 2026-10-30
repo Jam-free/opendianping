@@ -27,6 +27,9 @@ export const config = {
   sourceAdapter: (process.env.SOURCE_ADAPTER || 'opendianping') as SourceAdapterName,
   importRateLimitPerMin: Number(process.env.IMPORT_RATE_LIMIT_PER_MIN || 5),
   importMaxShops: Number(process.env.IMPORT_MAX_SHOPS || 200),
+  /** Agent 写入「我的店」：每 Token/用户每分钟、每天上限 */
+  agentShopWritePerMin: Number(process.env.AGENT_SHOP_WRITE_PER_MIN || 30),
+  agentShopWritePerDay: Number(process.env.AGENT_SHOP_WRITE_PER_DAY || 200),
   wechatAppId: process.env.WECHAT_APPID || 'touristappid',
   wechatAppSecret: process.env.WECHAT_APP_SECRET || '',
   /** 开发态绕过微信登录；生产必须关闭 */

@@ -8,14 +8,18 @@ const SKILL_RAW = 'https://raw.githubusercontent.com/Jam-free/opendianping/main/
 function buildInstallCmd(token) {
     return [
         '# 美食肥猫 · 发给你的 AI（Cursor / Claude / Grok 等）',
-        '# 下面已含个人 Token，粘贴后按说明只读调用即可',
+        '# 下面已含个人 Token。可读可写本人店；写前请向用户确认店名与是否心心念念',
         '',
         `export FEIMAOCAT_API_BASE="${config_1.API_BASE}"`,
         `export FEIMAOCAT_TOKEN="${token}"`,
         '',
-        '# 只读接口（Header: Authorization: Bearer $FEIMAOCAT_TOKEN）',
-        'GET $FEIMAOCAT_API_BASE/api/agent/shops',
-        'GET $FEIMAOCAT_API_BASE/api/agent/friends',
+        '# Header: Authorization: Bearer $FEIMAOCAT_TOKEN',
+        'GET  $FEIMAOCAT_API_BASE/api/agent/shops',
+        'GET  $FEIMAOCAT_API_BASE/api/agent/friends',
+        'POST $FEIMAOCAT_API_BASE/api/agent/shops',
+        '# POST body 例：{"name":"泰式河粉","city":"曼谷","note":"天桥下","wishlist":false}',
+        '# origin=agent 文案「Agent 记下」；无 poiKey 则为 pending；不要编造点评 shopId',
+        '# POST 若 404：接口尚未发版，不要假装已写入',
         '',
         '# wishlist=true =「心心念念」（很想去），筛店/规划优先用这些',
         '',
@@ -24,13 +28,14 @@ function buildInstallCmd(token) {
         SKILL_RAW,
         '',
         '# 不要用 npx skills add feimaocat/food-network（包不存在）',
-        '# 若 Agent 装不了 GitHub Skill：直接按上面两个 GET 调接口即可',
+        '# 若 Agent 装不了 GitHub Skill：直接按上面 GET/POST 调接口即可',
     ].join('\n');
 }
 Page({
     data: {
         capabilities: [
-            { title: '查看我的店', desc: '读取你导入与记下的店铺' },
+            { title: '查看我的店', desc: '读取你导入、记下与 Agent 记下的店铺' },
+            { title: '记下店铺', desc: '确认店名和是否心心念念后，写入你的「我的店」' },
             { title: '附近推荐', desc: '按距离挑选适合的店' },
             { title: '好友口味', desc: '参考美食好友共享的店' },
             { title: '导出清单', desc: '整理成可分享的列表' },

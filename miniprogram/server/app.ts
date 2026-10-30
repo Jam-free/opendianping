@@ -364,6 +364,26 @@ export function createApp() {
     })
   );
 
+  /**
+   * Agent 写入本人「我的店」。鉴权只认 Agent Token → 该用户，忽略 body 里的 userId。
+   * 只接受单个对象；数组/批量本迭代直接 400（H7）。
+   */
+  app.post(
+    '/api/agent/shops',
+    requireAgentAuth,
+    asyncHandler(async (req, res) => {
+      if (Array.isArray(req.body) || Array.isArray(req.body?.shops)) {
+        res.status(400).json({ error: '一次只能记一家店' });
+        return;
+      }
+      const result = await network.createAgentShop(
+        req.userId!,
+        (req.body || {}) as Record<string, unknown>
+      );
+      res.status(result.created ? 201 : 200).json(result.shop);
+    })
+  );
+
   app.get(
     '/api/agent/friends',
     requireAgentAuth,

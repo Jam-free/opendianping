@@ -194,7 +194,11 @@ Page({
 function friendlyError(err: unknown): string {
   const raw = ((err as Error)?.message || String(err || '')).trim();
   if (!raw) return '登录失败，请重试';
-  if (/fetch failed|request:fail|ERR_CONNECTION|超时|timeout/i.test(raw)) {
+  // 服务端 code2session 出网失败也会叫 fetch failed，不是用户家里断网
+  if (/fetch failed/i.test(raw)) {
+    return '登录服务忙了一下，请再点一次进入';
+  }
+  if (/request:fail|ERR_CONNECTION|超时|timeout/i.test(raw)) {
     return '登录请求失败，请检查网络后重试';
   }
   return raw.length > 60 ? `${raw.slice(0, 60)}…` : raw;

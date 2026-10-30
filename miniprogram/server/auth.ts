@@ -46,9 +46,55 @@ export function createSessionForOpenId(
   return { token, user };
 }
 
+function headerValue(
+  headers: Record<string, unknown> | undefined,
+  name: string
+): string {
+  if (!headers) return '';
+  const raw = headers[name] ?? headers[name.toLowerCase()];
+  if (Array.isArray(raw)) return String(raw[0] || '').trim();
+  return String(raw || '').trim();
+}
+
+/**
+ * 云托管 callContainer 会注入可信用户头。
+ * 资源复用时：优先 X-WX-FROM-OPENID（使用方小程序的用户），再退回 X-WX-OPENID。
+ * 这样不用再公网去打 jscode2session（云里经常 fetch failed）。
+ */
+export function openIdFromCloudHeaders(
+  headers: Record<string, unknown> | undefined
+): { openid: string; unionid?: string } | null {
+  const openid =
+    headerValue(headers, 'x-wx-from-openid') ||
+    headerValue(headers, 'x-wx-openid');
+  if (!openid) return null;
+  const unionid =
+    headerValue(headers, 'x-wx-from-unionid') ||
+    headerValue(headers, 'x-wx-unionid') ||
+    undefined;
+  return { openid, unionid };
+}
+
+/**
+ * 登录入口：优先云托管头里的 openid；没有头再走 code 换票 / 开发 bypass。
+ */
+export async function loginFromRequest(opts: {
+  code?: string;
+  headers?: Record<string, unknown>;
+}): Promise<{ token: string; user: UserRow }> {
+  const fromCloud = openIdFromCloudHeaders(opts.headers);
+  if (fromCloud) {
+    return createSessionForOpenId(fromCloud.openid, {
+      unionid: fromCloud.unionid,
+    });
+  }
+  return loginWithWxCode(opts.code || '');
+}
+
 /**
  * 登录：正式环境用 code 换 openid；开发态可用 bypass。
  * 密钥走 WECHAT_APP_SECRET，不硬编码。
+ * 注意：云托管生产更推荐走 loginFromRequest（读微信注入头），避免出网失败。
  */
 export async function loginWithWxCode(
   code: string
@@ -68,7 +114,16 @@ export async function loginWithWxCode(
   url.searchParams.set('js_code', code);
   url.searchParams.set('grant_type', 'authorization_code');
 
-  const res = await fetch(url.toString());
+  let res: Response;
+  try {
+    res = await fetch(url.toString());
+  } catch {
+    // 云托管出网去 api.weixin.qq.com 常失败；应优先用 callContainer 注入的 openid
+    throw Object.assign(
+      new Error('微信登录通道暂时不可用，请稍后再试'),
+      { status: 503 }
+    );
+  }
   const data = (await res.json()) as {
     openid?: string;
     unionid?: string;

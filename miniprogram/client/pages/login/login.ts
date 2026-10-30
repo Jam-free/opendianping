@@ -1,7 +1,6 @@
 import {
   ensureLogin,
   hasSession,
-  peekCachedUser,
   saveCachedUser,
   enterAppAfterLogin,
   request,
@@ -15,16 +14,18 @@ import {
 } from '../../utils/photo-upload';
 
 /**
- * 登录门禁：头像/昵称必须用户点选（微信不支持静默读取）。
- * 不论是否 DEV bypass，都要先选齐再进，避免云上 bypass=true 时整块 UI 被藏掉。
+ * 登录：点「进入」→ 选头像 → 填昵称 → 进应用。
+ * 微信不允许代码主动弹头像/昵称授权窗，只能挂在 button/input 上由用户点。
  */
 Page({
   data: {
     busy: false,
     bypass: false,
     error: '',
+    step: 'avatar' as 'avatar' | 'nickname',
     draftNickname: '',
     draftAvatar: '',
+    nickFocus: false,
   },
 
   onShow() {
@@ -51,16 +52,27 @@ Page({
       saveCachedUser(me.user);
       const nick = (me.user.nickname || '').trim();
       const av = me.user.avatar || '';
-      // 缺名片就停在登录页补齐（bypass 也一样）
-      if (!nick || !av) {
+      if (nick && av) {
+        enterAppAfterLogin();
+        return;
+      }
+      // 缺一项：有头像就走到昵称步，否则从头像步开始
+      if (av && !nick) {
         this.setData({
           busy: false,
-          draftNickname: nick,
+          step: 'nickname',
           draftAvatar: resolveAvatarDisplay(av),
+          draftNickname: '',
+          nickFocus: true,
         });
         return;
       }
-      enterAppAfterLogin();
+      this.setData({
+        busy: false,
+        step: 'avatar',
+        draftAvatar: resolveAvatarDisplay(av),
+        draftNickname: nick,
+      });
     } catch {
       this.setData({ busy: false });
     }
@@ -68,9 +80,24 @@ Page({
 
   onChooseAvatar(e: { detail?: { avatarUrl?: string } }) {
     const url = e?.detail?.avatarUrl || '';
-    if (url) {
-      this.setData({ draftAvatar: url, error: '' });
+    if (!url) {
+      this.setData({ error: '未拿到头像，请再试一次' });
+      return;
     }
+    this.setData({
+      draftAvatar: url,
+      step: 'nickname',
+      error: '',
+      nickFocus: true,
+    });
+  },
+
+  backToAvatar() {
+    this.setData({
+      step: 'avatar',
+      nickFocus: false,
+      error: '',
+    });
   },
 
   onNickInput(e: WechatMiniprogram.Input) {
@@ -78,30 +105,24 @@ Page({
   },
 
   onNickBlur(e: WechatMiniprogram.Input) {
-    this.setData({ draftNickname: e.detail.value });
+    this.setData({ draftNickname: e.detail.value, nickFocus: false });
   },
 
-  onNickReview() {
-    /* 基础库昵称审核回调，有即可，不拦登录 */
-  },
-
-  async onLogin() {
+  async onConfirmEnter() {
     if (this.data.busy) return;
-
     const nickname = this.data.draftNickname.trim();
     if (!this.data.draftAvatar) {
-      this.setData({ error: '请先点上方圆形选择微信头像' });
+      this.setData({ step: 'avatar', error: '请先选择头像' });
       return;
     }
     if (!nickname) {
-      this.setData({ error: '请点昵称框，选择或填写微信昵称' });
+      this.setData({ error: '请点输入框选择或填写昵称', nickFocus: true });
       return;
     }
 
     this.setData({ busy: true, error: '' });
     try {
       await ensureLogin({ force: true, interactive: true });
-
       const avatarUrl = await persistAvatarIfNeeded(this.data.draftAvatar);
       await request('/api/me/profile', {
         method: 'PATCH',
@@ -133,16 +154,14 @@ async function persistAvatarIfNeeded(path: string): Promise<string> {
   if (/^https?:\/\//i.test(path) && path.indexOf(API_BASE) === 0) {
     return path.slice(API_BASE.length) || path;
   }
-  // 已是可公网访问的头像链接（少见）
   if (/^https?:\/\//i.test(path) && !/tmp|wxfile/i.test(path)) {
     return path.slice(0, 800);
   }
 
   const compressed = await compressPhotoForUpload(path);
   const base64 = await readPhotoBase64(compressed);
-  const token = await (
-    await import('../../utils/api')
-  ).ensureLogin();
+  const { ensureLogin, request } = await import('../../utils/api');
+  const token = await ensureLogin();
 
   try {
     if (estimatePayloadBytes(base64) > 90 * 1024) {

@@ -6,46 +6,38 @@
       把大众点评收藏搬进来，记美食、看自己的店，再和好友慢慢共享。
     </view>
 
-    <!-- 始终展示：云上若开了 bypass 也不能藏，否则用户永远选不到头像昵称 -->
-    <view class="profile">
-      <button
-        class="avatar-btn"
-        open-type="chooseAvatar"
-        bindchooseavatar="onChooseAvatar"
-      >
-        <image
-          wx:if="{{draftAvatar}}"
-          class="avatar"
-          src="{{draftAvatar}}"
-          mode="aspectFill"
-        />
-        <view wx:else class="avatar placeholder">
-          <text class="plus">+</text>
-          <text class="avatar-hint">选头像</text>
-        </view>
-      </button>
+    <!-- 步骤 1：点进入 = 选头像（微信规定必须挂在 button 上，不能代码弹窗） -->
+    <button
+      wx:if="{{step === 'avatar'}}"
+      class="login-btn"
+      open-type="chooseAvatar"
+      bindchooseavatar="onChooseAvatar"
+      loading="{{busy}}"
+    >
+      {{bypass ? '进入' : '微信登录'}}
+    </button>
+
+    <!-- 步骤 2：选完头像 → 填/选昵称 → 确认进入 -->
+    <view class="nick-step" wx:elif="{{step === 'nickname'}}">
+      <image class="preview-av" src="{{draftAvatar}}" mode="aspectFill" />
+      <view class="muted step-tip">头像已选，接下来填写昵称</view>
       <input
         class="nick-input"
         type="nickname"
         placeholder="点这里选微信昵称"
         value="{{draftNickname}}"
+        focus="{{nickFocus}}"
         bindinput="onNickInput"
         bindblur="onNickBlur"
-        bindnicknamereview="onNickReview"
       />
-      <view class="profile-tip muted">
-        请先选择头像并填写昵称（点输入框可选微信昵称），朋友才能认出你
-      </view>
+      <button class="login-btn" loading="{{busy}}" bindtap="onConfirmEnter">
+        确认进入
+      </button>
+      <view class="repick muted" bindtap="backToAvatar">重选头像</view>
     </view>
 
-    <button class="login-btn" loading="{{busy}}" bindtap="onLogin">
-      {{bypass ? '进入' : '微信登录'}}
-    </button>
-    <view class="hint muted" wx:if="{{bypass}}">
-      开发模式可直接进入，仍需上方头像和昵称。
-    </view>
-    <view class="hint muted" wx:else>
-      登录后才能导入收藏与使用「我的店」。我们不会自动读取你的微信好友。
+    <view class="hint muted" wx:if="{{step === 'avatar'}}">
+      点上方后会先选择微信头像，再填写昵称。
     </view>
     <view class="err" wx:if="{{error}}">{{error}}</view>
   </view>

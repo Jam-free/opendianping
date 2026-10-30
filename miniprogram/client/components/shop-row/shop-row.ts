@@ -40,7 +40,10 @@ Component({
   },
   methods: {
     onTap() {
-      this.triggerEvent('tap', { shop: this.properties.shop });
+      const shop = this.properties.shop;
+      if (!shop || !(shop as { poiKey?: string }).poiKey) return;
+      // 不用原生名 tap，防止和冒泡 tap 混成 detail 里没有 shop
+      this.triggerEvent('openshop', { shop });
     },
     /** 代理/CDN 失败时切本地兜底，只切一次避免循环 */
     onImgError() {

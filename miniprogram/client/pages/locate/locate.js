@@ -37,9 +37,14 @@ Page({
         this.setData({ shops });
     },
     pickShop(e) {
-        const shop = e.detail.shop;
+        var _a;
+        const shop = (_a = e === null || e === void 0 ? void 0 : e.detail) === null || _a === void 0 ? void 0 : _a.shop;
+        if (!(shop === null || shop === void 0 ? void 0 : shop.poiKey)) {
+            wx.showToast({ title: '店铺信息还没准备好', icon: 'none' });
+            return;
+        }
         wx.navigateTo({
-            url: `/pages/locate-note/locate-note?c=${this.data.circleId}&p=${encodeURIComponent(shop.poiKey)}&name=${encodeURIComponent(shop.name)}`,
+            url: `/pages/locate-note/locate-note?c=${this.data.circleId}&p=${encodeURIComponent(shop.poiKey)}&name=${encodeURIComponent(shop.name || '')}`,
         });
     },
 });

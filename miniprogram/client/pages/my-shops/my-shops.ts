@@ -7,7 +7,7 @@ import {
   goLoginGate,
 } from '../../utils/api';
 import { getUserLocation } from '../../utils/location';
-import { getActiveCircleId } from '../../utils/circle';
+import { getActiveCircleId, setActiveCircleId } from '../../utils/circle';
 import { avatarInitial } from '../../utils/format';
 
 /**
@@ -57,9 +57,26 @@ Page({
       });
   },
 
+  /** 详情页要带圈子 id；没缓存时从美食网接口补一份 */
+  async ensureCircleId(): Promise<string> {
+    const cached = getActiveCircleId();
+    if (cached) return cached;
+    try {
+      const net = await request<{ networkId: string }>('/api/me/network');
+      if (net.networkId) {
+        setActiveCircleId(net.networkId);
+        return net.networkId;
+      }
+    } catch {
+      /* ignore */
+    }
+    return '';
+  },
+
   async load() {
     this.setData({ loading: true });
     try {
+      await this.ensureCircleId();
       const loc = await getUserLocation();
       const qs = buildQuery({
         lat: loc ? loc.lat : undefined,
@@ -91,15 +108,19 @@ Page({
     wx.navigateTo({ url: '/pages/locate-note/locate-note' });
   },
 
-  openShop(e: WechatMiniprogram.CustomEvent) {
-    const shop = e.detail.shop;
-    const circleId = getActiveCircleId();
-    if (circleId && shop.poiKey) {
-      wx.navigateTo({
-        url: `/pages/shop-detail/shop-detail?c=${circleId}&p=${encodeURIComponent(shop.poiKey)}`,
-      });
+  async openShop(e: WechatMiniprogram.CustomEvent) {
+    const shop = e?.detail?.shop;
+    if (!shop || !shop.poiKey) {
+      wx.showToast({ title: '店铺信息还没准备好', icon: 'none' });
       return;
     }
-    wx.showToast({ title: shop.name || '店铺', icon: 'none' });
+    const circleId = await this.ensureCircleId();
+    if (!circleId) {
+      wx.showToast({ title: '美食网还没就绪，稍后再试', icon: 'none' });
+      return;
+    }
+    wx.navigateTo({
+      url: `/pages/shop-detail/shop-detail?c=${circleId}&p=${encodeURIComponent(shop.poiKey)}`,
+    });
   },
 });

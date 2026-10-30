@@ -1,4 +1,5 @@
-<view class="row" bindtap="onTap">
+<!-- catchtap：避免原生 tap 冒泡和自定义事件抢同一 bind:tap 导致 detail.shop 为空 -->
+<view class="row" catchtap="onTap">
   <!-- 无头图或代理失败：统一本地兜底，避免灰块 -->
   <image
     class="thumb"

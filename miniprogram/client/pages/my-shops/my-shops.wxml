@@ -26,7 +26,7 @@
   <view class="list card" wx:if="{{shops.length}}">
     <block wx:for="{{shops}}" wx:key="poiKey">
       <view class="item hairline">
-        <shop-row shop="{{item}}" source-tag="{{item.sourceTag}}" bind:tap="openShop" />
+        <shop-row shop="{{item}}" source-tag="{{item.sourceTag}}" bind:openshop="openShop" />
       </view>
     </block>
   </view>

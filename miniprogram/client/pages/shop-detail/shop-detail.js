@@ -46,6 +46,7 @@ Page({
         sending: false,
         wishlist: false,
         canEditCheckin: false,
+        canNav: false,
     },
     onLoad(query) {
         this.setData({
@@ -87,6 +88,7 @@ Page({
             wishlist: Boolean(shop.wishlist),
             canEditCheckin: (shop.sourceType === 'locate' || shop.sourceType === 'photo') &&
                 Boolean(shop.myFavoriteId),
+            canNav: shop.lat != null && shop.lng != null,
         });
         await this.loadComments();
     },

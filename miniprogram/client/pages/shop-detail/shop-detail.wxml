@@ -7,14 +7,51 @@
         mode="aspectFill"
         binderror="onImgError"
       />
-      <view class="title-row">
+      <view class="hero-body">
         <view class="h1">{{shop.name}}</view>
+        <view class="meta muted" wx:if="{{metaLine}}">{{metaLine}}</view>
+        <view class="dist muted" wx:if="{{!dist.na}}">{{dist.main}}{{dist.unit}}</view>
       </view>
-      <view class="dist-block" wx:if="{{!dist.na}}">
-        <view class="dist muted">{{dist.main}}{{dist.unit}}</view>
-        <view class="nav-link" bindtap="onNav">导航到这里</view>
+    </view>
+
+    <!-- 统一操作条：图标对齐，不东一块西一块 -->
+    <view class="card action-bar">
+      <view
+        wx:if="{{dianpingUrl}}"
+        class="action"
+        bindtap="openDianping"
+        hover-class="action-hover"
+      >
+        <image class="action-icon" src="/assets/icons/dianping.png" mode="aspectFit" />
+        <text class="action-label">大众点评</text>
       </view>
-      <view class="meta muted" wx:if="{{metaLine}}">{{metaLine}}</view>
+      <view
+        wx:if="{{canNav}}"
+        class="action"
+        bindtap="onNav"
+        hover-class="action-hover"
+      >
+        <image class="action-icon" src="/assets/icons/nav.png" mode="aspectFit" />
+        <text class="action-label">导航</text>
+      </view>
+      <view
+        wx:if="{{shop.phone}}"
+        class="action"
+        bindtap="onCall"
+        hover-class="action-hover"
+      >
+        <image class="action-icon" src="/assets/icons/phone.png" mode="aspectFit" />
+        <text class="action-label">电话</text>
+      </view>
+      <view
+        wx:if="{{canEditCheckin}}"
+        class="action"
+        bindtap="goEditCheckin"
+        hover-class="action-hover"
+      >
+        <image class="action-icon" src="/assets/icons/edit.png" mode="aspectFit" />
+        <text class="action-label">编辑</text>
+      </view>
     </view>
 
     <view class="card block">
@@ -26,23 +63,9 @@
         <text class="k muted">地址</text>
         <text class="v">{{shop.address}}</text>
       </view>
-      <view class="kv hairline" wx:if="{{shop.phone}}" bindtap="onCall">
-        <text class="k muted">电话</text>
-        <text class="v phone">{{shop.phone}}</text>
-      </view>
-      <view class="kv source-row">
+      <view class="kv">
         <text class="k muted">来源</text>
-        <view class="source-right">
-          <text>{{sourceLabel}}</text>
-          <view
-            wx:if="{{dianpingUrl}}"
-            class="dp-icon"
-            bindtap="openDianping"
-            hover-class="dp-icon-hover"
-          >
-            评
-          </view>
-        </view>
+        <text>{{sourceLabel}}</text>
       </view>
     </view>
 
@@ -95,13 +118,5 @@
       <text class="heart-icon">{{wishlist ? '♥' : '♡'}}</text>
       <text class="heart-label">心心念念</text>
     </view>
-  </view>
-
-  <view
-    wx:if="{{canEditCheckin}}"
-    class="edit-fab muted"
-    bindtap="goEditCheckin"
-  >
-    改记美食
   </view>
 </view>

@@ -22,11 +22,11 @@
 
   <block wx:elif="{{tab === 0}}">
     <block wx:for="{{shops}}" wx:key="poiKey">
-      <shop-row shop="{{item}}" bind:tap="openShop" />
+      <shop-row shop="{{item}}" bind:openshop="openShop" />
     </block>
     <view wx:if="{{noCoordSection}}" class="sec hairline">无坐标的店</view>
     <block wx:for="{{shopsNoCoord}}" wx:key="poiKey">
-      <shop-row shop="{{item}}" bind:tap="openShop" />
+      <shop-row shop="{{item}}" bind:openshop="openShop" />
     </block>
     <view wx:if="{{!shops.length && !shopsNoCoord.length && !loading}}" class="empty pad muted">圈内还没有共享的店，先导入专辑吧。</view>
   </block>

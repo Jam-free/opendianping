@@ -45,9 +45,27 @@ Page({
             /* 401 会踢回登录 */
         });
     },
+    /** 详情页要带圈子 id；没缓存时从美食网接口补一份 */
+    async ensureCircleId() {
+        const cached = (0, circle_1.getActiveCircleId)();
+        if (cached)
+            return cached;
+        try {
+            const net = await (0, api_1.request)('/api/me/network');
+            if (net.networkId) {
+                (0, circle_1.setActiveCircleId)(net.networkId);
+                return net.networkId;
+            }
+        }
+        catch (_a) {
+            /* ignore */
+        }
+        return '';
+    },
     async load() {
         this.setData({ loading: true });
         try {
+            await this.ensureCircleId();
             const loc = await (0, location_1.getUserLocation)();
             const qs = (0, api_1.buildQuery)({
                 lat: loc ? loc.lat : undefined,
@@ -73,15 +91,20 @@ Page({
     goLocate() {
         wx.navigateTo({ url: '/pages/locate-note/locate-note' });
     },
-    openShop(e) {
-        const shop = e.detail.shop;
-        const circleId = (0, circle_1.getActiveCircleId)();
-        if (circleId && shop.poiKey) {
-            wx.navigateTo({
-                url: `/pages/shop-detail/shop-detail?c=${circleId}&p=${encodeURIComponent(shop.poiKey)}`,
-            });
+    async openShop(e) {
+        var _a;
+        const shop = (_a = e === null || e === void 0 ? void 0 : e.detail) === null || _a === void 0 ? void 0 : _a.shop;
+        if (!shop || !shop.poiKey) {
+            wx.showToast({ title: '店铺信息还没准备好', icon: 'none' });
             return;
         }
-        wx.showToast({ title: shop.name || '店铺', icon: 'none' });
+        const circleId = await this.ensureCircleId();
+        if (!circleId) {
+            wx.showToast({ title: '美食网还没就绪，稍后再试', icon: 'none' });
+            return;
+        }
+        wx.navigateTo({
+            url: `/pages/shop-detail/shop-detail?c=${circleId}&p=${encodeURIComponent(shop.poiKey)}`,
+        });
     },
 });

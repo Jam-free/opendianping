@@ -52,6 +52,7 @@ Page({
     sending: false,
     wishlist: false,
     canEditCheckin: false,
+    canNav: false,
   },
 
   onLoad(query: Record<string, string | undefined>) {
@@ -98,6 +99,7 @@ Page({
       canEditCheckin:
         (shop.sourceType === 'locate' || shop.sourceType === 'photo') &&
         Boolean(shop.myFavoriteId),
+      canNav: shop.lat != null && shop.lng != null,
     });
     await this.loadComments();
   },

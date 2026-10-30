@@ -20,7 +20,7 @@
 .hero {
   padding: 0 0 28rpx;
   overflow: hidden;
-  margin-bottom: 24rpx;
+  margin-bottom: 20rpx;
 }
 
 .hero-img {
@@ -31,7 +31,7 @@
   border-bottom: 1rpx solid var(--line);
 }
 
-.title-row {
+.hero-body {
   padding: 28rpx 28rpx 0;
 }
 
@@ -41,31 +41,57 @@
   line-height: 1.35;
 }
 
-.dist-block {
-  padding: 12rpx 28rpx 0;
-  display: flex;
-  align-items: baseline;
-  gap: 20rpx;
+.meta {
+  margin-top: 8rpx;
+  font-size: 26rpx;
 }
 
 .dist {
+  margin-top: 10rpx;
   font-size: 24rpx;
 }
 
-.nav-link {
-  font-size: 24rpx;
-  color: var(--brand, #ff6b4a);
-  font-weight: 600;
+/* 操作条：等分图标，整齐一排 */
+.action-bar {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-around;
+  padding: 20rpx 8rpx;
+  margin-bottom: 20rpx;
 }
 
-.meta {
-  padding: 8rpx 28rpx 0;
-  font-size: 26rpx;
+.action {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  padding: 12rpx 0;
+  min-width: 0;
+}
+
+.action-hover {
+  opacity: 0.72;
+}
+
+.action-icon {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 14rpx;
+  display: block;
+}
+
+.action-label {
+  font-size: 22rpx;
+  color: var(--sub, #666);
+  line-height: 1.2;
+  text-align: center;
 }
 
 .block {
   padding: 8rpx 28rpx;
-  margin-bottom: 24rpx;
+  margin-bottom: 20rpx;
 }
 
 .kv {
@@ -83,38 +109,6 @@
 
 .v {
   flex: 1;
-}
-
-.phone {
-  color: var(--brand, #ff6b4a);
-}
-
-.source-row {
-  align-items: center;
-}
-
-.source-right {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 16rpx;
-}
-
-.dp-icon {
-  width: 48rpx;
-  height: 48rpx;
-  border-radius: 12rpx;
-  background: #ff6633;
-  color: #fff;
-  font-size: 22rpx;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.dp-icon-hover {
-  opacity: 0.85;
 }
 
 .sec {
@@ -186,6 +180,7 @@
   background: #fff;
   border-top: 1rpx solid var(--line, #eee);
   box-sizing: border-box;
+  z-index: 20;
 }
 
 .dock-input {
@@ -234,16 +229,4 @@
 
 .heart-hover {
   opacity: 0.75;
-}
-
-.edit-fab {
-  position: fixed;
-  right: 32rpx;
-  bottom: calc(140rpx + env(safe-area-inset-bottom));
-  background: #fff;
-  border: 1rpx solid var(--line, #eee);
-  border-radius: 32rpx;
-  padding: 12rpx 22rpx;
-  font-size: 22rpx;
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.06);
 }

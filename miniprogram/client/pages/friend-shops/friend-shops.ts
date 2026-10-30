@@ -42,7 +42,11 @@ Page({
   },
 
   openShop(e: WechatMiniprogram.CustomEvent) {
-    const shop = e.detail.shop;
+    const shop = e?.detail?.shop;
+    if (!shop?.poiKey || !this.data.circleId) {
+      wx.showToast({ title: '店铺信息还没准备好', icon: 'none' });
+      return;
+    }
     wx.navigateTo({
       url: `/pages/shop-detail/shop-detail?c=${this.data.circleId}&p=${encodeURIComponent(shop.poiKey)}`,
     });

@@ -105,7 +105,12 @@ Page({
         this.loadMembers(circle.id);
     },
     openShop(e) {
-        const shop = e.detail.shop;
+        var _a;
+        const shop = (_a = e === null || e === void 0 ? void 0 : e.detail) === null || _a === void 0 ? void 0 : _a.shop;
+        if (!(shop === null || shop === void 0 ? void 0 : shop.poiKey) || !this.data.activeCircleId) {
+            wx.showToast({ title: '店铺信息还没准备好', icon: 'none' });
+            return;
+        }
         const q = encodeURIComponent(shop.poiKey);
         wx.navigateTo({
             url: `/pages/shop-detail/shop-detail?c=${this.data.activeCircleId}&p=${q}`,

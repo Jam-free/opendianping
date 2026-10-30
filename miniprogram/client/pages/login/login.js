@@ -1,44 +1,11 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 Object.defineProperty(exports, "__esModule", { value: true });
 const api_1 = require("../../utils/api");
 const config_1 = require("../../utils/config");
-const photo_upload_1 = require("../../utils/photo-upload");
+const avatar_upload_1 = require("../../utils/avatar-upload");
 /**
  * 登录：点进入 → 选头像 → 选昵称后自动进入。
- * type=nickname 不能用受控 value，否则微信昵称点选经常进不了 data。
+ * 头像只走云托管内网；上传失败也不挡进入（昵称仍会保存）。
  */
 Page({
     data: {
@@ -85,12 +52,16 @@ Page({
                 });
                 return;
             }
-            this.setData({
-                busy: false,
-                step: 'avatar',
-                draftAvatar: resolveAvatarDisplay(av),
-                draftNickname: nick,
-            });
+            // 有昵称没头像，或都没有：从头像步走（本地已选的临时头像优先）
+            if (nick && !av) {
+                this.setData({
+                    busy: false,
+                    step: 'avatar',
+                    draftNickname: nick,
+                });
+                return;
+            }
+            this.setData({ busy: false, step: 'avatar' });
         }
         catch (_b) {
             this.setData({ busy: false });
@@ -121,17 +92,14 @@ Page({
     onNickInput(e) {
         const nickname = (e.detail.value || '').trim();
         this.setData({ draftNickname: nickname, error: '' });
-        // 点选微信昵称时，input 往往会带上完整值，直接进
-        if (nickname) {
+        if (nickname)
             this.tryEnterWithNickname(nickname);
-        }
     },
     onNickBlur(e) {
         const nickname = (e.detail.value || '').trim();
         this.setData({ draftNickname: nickname, nickFocus: false });
-        if (nickname) {
+        if (nickname)
             this.tryEnterWithNickname(nickname);
-        }
     },
     onNickConfirm(e) {
         const nickname = (e.detail.value || this.data.draftNickname || '').trim();
@@ -155,10 +123,11 @@ Page({
         this.setData({ busy: true, error: '', draftNickname: nickname });
         try {
             await (0, api_1.ensureLogin)({ force: true, interactive: true });
-            const avatarUrl = await persistAvatarIfNeeded(this.data.draftAvatar);
+            // 头像失败不拦路：昵称先存上，进得去再说
+            const avatarUrl = await (0, avatar_upload_1.uploadAvatarOrEmpty)(this.data.draftAvatar);
             await (0, api_1.request)('/api/me/profile', {
                 method: 'PATCH',
-                data: { nickname, avatar: avatarUrl },
+                data: Object.assign({ nickname }, (avatarUrl ? { avatar: avatarUrl } : {})),
             });
             const me = await (0, api_1.request)('/api/me');
             (0, api_1.saveCachedUser)(me.user);
@@ -177,13 +146,7 @@ function friendlyError(err) {
     if (!raw)
         return '登录失败，请重试';
     if (/fetch failed|request:fail|ERR_CONNECTION|超时|timeout/i.test(raw)) {
-        return '网络没连上云服务，请检查网络后重试；若刚部署过，稍等再试';
-    }
-    if (/照片太大|太大|606001/i.test(raw)) {
-        return '头像有点大，请换一张或再试一次';
-    }
-    if (/上传/i.test(raw)) {
-        return '头像上传失败，请重试；云服务若在更新，稍等一会儿';
+        return '登录请求失败，请检查网络后重试';
     }
     return raw.length > 60 ? `${raw.slice(0, 60)}…` : raw;
 }
@@ -193,39 +156,4 @@ function resolveAvatarDisplay(avatar) {
     if (avatar.startsWith('/api/'))
         return `${config_1.API_BASE}${avatar}`;
     return avatar;
-}
-async function persistAvatarIfNeeded(path) {
-    if (!path)
-        return '';
-    if (path.startsWith('/api/media/local/'))
-        return path;
-    if (/^https?:\/\//i.test(path) && path.indexOf(config_1.API_BASE) === 0) {
-        return path.slice(config_1.API_BASE.length) || path;
-    }
-    if (/^https?:\/\//i.test(path) && !/tmp|wxfile/i.test(path)) {
-        return path.slice(0, 800);
-    }
-    const compressed = await (0, photo_upload_1.compressPhotoForUpload)(path);
-    const base64 = await (0, photo_upload_1.readPhotoBase64)(compressed);
-    const { ensureLogin, request } = await Promise.resolve().then(() => __importStar(require('../../utils/api')));
-    const token = await ensureLogin();
-    try {
-        if ((0, photo_upload_1.estimatePayloadBytes)(base64) > 90 * 1024) {
-            return await (0, photo_upload_1.uploadPhotoPublic)(base64, token);
-        }
-        const res = await request('/api/me/photos', {
-            method: 'POST',
-            data: { base64, mime: 'image/jpeg' },
-        });
-        if (!res.url)
-            throw new Error('头像上传失败');
-        return res.url;
-    }
-    catch (err) {
-        const msg = err.message || '';
-        if (/太大|606001|上传|网络|失败|404|不存在|fetch failed/i.test(msg)) {
-            return await (0, photo_upload_1.uploadPhotoPublic)(base64, token);
-        }
-        throw err;
-    }
 }

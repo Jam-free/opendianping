@@ -4,7 +4,7 @@ const api_1 = require("../../utils/api");
 const format_1 = require("../../utils/format");
 const config_1 = require("../../utils/config");
 const media_1 = require("../../utils/media");
-const photo_upload_1 = require("../../utils/photo-upload");
+const avatar_upload_1 = require("../../utils/avatar-upload");
 /**
  * 账号页：可点头像/昵称修改并保存；也可退出。
  */
@@ -121,26 +121,6 @@ async function persistAvatarIfNeeded(path) {
         !path.startsWith('http'))) {
         return path.slice(0, 800);
     }
-    const compressed = await (0, photo_upload_1.compressPhotoForUpload)(path);
-    const base64 = await (0, photo_upload_1.readPhotoBase64)(compressed);
-    const token = await (0, api_1.ensureLogin)();
-    try {
-        if ((0, photo_upload_1.estimatePayloadBytes)(base64) > 90 * 1024) {
-            return await (0, photo_upload_1.uploadPhotoPublic)(base64, token);
-        }
-        const res = await (0, api_1.request)('/api/me/photos', {
-            method: 'POST',
-            data: { base64, mime: 'image/jpeg' },
-        });
-        if (!res.url)
-            throw new Error('头像上传失败');
-        return res.url;
-    }
-    catch (err) {
-        const msg = err.message || '';
-        if (/太大|606001|上传|网络|失败|404|不存在/i.test(msg)) {
-            return await (0, photo_upload_1.uploadPhotoPublic)(base64, token);
-        }
-        throw err;
-    }
+    // 只走 callContainer；失败返回空，昵称仍可保存
+    return (0, avatar_upload_1.uploadAvatarOrEmpty)(path);
 }

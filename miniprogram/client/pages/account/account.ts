@@ -3,17 +3,11 @@ import {
   peekCachedUser,
   saveCachedUser,
   request,
-  ensureLogin,
 } from '../../utils/api';
 import { avatarInitial } from '../../utils/format';
 import { API_BASE } from '../../utils/config';
 import { userAvatarSrc } from '../../utils/media';
-import {
-  compressPhotoForUpload,
-  estimatePayloadBytes,
-  readPhotoBase64,
-  uploadPhotoPublic,
-} from '../../utils/photo-upload';
+import { uploadAvatarOrEmpty } from '../../utils/avatar-upload';
 
 /**
  * 账号页：可点头像/昵称修改并保存；也可退出。
@@ -140,25 +134,6 @@ async function persistAvatarIfNeeded(path: string): Promise<string> {
   ) {
     return path.slice(0, 800);
   }
-
-  const compressed = await compressPhotoForUpload(path);
-  const base64 = await readPhotoBase64(compressed);
-  const token = await ensureLogin();
-  try {
-    if (estimatePayloadBytes(base64) > 90 * 1024) {
-      return await uploadPhotoPublic(base64, token);
-    }
-    const res = await request<{ url: string }>('/api/me/photos', {
-      method: 'POST',
-      data: { base64, mime: 'image/jpeg' },
-    });
-    if (!res.url) throw new Error('头像上传失败');
-    return res.url;
-  } catch (err) {
-    const msg = (err as Error).message || '';
-    if (/太大|606001|上传|网络|失败|404|不存在/i.test(msg)) {
-      return await uploadPhotoPublic(base64, token);
-    }
-    throw err;
-  }
+  // 只走 callContainer；失败返回空，昵称仍可保存
+  return uploadAvatarOrEmpty(path);
 }

@@ -6,16 +6,11 @@ import {
   request,
 } from '../../utils/api';
 import { API_BASE } from '../../utils/config';
-import {
-  compressPhotoForUpload,
-  estimatePayloadBytes,
-  readPhotoBase64,
-  uploadPhotoPublic,
-} from '../../utils/photo-upload';
+import { uploadAvatarOrEmpty } from '../../utils/avatar-upload';
 
 /**
  * 登录：点进入 → 选头像 → 选昵称后自动进入。
- * type=nickname 不能用受控 value，否则微信昵称点选经常进不了 data。
+ * 头像只走云托管内网；上传失败也不挡进入（昵称仍会保存）。
  */
 Page({
   data: {
@@ -66,12 +61,16 @@ Page({
         });
         return;
       }
-      this.setData({
-        busy: false,
-        step: 'avatar',
-        draftAvatar: resolveAvatarDisplay(av),
-        draftNickname: nick,
-      });
+      // 有昵称没头像，或都没有：从头像步走（本地已选的临时头像优先）
+      if (nick && !av) {
+        this.setData({
+          busy: false,
+          step: 'avatar',
+          draftNickname: nick,
+        });
+        return;
+      }
+      this.setData({ busy: false, step: 'avatar' });
     } catch {
       this.setData({ busy: false });
     }
@@ -103,18 +102,13 @@ Page({
   onNickInput(e: WechatMiniprogram.Input) {
     const nickname = (e.detail.value || '').trim();
     this.setData({ draftNickname: nickname, error: '' });
-    // 点选微信昵称时，input 往往会带上完整值，直接进
-    if (nickname) {
-      this.tryEnterWithNickname(nickname);
-    }
+    if (nickname) this.tryEnterWithNickname(nickname);
   },
 
   onNickBlur(e: WechatMiniprogram.Input) {
     const nickname = (e.detail.value || '').trim();
     this.setData({ draftNickname: nickname, nickFocus: false });
-    if (nickname) {
-      this.tryEnterWithNickname(nickname);
-    }
+    if (nickname) this.tryEnterWithNickname(nickname);
   },
 
   onNickConfirm(e: WechatMiniprogram.Input) {
@@ -137,10 +131,15 @@ Page({
     this.setData({ busy: true, error: '', draftNickname: nickname });
     try {
       await ensureLogin({ force: true, interactive: true });
-      const avatarUrl = await persistAvatarIfNeeded(this.data.draftAvatar);
+
+      // 头像失败不拦路：昵称先存上，进得去再说
+      const avatarUrl = await uploadAvatarOrEmpty(this.data.draftAvatar);
       await request('/api/me/profile', {
         method: 'PATCH',
-        data: { nickname, avatar: avatarUrl },
+        data: {
+          nickname,
+          ...(avatarUrl ? { avatar: avatarUrl } : {}),
+        },
       });
       const me = await request<{
         user: { id: string; nickname?: string | null; avatar?: string | null };
@@ -160,13 +159,7 @@ function friendlyError(err: unknown): string {
   const raw = ((err as Error)?.message || String(err || '')).trim();
   if (!raw) return '登录失败，请重试';
   if (/fetch failed|request:fail|ERR_CONNECTION|超时|timeout/i.test(raw)) {
-    return '网络没连上云服务，请检查网络后重试；若刚部署过，稍等再试';
-  }
-  if (/照片太大|太大|606001/i.test(raw)) {
-    return '头像有点大，请换一张或再试一次';
-  }
-  if (/上传/i.test(raw)) {
-    return '头像上传失败，请重试；云服务若在更新，稍等一会儿';
+    return '登录请求失败，请检查网络后重试';
   }
   return raw.length > 60 ? `${raw.slice(0, 60)}…` : raw;
 }
@@ -175,38 +168,4 @@ function resolveAvatarDisplay(avatar?: string | null): string {
   if (!avatar) return '';
   if (avatar.startsWith('/api/')) return `${API_BASE}${avatar}`;
   return avatar;
-}
-
-async function persistAvatarIfNeeded(path: string): Promise<string> {
-  if (!path) return '';
-  if (path.startsWith('/api/media/local/')) return path;
-  if (/^https?:\/\//i.test(path) && path.indexOf(API_BASE) === 0) {
-    return path.slice(API_BASE.length) || path;
-  }
-  if (/^https?:\/\//i.test(path) && !/tmp|wxfile/i.test(path)) {
-    return path.slice(0, 800);
-  }
-
-  const compressed = await compressPhotoForUpload(path);
-  const base64 = await readPhotoBase64(compressed);
-  const { ensureLogin, request } = await import('../../utils/api');
-  const token = await ensureLogin();
-
-  try {
-    if (estimatePayloadBytes(base64) > 90 * 1024) {
-      return await uploadPhotoPublic(base64, token);
-    }
-    const res = await request<{ url: string }>('/api/me/photos', {
-      method: 'POST',
-      data: { base64, mime: 'image/jpeg' },
-    });
-    if (!res.url) throw new Error('头像上传失败');
-    return res.url;
-  } catch (err) {
-    const msg = (err as Error).message || '';
-    if (/太大|606001|上传|网络|失败|404|不存在|fetch failed/i.test(msg)) {
-      return await uploadPhotoPublic(base64, token);
-    }
-    throw err;
-  }
 }

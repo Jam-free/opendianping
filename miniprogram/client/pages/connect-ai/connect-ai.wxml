@@ -1,4 +1,5 @@
-<scroll-view class="page" scroll-y show-scrollbar="{{false}}">
+<!-- 不用 scroll-view + 100vh：真机导航栏/底部安全区容易把末尾挤乱 -->
+<view class="page">
   <view class="intro card">
     <view class="intro-title">把你的店交给 AI 助手</view>
     <view class="muted intro-desc">
@@ -43,15 +44,19 @@
   </view>
 
   <view class="section-label">AI 能帮你做什么</view>
-  <view class="grid">
-    <view class="cap card" wx:for="{{capabilities}}" wx:key="title">
-      <view class="cap-dot"></view>
-      <text class="cap-title">{{item.title}}</text>
-      <text class="cap-desc muted">{{item.desc}}</text>
-    </view>
+  <view class="cap-list card">
+    <block wx:for="{{capabilities}}" wx:key="title">
+      <view class="cap-row {{index + 1 < capabilities.length ? 'hairline' : ''}}">
+        <view class="cap-dot"></view>
+        <view class="cap-body">
+          <text class="cap-title">{{item.title}}</text>
+          <text class="cap-desc muted">{{item.desc}}</text>
+        </view>
+      </view>
+    </block>
   </view>
 
   <view class="foot muted">
     仓库公开。外部 Agent 若装不了 GitHub Skill，直接用指令里的两个 GET 即可。重置后旧口令立即失效。
   </view>
-</scroll-view>
+</view>

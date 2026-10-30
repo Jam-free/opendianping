@@ -12,3 +12,13 @@ export function shopImageSrc(
   if (headImgProxy) return `${apiBase}${headImgProxy}`;
   return SHOP_PLACEHOLDER;
 }
+
+/** 用户头像：本地上传路径需拼 API_BASE；http(s)/wxfile 原样用 */
+export function userAvatarSrc(
+  apiBase: string,
+  avatar?: string | null
+): string {
+  if (!avatar) return '';
+  if (avatar.startsWith('/api/')) return `${apiBase}${avatar}`;
+  return avatar;
+}

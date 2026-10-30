@@ -5,6 +5,8 @@ import {
   request,
 } from '../../utils/api';
 import { avatarInitial } from '../../utils/format';
+import { API_BASE } from '../../utils/config';
+import { userAvatarSrc } from '../../utils/media';
 
 /**
  * 账号页：展示身份 + 退出/撤权。
@@ -27,7 +29,7 @@ Page({
     if (cached) {
       this.setData({
         nickname: cached.nickname || '',
-        avatar: cached.avatar || '',
+        avatar: userAvatarSrc(API_BASE, cached.avatar),
         initial: avatarInitial(cached.nickname),
       });
     }
@@ -38,7 +40,7 @@ Page({
       saveCachedUser(me.user);
       this.setData({
         nickname: me.user.nickname || '',
-        avatar: me.user.avatar || '',
+        avatar: userAvatarSrc(API_BASE, me.user.avatar),
         initial: avatarInitial(me.user.nickname),
       });
     } catch {

@@ -1,19 +1,22 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const api_1 = require("../../utils/api");
+const config_1 = require("../../utils/config");
 const format_1 = require("../../utils/format");
 const circle_1 = require("../../utils/circle");
+function avatarSrc(avatar) {
+    if (!avatar)
+        return '';
+    if (avatar.startsWith('/api/'))
+        return `${config_1.API_BASE}${avatar}`;
+    return avatar;
+}
 Page({
     data: {
         loading: true,
         friends: [],
         networkId: '',
         inviteToken: '',
-        needProfile: false,
-        showProfile: false,
-        draftNickname: '',
-        draftAvatar: '',
-        savingProfile: false,
         loginError: '',
     },
     onShow() {
@@ -34,23 +37,15 @@ Page({
         }
     },
     async bootstrap() {
-        var _a, _b, _c, _d;
         this.setData({ loading: true, loginError: '' });
         try {
-            const [me, net] = await Promise.all([
-                (0, api_1.request)('/api/me'),
-                (0, api_1.request)('/api/me/network'),
-            ]);
+            const net = await (0, api_1.request)('/api/me/network');
             (0, circle_1.setActiveCircleId)(net.networkId);
-            const friends = (net.friends || []).map((f) => (Object.assign(Object.assign({}, f), { initial: (0, format_1.avatarInitial)(f.nickname) })));
-            const needProfile = !((_a = me.user) === null || _a === void 0 ? void 0 : _a.nickname) || !((_b = me.user) === null || _b === void 0 ? void 0 : _b.avatar);
+            const friends = (net.friends || []).map((f) => (Object.assign(Object.assign({}, f), { avatarSrc: avatarSrc(f.avatar), initial: (0, format_1.avatarInitial)(f.nickname) })));
             this.setData({
                 friends,
                 networkId: net.networkId,
                 inviteToken: net.inviteToken,
-                needProfile,
-                draftNickname: ((_c = me.user) === null || _c === void 0 ? void 0 : _c.nickname) || '',
-                draftAvatar: ((_d = me.user) === null || _d === void 0 ? void 0 : _d.avatar) || '',
                 loading: false,
                 loginError: '',
             });
@@ -70,7 +65,10 @@ Page({
     onShareAppMessage() {
         const { networkId, inviteToken } = this.data;
         if (!networkId || !inviteToken) {
-            return { title: '我和我爱吃的朋友们 · 一起收藏好店', path: '/pages/friends/friends' };
+            return {
+                title: '我和我爱吃的朋友们 · 一起收藏好店',
+                path: '/pages/friends/friends',
+            };
         }
         return {
             title: '来我和我爱吃的朋友们，一起共享收藏的店',
@@ -83,48 +81,5 @@ Page({
         wx.navigateTo({
             url: `/pages/friend-shops/friend-shops?c=${this.data.networkId}&m=${id}&n=${name}`,
         });
-    },
-    openProfile() {
-        this.setData({ showProfile: true });
-    },
-    closeProfile() {
-        this.setData({ showProfile: false });
-    },
-    onChooseAvatar(e) {
-        var _a;
-        const url = ((_a = e === null || e === void 0 ? void 0 : e.detail) === null || _a === void 0 ? void 0 : _a.avatarUrl) || '';
-        if (url)
-            this.setData({ draftAvatar: url });
-    },
-    onNickInput(e) {
-        this.setData({ draftNickname: e.detail.value });
-    },
-    onNickBlur(e) {
-        this.setData({ draftNickname: e.detail.value });
-    },
-    async saveProfile() {
-        const nickname = this.data.draftNickname.trim();
-        const avatar = this.data.draftAvatar.trim();
-        if (!nickname) {
-            wx.showToast({ title: '请填写昵称', icon: 'none' });
-            return;
-        }
-        this.setData({ savingProfile: true });
-        try {
-            await (0, api_1.request)('/api/me/profile', {
-                method: 'PATCH',
-                data: { nickname, avatar: avatar || undefined },
-            });
-            this.setData({
-                savingProfile: false,
-                showProfile: false,
-                needProfile: !avatar,
-            });
-            wx.showToast({ title: '已保存' });
-        }
-        catch (err) {
-            this.setData({ savingProfile: false });
-            wx.showToast({ title: err.message, icon: 'none' });
-        }
     },
 });

@@ -470,7 +470,8 @@ export function updateUserProfile(
   patch: { nickname?: string; avatar?: string }
 ) {
   const nickname = patch.nickname?.trim().slice(0, 32) || null;
-  const avatar = patch.avatar?.trim().slice(0, 500) || null;
+  // 本地上传路径 /api/media/local/... 较短；也兼容少量外链
+  const avatar = patch.avatar?.trim().slice(0, 800) || null;
   if (!nickname && !avatar) {
     throw Object.assign(new Error('请提供昵称或头像'), { status: 400 });
   }

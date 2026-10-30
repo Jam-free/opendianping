@@ -6,17 +6,23 @@ import {
   enterAppAfterLogin,
   request,
 } from '../../utils/api';
+import { API_BASE } from '../../utils/config';
+import {
+  compressPhotoForUpload,
+  readPhotoBase64,
+} from '../../utils/photo-upload';
 
 /**
  * 强制登录门禁页。
- * 设计决策：未登录不能进 Tab；有本地票则静默验票后进「我的店」。
- * DEV_AUTH_BYPASS 时按钮文案改为「一键进入」，流程仍是同一套。
+ * 头像/昵称在登录前就展示：微信不允许静默读资料，必须用户点选 chooseAvatar / type=nickname。
  */
 Page({
   data: {
     busy: false,
     bypass: false,
     error: '',
+    draftNickname: '',
+    draftAvatar: '',
   },
 
   onShow() {
@@ -35,35 +41,84 @@ Page({
 
     if (!hasSession()) return;
 
-    // 已有本地票：验一次 /api/me，通过则直接进主界面
     this.setData({ busy: true, error: '' });
     try {
       const me = await request<{
         user: { id: string; nickname?: string | null; avatar?: string | null };
       }>('/api/me');
       saveCachedUser(me.user);
+      // 已有票但还没名片：留在本页补齐，避免进了朋友圈才发现
+      if (!this.data.bypass && (!me.user.nickname || !me.user.avatar)) {
+        this.setData({
+          busy: false,
+          draftNickname: me.user.nickname || '',
+          draftAvatar: resolveAvatarDisplay(me.user.avatar),
+        });
+        return;
+      }
       enterAppAfterLogin();
     } catch {
-      // 票失效：停在本页等用户点登录
       this.setData({ busy: false });
     }
   },
 
+  onChooseAvatar(e: { detail?: { avatarUrl?: string } }) {
+    const url = e?.detail?.avatarUrl || '';
+    if (url) this.setData({ draftAvatar: url });
+  },
+
+  onNickInput(e: WechatMiniprogram.Input) {
+    this.setData({ draftNickname: e.detail.value });
+  },
+
+  onNickBlur(e: WechatMiniprogram.Input) {
+    this.setData({ draftNickname: e.detail.value });
+  },
+
   async onLogin() {
     if (this.data.busy) return;
+
+    const nickname = this.data.draftNickname.trim();
+    if (!this.data.bypass) {
+      if (!this.data.draftAvatar) {
+        this.setData({ error: '请先点上方圆形选择头像' });
+        return;
+      }
+      if (!nickname) {
+        this.setData({ error: '请填写微信昵称（点输入框可选微信昵称）' });
+        return;
+      }
+    }
+
     this.setData({ busy: true, error: '' });
     try {
-      // force：即使用户清过权，也重新换票；bypass 下同样走这条路径
       await ensureLogin({ force: true, interactive: true });
-      try {
+
+      if (!this.data.bypass) {
+        const avatarUrl = await persistAvatarIfNeeded(this.data.draftAvatar);
+        await request('/api/me/profile', {
+          method: 'PATCH',
+          data: { nickname, avatar: avatarUrl },
+        });
         const me = await request<{
           user: { id: string; nickname?: string | null; avatar?: string | null };
         }>('/api/me');
         saveCachedUser(me.user);
-      } catch {
-        saveCachedUser(
-          peekCachedUser() || { id: '', nickname: null, avatar: null }
-        );
+      } else {
+        try {
+          const me = await request<{
+            user: {
+              id: string;
+              nickname?: string | null;
+              avatar?: string | null;
+            };
+          }>('/api/me');
+          saveCachedUser(me.user);
+        } catch {
+          saveCachedUser(
+            peekCachedUser() || { id: '', nickname: null, avatar: null }
+          );
+        }
       }
       enterAppAfterLogin();
     } catch (err) {
@@ -74,3 +129,32 @@ Page({
     }
   },
 });
+
+function resolveAvatarDisplay(avatar?: string | null): string {
+  if (!avatar) return '';
+  if (avatar.startsWith('/api/')) return `${API_BASE}${avatar}`;
+  return avatar;
+}
+
+/** 微信 chooseAvatar 是临时路径，需上传后朋友才能看见 */
+async function persistAvatarIfNeeded(path: string): Promise<string> {
+  if (!path) return '';
+  if (path.startsWith('/api/media/local/')) return path;
+  if (/^https?:\/\//i.test(path) && path.indexOf(API_BASE) === 0) {
+    return path.slice(API_BASE.length) || path;
+  }
+  if (
+    path.startsWith('wxfile://') ||
+    path.startsWith('http://tmp') ||
+    !path.startsWith('http')
+  ) {
+    const compressed = await compressPhotoForUpload(path);
+    const base64 = await readPhotoBase64(compressed);
+    const res = await request<{ url: string }>('/api/me/photos', {
+      method: 'POST',
+      data: { base64, mime: 'image/jpeg' },
+    });
+    return res.url;
+  }
+  return path.slice(0, 500);
+}

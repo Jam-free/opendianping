@@ -21,7 +21,6 @@
   margin: 0;
 }
 
-.profile-tip,
 .login-tip {
   display: flex;
   justify-content: space-between;
@@ -30,9 +29,6 @@
   padding: 24rpx 28rpx;
   margin-bottom: 24rpx;
   font-size: 26rpx;
-}
-
-.login-tip {
   background: #fff8f0;
 }
 
@@ -124,59 +120,4 @@
   margin-bottom: 32rpx;
   line-height: 1.6;
   text-align: center;
-}
-
-.mask {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  z-index: 20;
-}
-
-.sheet {
-  position: fixed;
-  left: 24rpx;
-  right: 24rpx;
-  bottom: calc(48rpx + env(safe-area-inset-bottom));
-  z-index: 21;
-  padding: 36rpx 32rpx;
-}
-
-.sheet-title {
-  font-size: 34rpx;
-  font-weight: 600;
-  margin-bottom: 28rpx;
-}
-
-.form-row {
-  display: flex;
-  align-items: center;
-  gap: 24rpx;
-  margin-bottom: 28rpx;
-}
-
-.label {
-  width: 80rpx;
-  color: var(--sub);
-  font-size: 26rpx;
-}
-
-.avatar-btn {
-  padding: 0;
-  margin: 0;
-  background: transparent;
-  border: none;
-  line-height: 1;
-}
-
-.avatar-btn::after {
-  border: none;
-}
-
-.nick-input {
-  flex: 1;
-  background: var(--bg);
-  border-radius: 12rpx;
-  padding: 20rpx 24rpx;
-  font-size: 28rpx;
 }

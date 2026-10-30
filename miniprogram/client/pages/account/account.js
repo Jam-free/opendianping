@@ -2,6 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const api_1 = require("../../utils/api");
 const format_1 = require("../../utils/format");
+const config_1 = require("../../utils/config");
+const media_1 = require("../../utils/media");
 /**
  * 账号页：展示身份 + 退出/撤权。
  * 产品意图：头像入口可随时收回授权，回到登录引导，而不是埋在设置深处。
@@ -21,7 +23,7 @@ Page({
         if (cached) {
             this.setData({
                 nickname: cached.nickname || '',
-                avatar: cached.avatar || '',
+                avatar: (0, media_1.userAvatarSrc)(config_1.API_BASE, cached.avatar),
                 initial: (0, format_1.avatarInitial)(cached.nickname),
             });
         }
@@ -30,7 +32,7 @@ Page({
             (0, api_1.saveCachedUser)(me.user);
             this.setData({
                 nickname: me.user.nickname || '',
-                avatar: me.user.avatar || '',
+                avatar: (0, media_1.userAvatarSrc)(config_1.API_BASE, me.user.avatar),
                 initial: (0, format_1.avatarInitial)(me.user.nickname),
             });
         }

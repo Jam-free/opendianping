@@ -36,10 +36,77 @@
   max-width: 520rpx;
 }
 
+.profile {
+  width: 100%;
+  margin-top: 48rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20rpx;
+}
+
+.avatar-btn {
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  line-height: 1;
+  width: 160rpx;
+  height: 160rpx;
+}
+
+.avatar-btn::after {
+  border: none;
+}
+
+.avatar {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 50%;
+  display: block;
+  background: #f0f0f0;
+}
+
+.avatar.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx dashed #ccc;
+  box-sizing: border-box;
+  color: #999;
+}
+
+.plus {
+  font-size: 48rpx;
+  line-height: 1;
+}
+
+.avatar-hint {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+}
+
+.nick-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx 28rpx;
+  font-size: 30rpx;
+  text-align: center;
+  border: 1rpx solid #eee;
+}
+
+.profile-tip {
+  font-size: 22rpx;
+  line-height: 1.4;
+}
+
 /* 微信按钮默认会缩成内容宽度并靠左，这里拉满并跟头像用同一种珊瑚红 */
 .login-btn {
   width: 100%;
-  margin: 56rpx 0 0;
+  margin: 40rpx 0 0;
   padding: 0;
   height: 96rpx;
   line-height: 96rpx;

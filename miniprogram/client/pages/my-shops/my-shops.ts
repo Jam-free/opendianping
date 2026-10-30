@@ -9,6 +9,8 @@ import {
 import { getUserLocation } from '../../utils/location';
 import { getActiveCircleId, setActiveCircleId } from '../../utils/circle';
 import { avatarInitial } from '../../utils/format';
+import { API_BASE } from '../../utils/config';
+import { userAvatarSrc } from '../../utils/media';
 
 /**
  * 「我的店」：默认主页。核心路径是导入/看收藏；顶栏头像进账号可撤权。
@@ -38,7 +40,7 @@ Page({
     const cached = peekCachedUser();
     if (cached) {
       this.setData({
-        avatar: cached.avatar || '',
+        avatar: userAvatarSrc(API_BASE, cached.avatar),
         initial: avatarInitial(cached.nickname),
       });
     }
@@ -48,7 +50,7 @@ Page({
       .then((me) => {
         saveCachedUser(me.user);
         this.setData({
-          avatar: me.user.avatar || '',
+          avatar: userAvatarSrc(API_BASE, me.user.avatar),
           initial: avatarInitial(me.user.nickname),
         });
       })

@@ -4,6 +4,8 @@ const api_1 = require("../../utils/api");
 const location_1 = require("../../utils/location");
 const circle_1 = require("../../utils/circle");
 const format_1 = require("../../utils/format");
+const config_1 = require("../../utils/config");
+const media_1 = require("../../utils/media");
 /**
  * 「我的店」：默认主页。核心路径是导入/看收藏；顶栏头像进账号可撤权。
  */
@@ -29,7 +31,7 @@ Page({
         const cached = (0, api_1.peekCachedUser)();
         if (cached) {
             this.setData({
-                avatar: cached.avatar || '',
+                avatar: (0, media_1.userAvatarSrc)(config_1.API_BASE, cached.avatar),
                 initial: (0, format_1.avatarInitial)(cached.nickname),
             });
         }
@@ -37,7 +39,7 @@ Page({
             .then((me) => {
             (0, api_1.saveCachedUser)(me.user);
             this.setData({
-                avatar: me.user.avatar || '',
+                avatar: (0, media_1.userAvatarSrc)(config_1.API_BASE, me.user.avatar),
                 initial: (0, format_1.avatarInitial)(me.user.nickname),
             });
         })

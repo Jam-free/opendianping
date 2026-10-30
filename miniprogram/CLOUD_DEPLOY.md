@@ -54,6 +54,34 @@ AppID：`wx219e6044fdb7a6cd`
 
 先浏览器打开：`https://你的域名/health`，应返回含 `"albumImport":true` 的 JSON（说明新镜像已生效）。
 
+### 登录依赖（必读）
+
+小程序客户端走微信云托管 **`callContainer`**（见 `client/utils/api.ts`），不是用公网域名直打登录。
+
+正式环境（`DEV_AUTH_BYPASS=false`）登录顺序：
+
+1. **优先认网关身份（不出网）**  
+   `callContainer` 到达容器时，微信会注入用户身份头（官方保证，可信任）：
+   - 肥猫是 **资源复用**（云在美食探索账号下）：读 `X-WX-FROM-OPENID`（以及可能的 `X-WX-FROM-UNIONID`）
+   - 普通直属环境：读 `X-WX-OPENID` / `X-WX-UNIONID`  
+   有这些头就直接建会话、发 token，**容器不必访问** `api.weixin.qq.com`。
+2. **没有这些头时才 code 换票（要出网）**  
+   例如用公网域名 `curl` 调试。此时需要：
+   - 环境变量 `WECHAT_APPID` / `WECHAT_APP_SECRET`（控制台填写，**不要写进仓库**）
+   - 云托管允许容器访问 `https://api.weixin.qq.com/sns/jscode2session`  
+   若出网失败，接口返回可读中文（如「无法连接微信登录服务…」），不再把 Node 的 `fetch failed` 原样丢给用户。
+
+生产不要开 `DEV_AUTH_BYPASS`（`container.config.json` 已是 `false`）。不要编造 openid。
+
+### 部署后如何验证登录
+
+**Jam / 云托管发布后（1–2 步）：**
+
+1. 用本分支重新发布 `feimaocat-api`，等版本变绿；浏览器打开 `/health` 仍应是 `{"ok":true,"albumImport":true}`。
+2. 手机打开小程序体验版：选头像 + 选昵称后应进入「我的店」，**不应**再出现红字「登录请求失败，请检查网络后重试」。
+
+说明：公网 `curl -X POST …/api/auth/login` **没有**微信注入头，会走 code 换票；容器若仍不能出网，这条公网调试路径可能继续失败——**不代表小程序登录失败**。要测正式路径，必须从微信里 `callContainer`。
+
 ---
 
 ## C. 小程序连上云
@@ -78,4 +106,5 @@ AppID：`wx219e6044fdb7a6cd`
 
 ```bash
 cd miniprogram && npm run dev   # http://127.0.0.1:8787
+cd miniprogram && npm test      # 含登录：网关头 / mock 微信 / 出网失败中文
 ```

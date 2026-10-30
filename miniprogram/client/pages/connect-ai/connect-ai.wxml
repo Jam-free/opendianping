@@ -3,7 +3,7 @@
   <view class="intro card">
     <view class="intro-title">把你的店交给 AI 助手</view>
     <view class="muted intro-desc">
-      一键复制完整指令（已含专属口令），粘贴给你的 AI。它只能读你的店和朋友共享的店，不能改写。
+      一键复制完整指令（已含专属口令），粘贴给你的 AI。它可以读你的店，也可以在向你确认店名和是否「心心念念」之后，写入你自己的「我的店」。不能改朋友的数据。
     </view>
   </view>
 
@@ -57,6 +57,6 @@
   </view>
 
   <view class="foot muted">
-    仓库公开。外部 Agent 若装不了 GitHub Skill，直接用指令里的两个 GET 即可。重置后旧口令立即失效。
+    仓库公开。外部 Agent 若装不了 GitHub Skill，直接用指令里的 GET / POST 即可。重置后旧口令立即失效。若 POST 返回 404，说明云端还没发这版，不要假装已经记下。
   </view>
 </view>

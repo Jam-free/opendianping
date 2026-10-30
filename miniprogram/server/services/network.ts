@@ -1,6 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { v4 as uuidv4 } from 'uuid';
+import { msgSecCheck } from '../auth.js';
 import { getDb } from '../db.js';
+import { tryConsumeAgentShopWrite } from '../rate-limit.js';
 import {
   formatDistanceLabel,
   haversineMeters,
@@ -108,13 +110,86 @@ type MyShopRow = {
   visibility: string;
   created_at: string;
   origin: string;
+  status: 'confirmed' | 'pending';
   wishlist: number;
   photo_url: string | null;
 };
 
+/** 小程序「我的店」来源文案；Agent 记下单独一条，避免和「记美食」混成 checkin */
+const MY_SHOP_ORIGIN_LABEL: Record<string, string> = {
+  imported: '我导入',
+  checkin: '我记下',
+  from_friend: '来自好友',
+  agent: 'Agent 记下',
+};
+
 /**
- * Tab2：我导入的 + 我记下的 + 我从好友清单收藏的店。
- * origin: imported | checkin | from_friend
+ * H3：有合法 poiKey（amap_poi_id）或导入带来的真实点评 id → confirmed。
+ * 仅有未校验坐标、或只有内部 UUID → pending。内部 id 不当作点评 shopId。
+ */
+function deriveShopStatus(row: {
+  amap_poi_id?: string | null;
+  source_shop_id?: string | null;
+}): 'confirmed' | 'pending' {
+  const hasPoi = Boolean(row.amap_poi_id && row.amap_poi_id.trim());
+  const hasImportedId = Boolean(
+    row.source_shop_id && row.source_shop_id.trim()
+  );
+  return hasPoi || hasImportedId ? 'confirmed' : 'pending';
+}
+
+/** GET /api/agent/shops 的 mine 单项；POST 写入成功后回同形状（H1 含 status） */
+export type AgentMineShop = {
+  poiKey: string;
+  name: string;
+  category: string | null;
+  district: string | null;
+  city: string | null;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  note: string | null;
+  origin: string;
+  wishlist: boolean;
+  phone: string | null;
+  status: 'confirmed' | 'pending';
+};
+
+function toAgentMineShop(s: {
+  poiKey: string;
+  name: string;
+  category: string | null;
+  district: string | null;
+  city: string | null;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  note: string | null;
+  origin: string;
+  wishlist: boolean;
+  phone: string | null;
+  status: 'confirmed' | 'pending';
+}): AgentMineShop {
+  return {
+    poiKey: s.poiKey,
+    name: s.name,
+    category: s.category,
+    district: s.district,
+    city: s.city,
+    address: s.address,
+    lat: s.lat,
+    lng: s.lng,
+    note: s.note,
+    origin: s.origin,
+    wishlist: s.wishlist,
+    phone: s.phone,
+    status: s.status,
+  };
+}
+
+/**
+ * Tab2：我导入的 + 我记下的 + Agent 记下的 + 我从好友清单收藏的店。
+ * origin: imported | checkin | from_friend | agent
  * wishlist=1 →「心心念念」（很想去），熄心不删店。
  */
 export async function listMyShops(
@@ -129,7 +204,9 @@ export async function listMyShops(
               s.raw_name AS name, s.avg_price, s.category, s.district, s.city,
               s.address, s.lat, s.lng, s.source_type, s.head_img, s.phone,
               f.note, f.visibility, f.created_at, f.wishlist, f.photo_url,
+              s.amap_poi_id, s.source_shop_id,
               CASE
+                WHEN s.source_type = 'agent' THEN 'agent'
                 WHEN s.source_type IN ('photo', 'locate') THEN 'checkin'
                 WHEN f.import_batch_id IS NOT NULL THEN 'imported'
                 ELSE 'from_friend'
@@ -139,13 +216,9 @@ export async function listMyShops(
        WHERE f.user_id = ?
        ORDER BY f.created_at DESC`
     )
-    .all(userId) as MyShopRow[];
-
-  const originLabel: Record<string, string> = {
-    imported: '我导入',
-    checkin: '我记下',
-    from_friend: '来自好友',
-  };
+    .all(userId) as Array<
+    MyShopRow & { amap_poi_id: string | null; source_shop_id: string | null }
+  >;
 
   const items = rows.map((r) => {
     let distanceMeters: number | undefined;
@@ -163,6 +236,7 @@ export async function listMyShops(
       });
     }
     const head = r.photo_url || r.head_img;
+    const status = deriveShopStatus(r);
     return {
       favoriteId: r.favorite_id,
       shopId: r.shop_id,
@@ -183,12 +257,13 @@ export async function listMyShops(
       visibility: r.visibility,
       createdAt: r.created_at,
       origin: r.origin,
+      status,
       wishlist: Boolean(r.wishlist),
-      sourceTag: originLabel[r.origin] || '',
+      sourceTag: MY_SHOP_ORIGIN_LABEL[r.origin] || '',
       hasCoords: r.lat != null && r.lng != null,
       distanceMeters,
       distanceLabel,
-      recommendersLine: originLabel[r.origin] || '',
+      recommendersLine: MY_SHOP_ORIGIN_LABEL[r.origin] || '',
       collectors: [],
       collectorCount: 0,
     };
@@ -550,7 +625,289 @@ export function resolveAgentToken(
   return row;
 }
 
-/** Agent 只读：本人收藏 + 美食网内好友共享店（去重） */
+function httpError(message: string, status: number): Error {
+  return Object.assign(new Error(message), { status });
+}
+
+function optionalText(
+  value: unknown,
+  max: number,
+  emptyMessage: string
+): string | null {
+  if (value == null || value === '') return null;
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    throw httpError(emptyMessage, 400);
+  }
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  if (trimmed.length > max) {
+    throw httpError(emptyMessage, 400);
+  }
+  return trimmed;
+}
+
+function optionalCoord(value: unknown, label: string): number | null {
+  if (value == null || value === '') return null;
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) {
+    throw httpError(`${label}无效`, 400);
+  }
+  return n;
+}
+
+/** 去重键：至少 trim（H2）；展示名另存原文（trim 后的请求文本，不改写用词） */
+function normalizeDedupName(name: string): string {
+  return name.trim();
+}
+
+function normalizeDedupCity(city: string | null | undefined): string {
+  return (city || '').trim();
+}
+
+/** H5：备注追加，第一次内容必须仍可读 */
+function appendNotes(
+  existing: string | null,
+  incoming: string | null
+): string | null {
+  const a = (existing || '').trim();
+  const b = (incoming || '').trim();
+  if (!b) return a || null;
+  if (!a) return b;
+  if (a.includes(b)) return a;
+  const merged = `${a}；${b}`;
+  return merged.length <= 200 ? merged : merged.slice(0, 200);
+}
+
+type UserShopRow = {
+  favorite_id: string;
+  shop_id: string;
+  raw_name: string;
+  city: string | null;
+  district: string | null;
+  address: string | null;
+  amap_poi_id: string | null;
+  source_shop_id: string | null;
+  lat: number | null;
+  lng: number | null;
+  note: string | null;
+  wishlist: number;
+};
+
+function listUserFavoriteShops(userId: string): UserShopRow[] {
+  return getDb()
+    .prepare(
+      `SELECT f.id AS favorite_id, f.note, f.wishlist,
+              s.id AS shop_id, s.raw_name, s.city, s.district, s.address,
+              s.amap_poi_id, s.source_shop_id, s.lat, s.lng
+       FROM favorites f
+       JOIN shops s ON s.id = f.shop_id
+       WHERE f.user_id = ?`
+    )
+    .all(userId) as UserShopRow[];
+}
+
+/**
+ * 去重：优先本人已有 poiKey；否则规范化店名 + 同城。
+ * 不同 poiKey 的同名同城不合并（S5-API-08），避免把 B 静默丢掉。
+ */
+function findDuplicateShop(
+  rows: UserShopRow[],
+  name: string,
+  city: string | null,
+  poiKey: string | null
+): UserShopRow | undefined {
+  if (poiKey) {
+    const byPoi = rows.find(
+      (r) =>
+        r.amap_poi_id === poiKey ||
+        r.shop_id === poiKey ||
+        r.source_shop_id === poiKey
+    );
+    if (byPoi) return byPoi;
+  }
+  const keyName = normalizeDedupName(name);
+  const keyCity = normalizeDedupCity(city);
+  return rows.find((r) => {
+    if (poiKey && r.amap_poi_id && r.amap_poi_id !== poiKey) return false;
+    return (
+      normalizeDedupName(r.raw_name) === keyName &&
+      normalizeDedupCity(r.city) === keyCity
+    );
+  });
+}
+
+async function agentShopByFavoriteId(
+  userId: string,
+  favoriteId: string
+): Promise<AgentMineShop> {
+  const listed = await listMyShops(userId);
+  const item = listed.items.find((s) => s.favoriteId === favoriteId);
+  if (!item) {
+    throw httpError('写入后未能读出店铺', 500);
+  }
+  return toAgentMineShop(item);
+}
+
+/**
+ * Agent 记下一家店，写入调用者自己的「我的店」。
+ *
+ * 不走 createCheckin：那边强制 lat/lng，且 source_type=locate → origin 会变成「我记下」。
+ * 本路径 source_type=agent、文案「Agent 记下」；无合法 poiKey 则为 pending；永不写 source_shop_id。
+ */
+export async function createAgentShop(
+  userId: string,
+  rawInput: Record<string, unknown> | null | undefined
+): Promise<{ created: boolean; shop: AgentMineShop }> {
+  const input = rawInput && typeof rawInput === 'object' ? rawInput : {};
+
+  if (typeof input.name !== 'string' && input.name != null) {
+    throw httpError('请填写店名', 400);
+  }
+  const nameRaw = input.name == null ? '' : String(input.name);
+  const name = nameRaw.trim();
+  if (!name) {
+    throw httpError('请填写店名', 400);
+  }
+  if (name.length > 80) {
+    throw httpError('店名最多 80 字', 400);
+  }
+
+  const note = optionalText(input.note, 200, '备注最多 200 字');
+  const city = optionalText(input.city, 40, '城市最多 40 字');
+  const district = optionalText(input.district, 80, '片区最多 80 字');
+  const poiKey = optionalText(input.poiKey, 64, 'poiKey 过长');
+  const lat = optionalCoord(input.lat, '纬度');
+  const lng = optionalCoord(input.lng, '经度');
+  if ((lat == null) !== (lng == null)) {
+    throw httpError('经纬度需要成对提供', 400);
+  }
+
+  const wishlistProvided =
+    Object.prototype.hasOwnProperty.call(input, 'wishlist') &&
+    input.wishlist !== undefined;
+  const wishlist = Boolean(input.wishlist);
+
+  if (!(await msgSecCheck(name)) || (note && !(await msgSecCheck(note)))) {
+    throw httpError('内容未通过安全检查', 400);
+  }
+
+  if (!tryConsumeAgentShopWrite(userId)) {
+    throw httpError('记店过于频繁，每分钟最多 30 次、每天最多 200 次', 429);
+  }
+
+  await ensurePersonalNetwork(userId);
+  const existing = findDuplicateShop(
+    listUserFavoriteShops(userId),
+    name,
+    city,
+    poiKey
+  );
+  const createdAt = nowIso();
+  const db = getDb();
+
+  // H4：body.source 乱传也忽略，永远按 agent 落库
+  // H10：任何幻觉点评 id / source_shop_id / shopId 字段一律丢掉
+  if (existing) {
+    const mergedNote = appendNotes(existing.note, note);
+    const nextWishlist = wishlistProvided
+      ? wishlist
+        ? 1
+        : 0
+      : existing.wishlist
+        ? 1
+        : 0;
+    const tx = db.transaction(() => {
+      db.prepare(
+        `UPDATE shops SET
+           city = COALESCE(NULLIF(city, ''), ?),
+           district = COALESCE(NULLIF(district, ''), ?),
+           lat = COALESCE(lat, ?),
+           lng = COALESCE(lng, ?),
+           amap_poi_id = COALESCE(amap_poi_id, ?)
+         WHERE id = ?`
+      ).run(
+        city,
+        district,
+        lat,
+        lng,
+        poiKey,
+        existing.shop_id
+      );
+      db.prepare(
+        `UPDATE favorites SET note = ?, wishlist = ? WHERE id = ? AND user_id = ?`
+      ).run(mergedNote, nextWishlist, existing.favorite_id, userId);
+      if (note) {
+        db.prepare(
+          `INSERT INTO shop_comments (id, shop_id, user_id, body, created_at)
+           VALUES (?, ?, ?, ?, ?)`
+        ).run(uuidv4(), existing.shop_id, userId, note, createdAt);
+      }
+    });
+    tx();
+    console.info(
+      JSON.stringify({
+        event: 'agent_shop_write',
+        userId,
+        name,
+        merged: true,
+        ts: createdAt,
+      })
+    );
+    return {
+      created: false,
+      shop: await agentShopByFavoriteId(userId, existing.favorite_id),
+    };
+  }
+
+  const shopId = uuidv4();
+  const favId = uuidv4();
+  const tx = db.transaction(() => {
+    db.prepare(
+      `INSERT INTO shops (
+         id, source_type, source_shop_id, amap_poi_id, raw_name, adcode,
+         category, district, city, address, avg_price, lat, lng,
+         source_url, head_img, phone, display_cache_policy
+       ) VALUES (?, 'agent', NULL, ?, ?, NULL, NULL, ?, ?, ?, NULL, ?, ?, NULL, NULL, NULL, 'minimal')`
+    ).run(
+      shopId,
+      poiKey,
+      name,
+      district,
+      city,
+      district,
+      lat,
+      lng
+    );
+    db.prepare(
+      `INSERT INTO favorites (
+         id, user_id, shop_id, note, visibility, import_batch_id,
+         created_at, photo_url, wishlist
+       ) VALUES (?, ?, ?, ?, 'circles', NULL, ?, NULL, ?)`
+    ).run(favId, userId, shopId, note, createdAt, wishlist ? 1 : 0);
+    if (note) {
+      db.prepare(
+        `INSERT INTO shop_comments (id, shop_id, user_id, body, created_at)
+         VALUES (?, ?, ?, ?, ?)`
+      ).run(uuidv4(), shopId, userId, note, createdAt);
+    }
+  });
+  tx();
+  console.info(
+    JSON.stringify({
+      event: 'agent_shop_write',
+      userId,
+      name,
+      merged: false,
+      ts: createdAt,
+    })
+  );
+  return {
+    created: true,
+    shop: await agentShopByFavoriteId(userId, favId),
+  };
+}
+
+/** Agent 可读可写本人店：本人收藏 + 美食网内好友共享店（去重） */
 export async function listAgentShops(userId: string) {
   const network = await ensurePersonalNetwork(userId);
   const mine = await listMyShops(userId);
@@ -569,26 +926,14 @@ export async function listAgentShops(userId: string) {
     .all(network.id, userId) as Array<Record<string, unknown>>;
 
   return {
-    mine: mine.items.map((s) => ({
-      poiKey: s.poiKey,
-      name: s.name,
-      category: s.category,
-      district: s.district,
-      city: s.city,
-      address: s.address,
-      lat: s.lat,
-      lng: s.lng,
-      note: s.note,
-      origin: s.origin,
-      /** 心心念念：很想去；Agent 做出行/筛选规划时优先用这些 */
-      wishlist: s.wishlist,
-      phone: s.phone,
-    })),
+    mine: mine.items.map((s) => toAgentMineShop(s)),
     friendsShared: friendRows,
     /** 语义说明，方便其他 Agent 理解字段 */
     semantics: {
       wishlist: '心心念念——用户很想去的店；熄灭不等于删除',
-      origin: 'imported=专辑导入 checkin=自己记下 from_friend=来自好友',
+      origin:
+        'imported=专辑导入 checkin=自己记下 from_friend=来自好友 agent=Agent记下',
+      status: 'confirmed=有合法 poiKey pending=仅店名/未校验坐标',
     },
   };
 }

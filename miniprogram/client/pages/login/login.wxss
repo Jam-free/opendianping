@@ -62,7 +62,11 @@
   box-sizing: border-box;
   background: #fff;
   border-radius: 16rpx;
-  padding: 24rpx 28rpx;
+  /* 真机 input 用 height+line-height 对齐，避免 padding 把字裁成半截 */
+  height: 96rpx;
+  min-height: 96rpx;
+  line-height: 96rpx;
+  padding: 0 28rpx;
   font-size: 30rpx;
   text-align: center;
   border: 1rpx solid #eee;

@@ -4,7 +4,7 @@
   right: 0;
   bottom: 0;
   z-index: 100;
-  padding: 0 28rpx calc(16rpx + env(safe-area-inset-bottom));
+  padding: 0 40rpx calc(20rpx + env(safe-area-inset-bottom));
   pointer-events: none;
   box-sizing: border-box;
 }
@@ -13,15 +13,12 @@
   pointer-events: auto;
   display: flex;
   align-items: stretch;
-  height: 112rpx;
-  padding: 0 8rpx;
-  background: rgba(255, 255, 255, 0.96);
-  border-radius: 56rpx;
+  height: 120rpx;
+  background: #ffffff;
+  border-radius: 999rpx;
   box-shadow:
-    0 8rpx 32rpx rgba(0, 0, 0, 0.08),
-    0 1rpx 0 rgba(0, 0, 0, 0.04);
-  border: 1rpx solid rgba(0, 0, 0, 0.04);
-  backdrop-filter: blur(20px);
+    0 10rpx 40rpx rgba(0, 0, 0, 0.08),
+    0 2rpx 8rpx rgba(0, 0, 0, 0.04);
 }
 
 .dock-item {
@@ -30,12 +27,12 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4rpx;
-  border-radius: 48rpx;
+  gap: 6rpx;
+  border-radius: 999rpx;
 }
 
 .dock-item--press {
-  background: rgba(0, 0, 0, 0.04);
+  background: rgba(255, 107, 74, 0.06);
 }
 
 .dock-icon {
@@ -49,8 +46,9 @@
 }
 
 .dock-label {
-  font-size: 20rpx;
-  color: #333;
+  font-size: 22rpx;
   line-height: 1.2;
+  color: var(--primary);
   font-weight: 500;
+  letter-spacing: 0.5rpx;
 }

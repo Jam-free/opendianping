@@ -39,8 +39,9 @@ Page({
             const wxAny = wx;
             const sys = ((_a = wxAny.getSystemInfoSync) === null || _a === void 0 ? void 0 : _a.call(wxAny)) || {};
             const menu = ((_b = wxAny.getMenuButtonBoundingClientRect) === null || _b === void 0 ? void 0 : _b.call(wxAny)) || {};
+            // 标题行垂直对齐胶囊中线附近，整体更贴系统顶栏
             const statusPad = menu.bottom
-                ? menu.bottom + 8
+                ? Math.max(menu.bottom - 6, (sys.statusBarHeight || 20) + 8)
                 : (sys.statusBarHeight || 20) + 12;
             this.setData(Object.assign({ statusPad }, (panel ? { panel } : {})));
         }

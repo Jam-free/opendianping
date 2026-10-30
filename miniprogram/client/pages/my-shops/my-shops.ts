@@ -54,8 +54,9 @@ Page({
       const wxAny = wx as any;
       const sys = wxAny.getSystemInfoSync?.() || {};
       const menu = wxAny.getMenuButtonBoundingClientRect?.() || {};
+      // 标题行垂直对齐胶囊中线附近，整体更贴系统顶栏
       const statusPad = menu.bottom
-        ? menu.bottom + 8
+        ? Math.max(menu.bottom - 6, (sys.statusBarHeight || 20) + 8)
         : (sys.statusBarHeight || 20) + 12;
       this.setData({ statusPad, ...(panel ? { panel } : {}) });
     } catch {

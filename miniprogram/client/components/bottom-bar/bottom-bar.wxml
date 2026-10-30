@@ -1,7 +1,4 @@
-<!--
-  常驻悬浮底栏：导入 / 连接AI / 记美食
-  圆角条浮在安全区上方，两主页共用，不抢系统 tab。
--->
+<!-- 参考：圆角胶囊悬浮条，三等分，图标+短文案，主题色 -->
 <view class="dock-safe">
   <view class="dock">
     <view class="dock-item" hover-class="dock-item--press" bindtap="onImport">
@@ -10,7 +7,7 @@
     </view>
     <view class="dock-item" hover-class="dock-item--press" bindtap="onConnectAi">
       <image class="dock-icon dock-icon--ai" src="/assets/icons/dock/connect-ai.png" mode="aspectFit" />
-      <text class="dock-label">连接AI</text>
+      <text class="dock-label">连接 AI</text>
     </view>
     <view class="dock-item" hover-class="dock-item--press" bindtap="onLocate">
       <image class="dock-icon" src="/assets/icons/dock/locate.png" mode="aspectFit" />

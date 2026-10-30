@@ -2,7 +2,6 @@
   "navigationStyle": "custom",
   "navigationBarTextStyle": "black",
   "usingComponents": {
-    "shop-row": "/components/shop-row/shop-row",
-    "bottom-bar": "/components/bottom-bar/bottom-bar"
+    "shop-row": "/components/shop-row/shop-row"
   }
 }

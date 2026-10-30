@@ -172,8 +172,44 @@ Page({
     goImport() {
         wx.navigateTo({ url: '/pages/import/import' });
     },
+    goConnectAi() {
+        wx.navigateTo({ url: '/pages/connect-ai/connect-ai' });
+    },
     goLocate() {
         wx.navigateTo({ url: '/pages/locate-note/locate-note' });
+    },
+    /** 长按店铺行 → 确认后从「我的店」移除 */
+    onDeleteShop(e) {
+        var _a;
+        const shop = (_a = e === null || e === void 0 ? void 0 : e.detail) === null || _a === void 0 ? void 0 : _a.shop;
+        const favoriteId = (shop === null || shop === void 0 ? void 0 : shop.favoriteId) || '';
+        if (!favoriteId) {
+            wx.showToast({ title: '这条还不能删', icon: 'none' });
+            return;
+        }
+        const name = ((shop === null || shop === void 0 ? void 0 : shop.name) || '这家店').slice(0, 20);
+        wx.showModal({
+            title: '删除这家店？',
+            content: `「${name}」会从你的私藏里移除，好友那边也不再看到你分享的这家。`,
+            confirmText: '删除',
+            confirmColor: '#e05a5a',
+            success: async (r) => {
+                if (!r.confirm)
+                    return;
+                try {
+                    await (0, api_1.request)(`/api/favorites/${encodeURIComponent(favoriteId)}`, {
+                        method: 'DELETE',
+                    });
+                    this.setData({
+                        shops: (this.data.shops || []).filter((s) => s.favoriteId !== favoriteId),
+                    });
+                    wx.showToast({ title: '已删除', icon: 'success' });
+                }
+                catch (err) {
+                    wx.showToast({ title: err.message, icon: 'none' });
+                }
+            },
+        });
     },
     onShareAppMessage() {
         const { networkId, inviteToken } = this.data;

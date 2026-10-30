@@ -82,6 +82,10 @@
   display: block;
 }
 
+.action-label.danger {
+  color: var(--danger);
+}
+
 .action-label {
   font-size: 22rpx;
   color: var(--sub, #666);

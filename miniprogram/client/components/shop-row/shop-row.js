@@ -44,6 +44,14 @@ Component({
             // 不用原生名 tap，防止和冒泡 tap 混成 detail 里没有 shop
             this.triggerEvent('openshop', { shop });
         },
+        onLongPress() {
+            const shop = this.properties.shop;
+            if (!(shop === null || shop === void 0 ? void 0 : shop.favoriteId)) {
+                wx.showToast({ title: '这条还不能删', icon: 'none' });
+                return;
+            }
+            this.triggerEvent('deleteshop', { shop });
+        },
         /** 代理/CDN 失败时切本地兜底，只切一次避免循环 */
         onImgError() {
             if (this.data.displaySrc === media_1.SHOP_PLACEHOLDER)

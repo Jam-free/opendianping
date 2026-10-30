@@ -53,6 +53,7 @@ Page({
     sending: false,
     wishlist: false,
     canEditCheckin: false,
+    canDelete: false,
     canNav: false,
   },
 
@@ -100,6 +101,8 @@ Page({
       canEditCheckin:
         (shop.sourceType === 'locate' || shop.sourceType === 'photo') &&
         Boolean(shop.myFavoriteId),
+      // 只要是自己收藏/记下的，就可以从私藏里删掉
+      canDelete: Boolean(shop.myFavoriteId),
       canNav: shop.lat != null && shop.lng != null,
     });
     await this.loadComments();
@@ -174,6 +177,32 @@ Page({
     if (!fav) return;
     wx.navigateTo({
       url: `/pages/locate-note/locate-note?fav=${encodeURIComponent(fav)}`,
+    });
+  },
+
+  onDelete() {
+    const fav = this.data.shop?.myFavoriteId;
+    const name = (this.data.shop?.name || '这家店').slice(0, 20);
+    if (!fav) return;
+    wx.showModal({
+      title: '删除这家店？',
+      content: `「${name}」会从你的私藏里移除。`,
+      confirmText: '删除',
+      confirmColor: '#e05a5a',
+      success: async (r) => {
+        if (!r.confirm) return;
+        try {
+          await request(`/api/favorites/${encodeURIComponent(fav)}`, {
+            method: 'DELETE',
+          });
+          wx.showToast({ title: '已删除', icon: 'success' });
+          setTimeout(() => wx.navigateBack({ fail: () => {
+            wx.reLaunch({ url: '/pages/my-shops/my-shops' });
+          }}), 400);
+        } catch (err) {
+          wx.showToast({ title: (err as Error).message, icon: 'none' });
+        }
+      },
     });
   },
 

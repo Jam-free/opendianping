@@ -1,16 +1,19 @@
+<!--
+  底栏必须放在 .page 外：page 若 overflow:hidden，微信里会把 position:fixed 裁掉，
+  看起来就像「底部按钮没了」。
+-->
 <view class="page" style="padding-top: {{statusPad}}px;">
   <!--
-    顶栏：左对齐大标题切换（当前橙色大号 + 旁侧灰色小号），头像靠右；
-    点小字或滑动内容切换。无等宽下划线 Tab。
+    标题相对位置固定：左「私藏好店」右「吃货排行」；
+    只切换字号/字色（当前大橙、另一页小灰），很常见的 UX。
   -->
   <view class="header">
-    <!-- 当前页永远在左：大号橙色；另一页紧挨右侧：小号灰色。切换即对调。 -->
     <view class="titles">
-      <view class="title-hit" bindtap="goPanel" data-panel="{{panel}}">
-        <text class="title title--on">{{panel === 0 ? '私藏好店' : '吃货排行'}}</text>
+      <view class="title-hit" bindtap="goPanel" data-panel="0">
+        <text class="title {{panel === 0 ? 'title--on' : 'title--off'}}">私藏好店</text>
       </view>
-      <view class="title-hit title-hit--off" bindtap="goPanel" data-panel="{{panel === 0 ? 1 : 0}}">
-        <text class="title title--off">{{panel === 0 ? '吃货排行' : '私藏好店'}}</text>
+      <view class="title-hit title-hit--gap" bindtap="goPanel" data-panel="1">
+        <text class="title {{panel === 1 ? 'title--on' : 'title--off'}}">吃货排行</text>
       </view>
     </view>
     <view class="avatar-entry" bindtap="goAccount" hover-class="avatar-hover">
@@ -30,9 +33,15 @@
     <swiper-item>
       <scroll-view scroll-y class="panel-scroll" enhanced show-scrollbar="{{false}}">
         <view class="sheet" wx:if="{{shops.length}}">
-          <block wx:for="{{shops}}" wx:key="poiKey">
+          <view class="list-tip">长按店铺可删除</view>
+          <block wx:for="{{shops}}" wx:key="favoriteId">
             <view class="sheet-item">
-              <shop-row shop="{{item}}" source-tag="{{item.sourceTag}}" bind:openshop="openShop" />
+              <shop-row
+                shop="{{item}}"
+                source-tag="{{item.sourceTag}}"
+                bind:openshop="openShop"
+                bind:deleteshop="onDeleteShop"
+              />
             </view>
           </block>
         </view>
@@ -86,6 +95,22 @@
       </scroll-view>
     </swiper-item>
   </swiper>
+</view>
 
-  <bottom-bar />
+<!-- 悬浮底栏：与 page 同级，避免被裁切 / 被 swiper 盖住 -->
+<view class="dock-safe">
+  <view class="dock">
+    <view class="dock-item" hover-class="dock-item--press" bindtap="goImport">
+      <image class="dock-icon" src="/assets/icons/dock/import.png" mode="aspectFit" />
+      <text class="dock-label">导入</text>
+    </view>
+    <view class="dock-item" hover-class="dock-item--press" bindtap="goConnectAi">
+      <image class="dock-icon dock-icon--ai" src="/assets/icons/dock/connect-ai.png" mode="aspectFit" />
+      <text class="dock-label">连接 AI</text>
+    </view>
+    <view class="dock-item" hover-class="dock-item--press" bindtap="goLocate">
+      <image class="dock-icon" src="/assets/icons/dock/locate.png" mode="aspectFit" />
+      <text class="dock-label">记美食</text>
+    </view>
+  </view>
 </view>

@@ -1,5 +1,17 @@
 import { config } from '../config.js';
 
+/** 附近兴趣点：记美食时点选店名/地址 */
+export type NearbyPoi = {
+  id: string;
+  title: string;
+  address: string;
+  category?: string;
+  /** 距定位点米数 */
+  distance?: number;
+  lat?: number;
+  lng?: number;
+};
+
 export type ReverseGeoResult = {
   address: string;
   province?: string;
@@ -7,12 +19,13 @@ export type ReverseGeoResult = {
   district?: string;
   township?: string;
   street?: string;
+  /** 附近 POI，前端可点选；没有 Key 时为空数组 */
+  pois: NearbyPoi[];
 };
 
 /**
- * 逆地理：坐标 → 可读地址。
- * 优先腾讯位置服务（TENCENT_MAP_KEY），其次高德（AMAP_KEY）；
- * 都没有则返回简短占位，避免只甩经纬度给用户。
+ * 逆地理：坐标 → 可读地址 + 附近店铺。
+ * 腾讯 get_poi=1 才能列出周边店；高德用 extensions=all。
  */
 export async function reverseGeocode(
   lat: number,
@@ -24,6 +37,7 @@ export async function reverseGeocode(
 
   const fallback: ReverseGeoResult = {
     address: `当前位置（${lat.toFixed(4)}, ${lng.toFixed(4)}）`,
+    pois: [],
   };
 
   if (config.tencentMapKey) {
@@ -46,7 +60,9 @@ async function reverseByTencent(
   const url = new URL('https://apis.map.qq.com/ws/geocoder/v1/');
   url.searchParams.set('location', `${lat},${lng}`);
   url.searchParams.set('key', config.tencentMapKey);
-  url.searchParams.set('get_poi', '0');
+  // 打开附近 POI，才能精确到店而不是只到街道
+  url.searchParams.set('get_poi', '1');
+  url.searchParams.set('poi_options', 'policy=2;radius=500;page_size=12');
 
   try {
     const res = await fetch(url.toString(), {
@@ -65,6 +81,14 @@ async function reverseByTencent(
           street_number?: string;
         };
         address_reference?: { town?: { title?: string } };
+        pois?: Array<{
+          id?: string;
+          title?: string;
+          address?: string;
+          category?: string;
+          _distance?: number;
+          location?: { lat?: number; lng?: number };
+        }>;
       };
     };
 
@@ -75,6 +99,19 @@ async function reverseByTencent(
 
     const ac = data.result.address_component || {};
     const street = [ac.street, ac.street_number].filter(Boolean).join('');
+    const pois: NearbyPoi[] = (data.result.pois || [])
+      .filter((p) => p.title)
+      .map((p, i) => ({
+        id: p.id || `t_${i}`,
+        title: String(p.title),
+        address: p.address || data.result?.address || '',
+        category: p.category,
+        distance:
+          typeof p._distance === 'number' ? Math.round(p._distance) : undefined,
+        lat: p.location?.lat,
+        lng: p.location?.lng,
+      }));
+
     return {
       address:
         data.result.address ||
@@ -85,6 +122,7 @@ async function reverseByTencent(
       district: ac.district,
       township: data.result.address_reference?.town?.title,
       street: street || undefined,
+      pois,
     };
   } catch (err) {
     console.warn('[geo] tencent reverse error', err);
@@ -99,7 +137,9 @@ async function reverseByAmap(
   const url = new URL('https://restapi.amap.com/v3/geocode/regeo');
   url.searchParams.set('key', config.amapKey);
   url.searchParams.set('location', `${lng},${lat}`);
-  url.searchParams.set('extensions', 'base');
+  url.searchParams.set('extensions', 'all');
+  url.searchParams.set('radius', '500');
+  url.searchParams.set('roadlevel', '0');
 
   try {
     const res = await fetch(url.toString(), {
@@ -116,6 +156,14 @@ async function reverseByAmap(
           township?: string;
           streetNumber?: { street?: string; number?: string };
         };
+        pois?: Array<{
+          id?: string;
+          name?: string;
+          address?: string | string[];
+          type?: string;
+          distance?: string;
+          location?: string;
+        }>;
       };
     };
 
@@ -127,6 +175,26 @@ async function reverseByAmap(
       .filter(Boolean)
       .join('');
 
+    const pois: NearbyPoi[] = (data.regeocode.pois || [])
+      .filter((p) => p.name)
+      .slice(0, 12)
+      .map((p, i) => {
+        const loc = (p.location || '').split(',');
+        const poiLng = loc[0] ? Number(loc[0]) : undefined;
+        const poiLat = loc[1] ? Number(loc[1]) : undefined;
+        const addr = Array.isArray(p.address) ? p.address[0] : p.address;
+        const dist = p.distance ? Number(p.distance) : undefined;
+        return {
+          id: p.id || `a_${i}`,
+          title: String(p.name),
+          address: addr || data.regeocode?.formatted_address || '',
+          category: p.type,
+          distance: Number.isFinite(dist) ? Math.round(dist!) : undefined,
+          lat: Number.isFinite(poiLat) ? poiLat : undefined,
+          lng: Number.isFinite(poiLng) ? poiLng : undefined,
+        };
+      });
+
     return {
       address:
         data.regeocode.formatted_address ||
@@ -137,6 +205,7 @@ async function reverseByAmap(
       district: ac.district,
       township: ac.township,
       street: street || undefined,
+      pois,
     };
   } catch (err) {
     console.warn('[geo] amap reverse error', err);

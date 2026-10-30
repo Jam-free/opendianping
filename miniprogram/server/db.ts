@@ -163,12 +163,25 @@ function migrateSchema(database: Database.Database): void {
   if (!shopCols.some((c) => c.name === 'head_img')) {
     database.exec(`ALTER TABLE shops ADD COLUMN head_img TEXT`);
   }
+  if (!shopCols.some((c) => c.name === 'phone')) {
+    database.exec(`ALTER TABLE shops ADD COLUMN phone TEXT`);
+  }
 
   const favCols = database
     .prepare(`PRAGMA table_info(favorites)`)
     .all() as Array<{ name: string }>;
   if (!favCols.some((c) => c.name === 'photo_url')) {
     database.exec(`ALTER TABLE favorites ADD COLUMN photo_url TEXT`);
+  }
+  // 心心念念：很想去；导入默认 1，记美食默认 0
+  if (!favCols.some((c) => c.name === 'wishlist')) {
+    database.exec(
+      `ALTER TABLE favorites ADD COLUMN wishlist INTEGER NOT NULL DEFAULT 0`
+    );
+    // 已有导入收藏视为心心念念
+    database.exec(
+      `UPDATE favorites SET wishlist = 1 WHERE import_batch_id IS NOT NULL`
+    );
   }
 
   database.exec(`
@@ -181,5 +194,52 @@ function migrateSchema(database: Database.Database): void {
       last_used_at TEXT,
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
+
+    -- 评论流：一人可发多条；旧 favorites.note 迁成首条评论
+    CREATE TABLE IF NOT EXISTS shop_comments (
+      id TEXT PRIMARY KEY,
+      shop_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      body TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_shop_comments_shop ON shop_comments(shop_id, created_at);
   `);
+
+  // 一次性：把非空备注迁成评论（用 note 前缀标记避免重复迁）
+  const pending = database
+    .prepare(
+      `SELECT id, user_id, shop_id, note FROM favorites
+       WHERE note IS NOT NULL AND note != ''
+         AND note NOT LIKE '[migrated]%'`
+    )
+    .all() as Array<{
+    id: string;
+    user_id: string;
+    shop_id: string;
+    note: string;
+  }>;
+  if (pending.length) {
+    const insert = database.prepare(
+      `INSERT INTO shop_comments (id, shop_id, user_id, body, created_at)
+       VALUES (?, ?, ?, ?, datetime('now'))`
+    );
+    const mark = database.prepare(
+      `UPDATE favorites SET note = ? WHERE id = ?`
+    );
+    const tx = database.transaction(() => {
+      for (const row of pending) {
+        insert.run(
+          `c_${row.id}`,
+          row.shop_id,
+          row.user_id,
+          row.note.slice(0, 500)
+        );
+        mark.run(`[migrated]${row.note.slice(0, 180)}`, row.id);
+      }
+    });
+    tx();
+  }
 }

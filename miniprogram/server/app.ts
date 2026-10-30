@@ -69,7 +69,8 @@ function sendError(res: Response, err: unknown) {
  */
 export function createApp() {
   const app = express();
-  app.use(express.json({ limit: '1mb' }));
+  // 记美食照片走 base64 JSON，需略大于默认 1mb
+  app.use(express.json({ limit: '4mb' }));
 
   app.get('/health', (_req, res) => {
     // albumImport=true 表示本镜像可解析点评公开专辑（不依赖根目录 lib）
@@ -107,6 +108,22 @@ export function createApp() {
       next(err);
     }
   });
+
+  /** 本地上传图：不鉴权，便于 <image> 直链加载 */
+  app.get(
+    '/api/media/local/:id',
+    asyncHandler(async (req, res) => {
+      const { readLocalPhoto } = await import('./services/photos.js');
+      const file = readLocalPhoto(String(req.params.id || ''));
+      if (!file) {
+        res.status(404).json({ error: '图片不存在' });
+        return;
+      }
+      res.setHeader('Content-Type', file.contentType);
+      res.setHeader('Cache-Control', 'public, max-age=604800');
+      res.status(200).send(file.buffer);
+    })
+  );
 
   /** 登录页用来区分「微信登录」vs「一键进入」文案；不鉴权 */
   app.get('/api/auth/bootstrap', (_req, res) => {
@@ -192,6 +209,20 @@ export function createApp() {
   );
 
   app.post(
+    '/api/me/photos',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const { saveUploadedPhoto } = await import('./services/photos.js');
+      res.json(
+        saveUploadedPhoto({
+          base64: String(req.body?.base64 || ''),
+          mime: req.body?.mime ? String(req.body.mime) : undefined,
+        })
+      );
+    })
+  );
+
+  app.post(
     '/api/me/checkins',
     requireAuth,
     asyncHandler(async (req, res) => {
@@ -202,8 +233,97 @@ export function createApp() {
         lng: Number(req.body?.lng),
         address: req.body?.address ? String(req.body.address) : undefined,
         photoUrl: req.body?.photoUrl ? String(req.body.photoUrl) : undefined,
+        phone: req.body?.phone ? String(req.body.phone) : undefined,
+        poiId: req.body?.poiId ? String(req.body.poiId) : undefined,
+        wishlist: Boolean(req.body?.wishlist),
       });
       res.json(result);
+    })
+  );
+
+  app.get(
+    '/api/me/checkins/:favoriteId',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      res.json(network.getCheckin(req.userId!, req.params.favoriteId));
+    })
+  );
+
+  app.patch(
+    '/api/me/checkins/:favoriteId',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      res.json(
+        network.updateCheckin(req.userId!, req.params.favoriteId, {
+          name: req.body?.name != null ? String(req.body.name) : undefined,
+          address:
+            req.body?.address != null ? String(req.body.address) : undefined,
+          photoUrl:
+            req.body?.photoUrl != null ? String(req.body.photoUrl) : undefined,
+          phone: req.body?.phone != null ? String(req.body.phone) : undefined,
+          note: req.body?.note != null ? String(req.body.note) : undefined,
+          wishlist:
+            req.body?.wishlist != null
+              ? Boolean(req.body.wishlist)
+              : undefined,
+        })
+      );
+    })
+  );
+
+  app.post(
+    '/api/me/wishlist',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const poiKey = String(req.body?.poiKey || '');
+      if (!poiKey) {
+        res.status(400).json({ error: '缺少 poiKey' });
+        return;
+      }
+      res.json(
+        network.setWishlistByPoi(
+          req.userId!,
+          poiKey,
+          Boolean(req.body?.wishlist)
+        )
+      );
+    })
+  );
+
+  app.get(
+    '/api/shops/:poiKey/comments',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const { listShopComments, resolveShopIdByPoiKey } = await import(
+        './services/comments.js'
+      );
+      const shopId = resolveShopIdByPoiKey(req.params.poiKey);
+      if (!shopId) {
+        res.status(404).json({ error: '店铺不存在' });
+        return;
+      }
+      res.json({ items: listShopComments(req.userId!, shopId) });
+    })
+  );
+
+  app.post(
+    '/api/shops/:poiKey/comments',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const { addShopComment, resolveShopIdByPoiKey } = await import(
+        './services/comments.js'
+      );
+      const shopId = resolveShopIdByPoiKey(req.params.poiKey);
+      if (!shopId) {
+        res.status(404).json({ error: '店铺不存在' });
+        return;
+      }
+      const comment = addShopComment(
+        req.userId!,
+        shopId,
+        String(req.body?.body || '')
+      );
+      res.json({ comment });
     })
   );
 

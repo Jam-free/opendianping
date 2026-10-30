@@ -168,6 +168,8 @@ function guessContentType(url: string, buffer?: Buffer): string {
 }
 
 export function buildProxyPath(rawUrl: string): string {
+  // 本地上传图已是本服务路径，不必再走外链代理
+  if (rawUrl.startsWith('/api/media/local/')) return rawUrl;
   // 存库的是原始 headImg；这里只 encode 一次。客户端拼 API_BASE 后由 Express 解一次。
   return `/api/media/proxy?url=${encodeURIComponent(rawUrl)}`;
 }

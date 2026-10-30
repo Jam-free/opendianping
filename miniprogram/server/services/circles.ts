@@ -284,6 +284,8 @@ type CircleShopRow = {
   favorited_at: string;
   source_url: string | null;
   source_shop_id: string | null;
+  phone: string | null;
+  wishlist: number;
 };
 
 export type AggregatedCircleShop = {
@@ -297,6 +299,7 @@ export type AggregatedCircleShop = {
   address?: string;
   lat?: number;
   lng?: number;
+  phone?: string;
   sourceType: string;
   sourceUrl?: string;
   sourceShopId?: string;
@@ -315,6 +318,8 @@ export type AggregatedCircleShop = {
   /** 当前用户在这家店上的收藏（用于改自己的备注） */
   myFavoriteId?: string;
   myNote?: string;
+  /** 心心念念（很想去） */
+  wishlist?: boolean;
   distanceMeters?: number;
   distanceLabel?: string;
   hasCoords: boolean;
@@ -342,11 +347,13 @@ function queryCircleShopRows(
       s.source_url,
       s.source_shop_id,
       s.head_img,
+      s.phone,
       f.id AS favorite_id,
       f.user_id AS collector_id,
       u.nickname AS collector_nickname,
       u.avatar AS collector_avatar,
       f.note,
+      f.wishlist,
       f.created_at AS favorited_at
     FROM circle_members cm
     JOIN favorites f ON f.user_id = cm.user_id
@@ -409,6 +416,7 @@ function aggregateCircleShops(rows: CircleShopRow[]): AggregatedCircleShop[] {
       }
       if (r.source_url) agg.sourceUrl = r.source_url;
       if (r.source_shop_id) agg.sourceShopId = r.source_shop_id;
+      if (r.phone) agg.phone = r.phone;
       if (r.head_img) {
         agg.headImg = r.head_img;
         agg.headImgProxy = buildProxyPath(r.head_img);
@@ -423,6 +431,7 @@ function aggregateCircleShops(rows: CircleShopRow[]): AggregatedCircleShop[] {
       if (!agg.sourceShopId && r.source_shop_id) {
         agg.sourceShopId = r.source_shop_id;
       }
+      if (!agg.phone && r.phone) agg.phone = r.phone;
     }
 
     const existing = agg.collectors.find((c) => c.userId === r.collector_id);
@@ -567,7 +576,21 @@ export function getCircleShopDetail(
   } else {
     shop.myNote = '';
   }
-  // 朋友备注列表里不重复展示「我」——我的备注单独编辑
+
+  // 当前用户的心心念念状态（按本人 favorites.wishlist）
+  const myWish = getDb()
+    .prepare(
+      `SELECT f.wishlist
+       FROM favorites f
+       JOIN shops s ON s.id = f.shop_id
+       WHERE f.user_id = ?
+         AND COALESCE(s.source_shop_id, s.amap_poi_id, s.id) = ?
+       LIMIT 1`
+    )
+    .get(userId, poiKey) as { wishlist: number } | undefined;
+  shop.wishlist = Boolean(myWish?.wishlist);
+
+  // 朋友备注列表里不重复展示「我」——评论流走 shop_comments
   shop.collectors = shop.collectors.filter((c) => c.userId !== userId);
   shop.collectorCount = shop.collectors.length;
   shop.recommendersLine = formatRecommendersLine(

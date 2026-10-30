@@ -75,4 +75,10 @@ declare const wx: {
   setNavigationBarTitle: (opts: any) => void;
   stopPullDownRefresh: () => void;
   getGroupEnterInfo?: (opts: any) => void;
+  getFileSystemManager: () => {
+    readFileSync: (path: string, encoding?: string) => string | ArrayBuffer;
+  };
+  showLoading: (opts: any) => void;
+  hideLoading: () => void;
+  makePhoneCall: (opts: any) => void;
 };

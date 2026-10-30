@@ -103,15 +103,19 @@ type MyShopRow = {
   lng: number | null;
   source_type: string;
   head_img: string | null;
+  phone: string | null;
   note: string | null;
   visibility: string;
   created_at: string;
   origin: string;
+  wishlist: number;
+  photo_url: string | null;
 };
 
 /**
  * Tab2：我导入的 + 我记下的 + 我从好友清单收藏的店。
  * origin: imported | checkin | from_friend
+ * wishlist=1 →「心心念念」（很想去），熄心不删店。
  */
 export async function listMyShops(
   userId: string,
@@ -123,8 +127,8 @@ export async function listMyShops(
       `SELECT f.id AS favorite_id, s.id AS shop_id,
               COALESCE(s.source_shop_id, s.amap_poi_id, s.id) AS poi_key,
               s.raw_name AS name, s.avg_price, s.category, s.district, s.city,
-              s.address, s.lat, s.lng, s.source_type, s.head_img,
-              f.note, f.visibility, f.created_at,
+              s.address, s.lat, s.lng, s.source_type, s.head_img, s.phone,
+              f.note, f.visibility, f.created_at, f.wishlist, f.photo_url,
               CASE
                 WHEN s.source_type IN ('photo', 'locate') THEN 'checkin'
                 WHEN f.import_batch_id IS NOT NULL THEN 'imported'
@@ -155,9 +159,10 @@ export async function listMyShops(
       distanceMeters = haversineMeters(opts.lat, opts.lng, r.lat, r.lng);
       distanceLabel = formatDistanceLabel(distanceMeters, {
         userCity: opts.userCity,
-        shopCity: r.city,
+        shopCity: r.city ?? undefined,
       });
     }
+    const head = r.photo_url || r.head_img;
     return {
       favoriteId: r.favorite_id,
       shopId: r.shop_id,
@@ -171,12 +176,14 @@ export async function listMyShops(
       lat: r.lat,
       lng: r.lng,
       sourceType: r.source_type,
-      headImg: r.head_img,
-      headImgProxy: r.head_img ? buildProxyPath(r.head_img) : null,
+      phone: r.phone,
+      headImg: head,
+      headImgProxy: head ? buildProxyPath(head) : null,
       note: r.note,
       visibility: r.visibility,
       createdAt: r.created_at,
       origin: r.origin,
+      wishlist: Boolean(r.wishlist),
       sourceTag: originLabel[r.origin] || '',
       hasCoords: r.lat != null && r.lng != null,
       distanceMeters,
@@ -200,7 +207,8 @@ export async function listMyShops(
 }
 
 /**
- * 记美食：在当前位置创建一家店并收藏，默认对美食好友可见。
+ * 记美食：在当前位置创建一家店并加入「我的店」，默认对美食好友可见。
+ * wishlist 默认 0（去过不等于心心念念）；导入专辑才默认亮心。
  */
 export async function createCheckin(
   userId: string,
@@ -211,6 +219,10 @@ export async function createCheckin(
     lng: number;
     address?: string;
     photoUrl?: string;
+    phone?: string;
+    /** 地图 POI id，便于以后对齐 */
+    poiId?: string;
+    wishlist?: boolean;
   }
 ) {
   await ensurePersonalNetwork(userId);
@@ -222,10 +234,19 @@ export async function createCheckin(
     throw Object.assign(new Error('需要有效定位'), { status: 400 });
   }
 
+  // 只接受本服务持久化后的路径，拒绝 wxfile:// 临时路径
+  const photoUrl =
+    input.photoUrl && input.photoUrl.startsWith('/api/media/local/')
+      ? input.photoUrl
+      : null;
+  const note = (input.note || '').trim().slice(0, 500) || null;
+  const phone = (input.phone || '').trim().slice(0, 40) || null;
+  const poiId = (input.poiId || '').trim().slice(0, 64) || null;
+  const wishlist = input.wishlist ? 1 : 0;
+
   const db = getDb();
   const shopId = uuidv4();
   const favId = uuidv4();
-  const note = (input.note || '').trim().slice(0, 200) || null;
   const createdAt = nowIso();
 
   const tx = db.transaction(() => {
@@ -233,28 +254,32 @@ export async function createCheckin(
       `INSERT INTO shops (
          id, source_type, source_shop_id, amap_poi_id, raw_name, adcode,
          category, district, city, address, avg_price, lat, lng,
-         source_url, head_img, display_cache_policy
-       ) VALUES (?, 'locate', NULL, NULL, ?, NULL, NULL, NULL, NULL, ?, NULL, ?, ?, NULL, ?, 'minimal')`
+         source_url, head_img, phone, display_cache_policy
+       ) VALUES (?, 'locate', NULL, ?, ?, NULL, NULL, NULL, NULL, ?, NULL, ?, ?, NULL, ?, ?, 'minimal')`
     ).run(
       shopId,
+      poiId,
       name,
       input.address || null,
       input.lat,
       input.lng,
-      input.photoUrl || null
+      photoUrl,
+      phone
     );
 
     db.prepare(
-      `INSERT INTO favorites (id, user_id, shop_id, note, visibility, import_batch_id, created_at, photo_url)
-       VALUES (?, ?, ?, ?, 'circles', NULL, ?, ?)`
-    ).run(
-      favId,
-      userId,
-      shopId,
-      note,
-      createdAt,
-      input.photoUrl || null
-    );
+      `INSERT INTO favorites (
+         id, user_id, shop_id, note, visibility, import_batch_id,
+         created_at, photo_url, wishlist
+       ) VALUES (?, ?, ?, ?, 'circles', NULL, ?, ?, ?)`
+    ).run(favId, userId, shopId, note, createdAt, photoUrl, wishlist);
+
+    if (note) {
+      db.prepare(
+        `INSERT INTO shop_comments (id, shop_id, user_id, body, created_at)
+         VALUES (?, ?, ?, ?, ?)`
+      ).run(uuidv4(), shopId, userId, note, createdAt);
+    }
   });
   tx();
 
@@ -264,6 +289,180 @@ export async function createCheckin(
     poiKey: shopId,
     name,
   };
+}
+
+/** 读出可再编辑的记美食记录（仅本人 + locate/photo） */
+export function getCheckin(userId: string, favoriteId: string) {
+  const row = getDb()
+    .prepare(
+      `SELECT f.id AS favoriteId, f.shop_id AS shopId, f.note, f.photo_url AS photoUrl,
+              f.wishlist, s.raw_name AS name, s.address, s.lat, s.lng, s.phone,
+              s.source_type AS sourceType, s.head_img AS headImg
+       FROM favorites f
+       JOIN shops s ON s.id = f.shop_id
+       WHERE f.id = ? AND f.user_id = ?`
+    )
+    .get(favoriteId, userId) as
+    | {
+        favoriteId: string;
+        shopId: string;
+        note: string | null;
+        photoUrl: string | null;
+        wishlist: number;
+        name: string;
+        address: string | null;
+        lat: number | null;
+        lng: number | null;
+        phone: string | null;
+        sourceType: string;
+        headImg: string | null;
+      }
+    | undefined;
+  if (!row) {
+    throw Object.assign(new Error('记录不存在'), { status: 404 });
+  }
+  if (row.sourceType !== 'locate' && row.sourceType !== 'photo') {
+    throw Object.assign(new Error('只有自己记下的店可以这样改'), {
+      status: 400,
+    });
+  }
+  const head = row.photoUrl || row.headImg;
+  return {
+    ...row,
+    wishlist: Boolean(row.wishlist),
+    headImgProxy: head ? buildProxyPath(head) : null,
+  };
+}
+
+/**
+ * 再编辑记美食：改店名 / 地址 / 图 / 电话；新备注作为新评论追加。
+ */
+export function updateCheckin(
+  userId: string,
+  favoriteId: string,
+  patch: {
+    name?: string;
+    address?: string;
+    photoUrl?: string;
+    phone?: string;
+    note?: string;
+    wishlist?: boolean;
+  }
+) {
+  const existing = getCheckin(userId, favoriteId);
+  const db = getDb();
+  const name =
+    patch.name !== undefined
+      ? patch.name.trim().slice(0, 60)
+      : existing.name;
+  if (!name) {
+    throw Object.assign(new Error('请填写店名或地点名'), { status: 400 });
+  }
+
+  let photoUrl = existing.photoUrl;
+  if (patch.photoUrl !== undefined) {
+    if (
+      patch.photoUrl === '' ||
+      patch.photoUrl === null ||
+      patch.photoUrl === undefined
+    ) {
+      photoUrl = null;
+    } else if (patch.photoUrl.startsWith('/api/media/local/')) {
+      photoUrl = patch.photoUrl;
+    } else {
+      throw Object.assign(new Error('请先上传图片'), { status: 400 });
+    }
+  }
+
+  const address =
+    patch.address !== undefined
+      ? patch.address.trim().slice(0, 200) || null
+      : existing.address;
+  const phone =
+    patch.phone !== undefined
+      ? patch.phone.trim().slice(0, 40) || null
+      : existing.phone;
+  const wishlist =
+    patch.wishlist !== undefined
+      ? patch.wishlist
+        ? 1
+        : 0
+      : existing.wishlist
+        ? 1
+        : 0;
+  const newNote = patch.note?.trim().slice(0, 500);
+
+  const tx = db.transaction(() => {
+    db.prepare(
+      `UPDATE shops SET raw_name = ?, address = ?, head_img = COALESCE(?, head_img), phone = ?
+       WHERE id = ?`
+    ).run(name, address, photoUrl, phone, existing.shopId);
+
+    db.prepare(
+      `UPDATE favorites SET photo_url = ?, wishlist = ? WHERE id = ? AND user_id = ?`
+    ).run(photoUrl, wishlist, favoriteId, userId);
+
+    if (newNote) {
+      db.prepare(
+        `INSERT INTO shop_comments (id, shop_id, user_id, body, created_at)
+         VALUES (?, ?, ?, ?, ?)`
+      ).run(uuidv4(), existing.shopId, userId, newNote, nowIso());
+      db.prepare(`UPDATE favorites SET note = ? WHERE id = ?`).run(
+        newNote.slice(0, 200),
+        favoriteId
+      );
+    }
+  });
+  tx();
+
+  return getCheckin(userId, favoriteId);
+}
+
+/**
+ * 心心念念开关：只改亮/灭，不从「我的店」删除。
+ * 若尚无收藏行（在朋友圈里看到的店），亮心时自动加一条。
+ */
+export function setWishlistByPoi(
+  userId: string,
+  poiKey: string,
+  wishlist: boolean
+) {
+  const db = getDb();
+  const shop = db
+    .prepare(
+      `SELECT id FROM shops
+       WHERE COALESCE(source_shop_id, amap_poi_id, id) = ?
+       LIMIT 1`
+    )
+    .get(poiKey) as { id: string } | undefined;
+  if (!shop) {
+    throw Object.assign(new Error('店铺不存在'), { status: 404 });
+  }
+
+  const fav = db
+    .prepare(`SELECT id FROM favorites WHERE user_id = ? AND shop_id = ?`)
+    .get(userId, shop.id) as { id: string } | undefined;
+
+  if (fav) {
+    db.prepare(`UPDATE favorites SET wishlist = ? WHERE id = ?`).run(
+      wishlist ? 1 : 0,
+      fav.id
+    );
+    return { favoriteId: fav.id, wishlist };
+  }
+
+  if (!wishlist) {
+    return { favoriteId: null as string | null, wishlist: false };
+  }
+
+  const favId = uuidv4();
+  db.prepare(
+    `INSERT INTO favorites (
+       id, user_id, shop_id, note, visibility, import_batch_id,
+       created_at, wishlist
+     ) VALUES (?, ?, ?, NULL, 'circles', NULL, ?, 1)`
+  ).run(favId, userId, shop.id, nowIso());
+  return { favoriteId: favId, wishlist: true };
 }
 
 export function updateUserProfile(
@@ -380,8 +579,16 @@ export async function listAgentShops(userId: string) {
       lng: s.lng,
       note: s.note,
       origin: s.origin,
+      /** 心心念念：很想去；Agent 做出行/筛选规划时优先用这些 */
+      wishlist: s.wishlist,
+      phone: s.phone,
     })),
     friendsShared: friendRows,
+    /** 语义说明，方便其他 Agent 理解字段 */
+    semantics: {
+      wishlist: '心心念念——用户很想去的店；熄灭不等于删除',
+      origin: 'imported=专辑导入 checkin=自己记下 from_friend=来自好友',
+    },
   };
 }
 

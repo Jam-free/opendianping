@@ -226,9 +226,10 @@ export function saveImportSelection(params: {
         }
 
         const favId = uuidv4();
+        // 导入默认「心心念念」：很想去；取消只熄心，店仍在列表
         db.prepare(
-          `INSERT INTO favorites (id, user_id, shop_id, note, visibility, import_batch_id, created_at)
-           VALUES (?, ?, ?, NULL, ?, ?, ?)`
+          `INSERT INTO favorites (id, user_id, shop_id, note, visibility, import_batch_id, created_at, wishlist)
+           VALUES (?, ?, ?, NULL, ?, ?, ?, 1)`
         ).run(
           favId,
           params.userId,

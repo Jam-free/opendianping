@@ -22,8 +22,25 @@ Page({
   },
 
   onLoad() {
+    // 仓库里真实 Skill 是 skills/feimaocat-cloud，没有 npm 上的 feimaocat/food-network
     this.setData({
-      installCmd: `npx skills add feimaocat/food-network -g\n# API: ${API_BASE}\n# Header: Authorization: Bearer <你的 Token>`,
+      installCmd: [
+        '# 发给你的 AI 助手（Cursor / Claude 等）',
+        '# 1) 先在本页生成并复制 Token，把下面的 <Token> 换成 fm_…',
+        '# 2) 按 skills/feimaocat-cloud 说明只读调用接口',
+        '',
+        `export FEIMAOCAT_API_BASE="${API_BASE}"`,
+        'export FEIMAOCAT_TOKEN="<Token>"',
+        '',
+        '# 只读接口（Header: Authorization: Bearer $FEIMAOCAT_TOKEN）',
+        'GET $FEIMAOCAT_API_BASE/api/agent/shops',
+        'GET $FEIMAOCAT_API_BASE/api/agent/friends',
+        '',
+        '# wishlist=true 表示「心心念念」（很想去），筛店/规划优先用这些',
+        '',
+        '# Skill 目录（克隆仓库后使用）',
+        'https://github.com/Jam-free/opendianping/tree/feat/miniprogram-import-circle/skills/feimaocat-cloud',
+      ].join('\n'),
     });
     this.loadMeta();
   },

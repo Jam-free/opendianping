@@ -67,8 +67,48 @@
   font-size: 28rpx;
 }
 
+/* 加高输入区，减轻键盘/安全区遮挡 */
+.input-lg {
+  min-height: 88rpx;
+  font-size: 32rpx;
+  font-weight: 600;
+  padding: 26rpx 24rpx;
+}
+
 .textarea {
-  min-height: 140rpx;
+  min-height: 160rpx;
+  line-height: 1.5;
+  padding-bottom: 28rpx;
+}
+
+.poi-list {
+  max-height: 360rpx;
+  background: var(--bg);
+  border-radius: 12rpx;
+}
+
+.poi-item {
+  padding: 22rpx 24rpx;
+  border-bottom: 1rpx solid var(--line);
+}
+
+.poi-item:last-child {
+  border-bottom: none;
+}
+
+.poi-item.on {
+  background: rgba(255, 107, 74, 0.08);
+}
+
+.poi-title {
+  font-size: 28rpx;
+  font-weight: 600;
+}
+
+.poi-meta {
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  line-height: 1.4;
 }
 
 .photos {

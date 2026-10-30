@@ -107,7 +107,7 @@ export function enterAppAfterLogin(): void {
   } catch {
     /* ignore */
   }
-  wx.switchTab({ url: '/pages/my-shops/my-shops' });
+  wx.reLaunch({ url: '/pages/my-shops/my-shops' });
 }
 
 /**

@@ -332,7 +332,7 @@ Page({
       });
       wx.showToast({ title: '已记下' });
       setTimeout(() => {
-        wx.switchTab({ url: '/pages/my-shops/my-shops' });
+        wx.reLaunch({ url: '/pages/my-shops/my-shops' });
       }, 400);
     } catch (err) {
       wx.showToast({ title: (err as Error).message, icon: 'none' });

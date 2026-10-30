@@ -1,20 +1,20 @@
-<view class="bar">
-  <view class="bar-inner">
-    <view class="side-item" hover-class="side-item--press" bindtap="onImport">
-      <view class="line-icon line-icon--import" aria-hidden="true"></view>
-      <text class="side-label">导入</text>
+<!--
+  常驻悬浮底栏：导入 / 连接AI / 记美食
+  圆角条浮在安全区上方，两主页共用，不抢系统 tab。
+-->
+<view class="dock-safe">
+  <view class="dock">
+    <view class="dock-item" hover-class="dock-item--press" bindtap="onImport">
+      <image class="dock-icon" src="/assets/icons/dock/import.png" mode="aspectFit" />
+      <text class="dock-label">导入</text>
     </view>
-
-    <view class="center-col">
-      <view class="fab" hover-class="fab--press" bindtap="onLocate">
-        <view class="fab-icon" aria-hidden="true"></view>
-      </view>
-      <text class="center-label">记美食</text>
+    <view class="dock-item" hover-class="dock-item--press" bindtap="onConnectAi">
+      <image class="dock-icon dock-icon--ai" src="/assets/icons/dock/connect-ai.png" mode="aspectFit" />
+      <text class="dock-label">连接AI</text>
     </view>
-
-    <view class="side-item" hover-class="side-item--press" bindtap="onInvite">
-      <view class="line-icon line-icon--invite" aria-hidden="true"></view>
-      <text class="side-label">邀请</text>
+    <view class="dock-item" hover-class="dock-item--press" bindtap="onLocate">
+      <image class="dock-icon" src="/assets/icons/dock/locate.png" mode="aspectFit" />
+      <text class="dock-label">记美食</text>
     </view>
   </view>
 </view>

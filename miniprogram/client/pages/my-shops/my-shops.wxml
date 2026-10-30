@@ -1,46 +1,101 @@
-<view class="page">
-  <!-- 顶栏右侧头像：点进账号页可退出/撤权；标题仍用系统导航「我的店」 -->
-  <view class="topbar">
-    <view class="topbar-hint muted">你的收藏</view>
-    <view class="avatar-entry" bindtap="goAccount" hover-class="avatar-hover">
-      <image wx:if="{{avatar}}" class="me-av" src="{{avatar}}" mode="aspectFill" />
-      <view wx:else class="me-av text">{{initial}}</view>
+<view class="page" style="padding-top: {{statusPad}}px;">
+  <!--
+    顶部大标题切换：当前页左侧大号加粗，另一页右侧小号灰字；
+    点小字或左右滑内容区切换。不做居中等宽橙色下划线 Tab。
+  -->
+  <view class="title-row">
+    <view class="title-main" bindtap="goPanel" data-panel="0">
+      <text class="title-lg">{{panel === 0 ? '私藏好店' : '吃货排行'}}</text>
     </view>
-  </view>
-
-  <view class="actions card">
-    <view class="action" bindtap="goImport">
-      <view class="icon import"></view>
-      <text>导入</text>
-    </view>
-    <view class="action" bindtap="goConnectAi">
-      <view class="icon ai"></view>
-      <text>连接 AI</text>
-    </view>
-    <view class="action" bindtap="goLocate">
-      <view class="icon locate"></view>
-      <text>记美食</text>
-    </view>
-  </view>
-
-  <view class="list card" wx:if="{{shops.length}}">
-    <block wx:for="{{shops}}" wx:key="poiKey">
-      <view class="item hairline">
-        <shop-row shop="{{item}}" source-tag="{{item.sourceTag}}" bind:openshop="openShop" />
+    <view class="title-side-wrap">
+      <view class="title-side" bindtap="goPanel" data-panel="{{panel === 0 ? 1 : 0}}">
+        <text class="title-sm">{{panel === 0 ? '吃货排行' : '私藏好店'}}</text>
       </view>
-    </block>
-  </view>
-
-  <view class="empty card empty-stage" wx:elif="{{!loading}}">
-    <view class="empty-inner">
-      <view class="empty-title">还没有店铺</view>
-      <view class="muted empty-desc">
-        从大众点评导入公开专辑，或点上面「记美食」记下你现在的位置。
+      <view class="avatar-entry" bindtap="goAccount" hover-class="avatar-hover">
+        <image wx:if="{{avatar}}" class="me-av" src="{{avatar}}" mode="aspectFill" />
+        <view wx:else class="me-av text">{{initial}}</view>
       </view>
-      <button class="btn-primary btn-block" bindtap="goImport">导入点评收藏</button>
-      <button class="btn-ghost btn-block empty-secondary" bindtap="goLocate">
-        记一笔美食
-      </button>
     </view>
   </view>
+
+  <swiper
+    class="panels"
+    current="{{panel}}"
+    duration="280"
+    bindchange="onSwipe"
+  >
+    <!-- 私藏好店 -->
+    <swiper-item>
+      <scroll-view scroll-y class="panel-scroll" enhanced show-scrollbar="{{false}}">
+        <view class="list card" wx:if="{{shops.length}}">
+          <block wx:for="{{shops}}" wx:key="poiKey">
+            <view class="item hairline">
+              <shop-row shop="{{item}}" source-tag="{{item.sourceTag}}" bind:openshop="openShop" />
+            </view>
+          </block>
+        </view>
+
+        <view class="empty card empty-stage" wx:elif="{{!shopsLoading}}">
+          <view class="empty-inner">
+            <view class="empty-title">还没有店铺</view>
+            <view class="muted empty-desc">
+              从大众点评导入公开专辑，或点底栏「记美食」记下你现在的位置。
+            </view>
+            <button class="btn-primary btn-block" bindtap="goImport">导入点评收藏</button>
+            <button class="btn-ghost btn-block empty-secondary" bindtap="goLocate">
+              记一笔美食
+            </button>
+          </view>
+        </view>
+        <view class="scroll-pad"></view>
+      </scroll-view>
+    </swiper-item>
+
+    <!-- 吃货排行：按共享店数排的美食好友 -->
+    <swiper-item>
+      <scroll-view scroll-y class="panel-scroll" enhanced show-scrollbar="{{false}}">
+        <view class="rank-intro muted" wx:if="{{friends.length}}">
+          按共享好店数量排一排，看看谁是本圈吃货
+        </view>
+
+        <view class="list-wrap card" wx:if="{{friends.length}}">
+          <block wx:for="{{friends}}" wx:key="id">
+            <view
+              class="friend-row hairline"
+              bindtap="openFriend"
+              data-id="{{item.id}}"
+              data-name="{{item.nickname}}"
+            >
+              <view class="rank-badge {{index < 3 ? 'top' : ''}}">{{index + 1}}</view>
+              <image wx:if="{{item.avatarSrc}}" class="av" src="{{item.avatarSrc}}" mode="aspectFill" />
+              <view wx:else class="av text">{{item.initial}}</view>
+              <view class="info">
+                <view class="name">{{item.nickname || '未命名好友'}}</view>
+                <view class="meta muted">共享 {{item.sharedShopCount}} 家</view>
+              </view>
+              <text class="chev muted">›</text>
+            </view>
+          </block>
+        </view>
+
+        <view class="login-tip card" wx:elif="{{loginError}}" bindtap="retryLogin">
+          <text>{{loginError}}</text>
+          <text class="link">点此重试</text>
+        </view>
+
+        <view class="empty card empty-stage" wx:elif="{{!friendsLoading}}">
+          <view class="empty-inner">
+            <view class="empty-title">还没有吃货上榜</view>
+            <view class="muted empty-desc">
+              邀请好友加入后，大家共享的店会在这里排成吃货榜。
+            </view>
+            <button class="btn-primary btn-block" open-type="share">邀请好友</button>
+          </view>
+        </view>
+        <view class="scroll-pad"></view>
+      </scroll-view>
+    </swiper-item>
+  </swiper>
+
+  <bottom-bar />
 </view>

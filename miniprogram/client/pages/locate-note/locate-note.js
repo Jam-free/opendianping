@@ -277,7 +277,7 @@ Page({
             });
             wx.showToast({ title: '已记下' });
             setTimeout(() => {
-                wx.switchTab({ url: '/pages/my-shops/my-shops' });
+                wx.reLaunch({ url: '/pages/my-shops/my-shops' });
             }, 400);
         }
         catch (err) {

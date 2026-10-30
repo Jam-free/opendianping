@@ -37,7 +37,7 @@ Page({
       setActiveCircleId(this.data.circleId);
       wx.showToast({ title: '已加入' });
       setTimeout(() => {
-        wx.switchTab({ url: '/pages/friends/friends' });
+        wx.reLaunch({ url: '/pages/my-shops/my-shops?panel=1' });
       }, 400);
     } catch (err) {
       this.setData({ joining: false });

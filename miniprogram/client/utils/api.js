@@ -106,7 +106,7 @@ function enterAppAfterLogin() {
     catch (_a) {
         /* ignore */
     }
-    wx.switchTab({ url: '/pages/my-shops/my-shops' });
+    wx.reLaunch({ url: '/pages/my-shops/my-shops' });
 }
 /**
  * 保证已登录。

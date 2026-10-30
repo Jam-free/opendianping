@@ -1,20 +1,56 @@
 .page {
-  padding: 8rpx 32rpx calc(32rpx + env(safe-area-inset-bottom));
+  height: 100vh;
+  box-sizing: border-box;
+  padding: 8rpx 32rpx 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.topbar {
+/* —— 大标题切换（非等宽 Tab） —— */
+.title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 12rpx 4rpx 24rpx;
+  flex: none;
+  gap: 24rpx;
+}
+
+.title-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.title-lg {
+  font-size: 48rpx; /* ≈24px */
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 1rpx;
+  line-height: 1.2;
+}
+
+.title-side-wrap {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8rpx 4rpx 20rpx;
+  gap: 20rpx;
+  flex: none;
 }
 
-.topbar-hint {
-  font-size: 26rpx;
+.title-side {
+  padding: 16rpx 8rpx;
+  /* 扩大点小字热区，避免要精准点字才切换 */
+}
+
+.title-sm {
+  font-size: 28rpx; /* ≈14px */
+  font-weight: 500;
+  color: var(--sub);
+  line-height: 1.2;
 }
 
 .avatar-entry {
-  padding: 4rpx;
+  padding: 2rpx;
 }
 
 .avatar-hover {
@@ -22,8 +58,8 @@
 }
 
 .me-av {
-  width: 64rpx;
-  height: 64rpx;
+  width: 56rpx;
+  height: 56rpx;
   border-radius: 50%;
   background: var(--placeholder);
   border: 1rpx solid var(--line);
@@ -33,85 +69,27 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24rpx;
+  font-size: 22rpx;
   font-weight: 700;
   color: #555;
 }
 
-.actions {
-  display: flex;
-  padding: 28rpx 12rpx;
-  margin-bottom: 24rpx;
-}
-
-.action {
+/* —— 可滑动双面板 —— */
+.panels {
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12rpx;
-  font-size: 26rpx;
-  font-weight: 600;
-  color: var(--ink);
+  min-height: 0;
+  height: 0;
+  width: 100%;
 }
 
-.muted-action {
-  color: var(--sub);
-  font-weight: 500;
+.panel-scroll {
+  height: 100%;
+  box-sizing: border-box;
 }
 
-.icon {
-  width: 72rpx;
-  height: 72rpx;
-  border-radius: 20rpx;
-  background: var(--primary-soft);
-  position: relative;
-}
-
-.icon.import::before,
-.icon.import::after,
-.icon.ai::before,
-.icon.locate::before,
-.icon.locate::after {
-  content: '';
-  position: absolute;
-  background: var(--primary);
-}
-
-.icon.import::before {
-  width: 28rpx;
-  height: 4rpx;
-  left: 22rpx;
-  top: 34rpx;
-}
-.icon.import::after {
-  width: 4rpx;
-  height: 28rpx;
-  left: 34rpx;
-  top: 22rpx;
-}
-
-.icon.ai::before {
-  width: 28rpx;
-  height: 28rpx;
-  border-radius: 50%;
-  left: 22rpx;
-  top: 22rpx;
-}
-
-.icon.locate::before {
-  width: 20rpx;
-  height: 20rpx;
-  border-radius: 50%;
-  left: 26rpx;
-  top: 20rpx;
-}
-.icon.locate::after {
-  width: 4rpx;
-  height: 18rpx;
-  left: 34rpx;
-  top: 38rpx;
-  border-radius: 2rpx;
+/* 给悬浮底栏留空，避免最后一项被挡住 */
+.scroll-pad {
+  height: calc(180rpx + env(safe-area-inset-bottom));
 }
 
 .list {
@@ -122,7 +100,87 @@
   border-bottom: none;
 }
 
-/* 空态：卡片内居中，避免内容贴左上 */
+.rank-intro {
+  padding: 0 8rpx 20rpx;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
+.list-wrap {
+  padding: 8rpx 28rpx;
+  overflow: hidden;
+}
+
+.friend-row {
+  display: flex;
+  align-items: center;
+  padding: 24rpx 0;
+  gap: 16rpx;
+}
+
+.rank-badge {
+  width: 40rpx;
+  flex: none;
+  text-align: center;
+  font-size: 26rpx;
+  font-weight: 600;
+  color: var(--sub);
+}
+
+.rank-badge.top {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.av {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  background: var(--placeholder);
+  flex: none;
+}
+
+.av.text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: #555;
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.meta {
+  margin-top: 6rpx;
+}
+
+.chev {
+  font-size: 36rpx;
+}
+
+.login-tip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16rpx;
+  padding: 24rpx 28rpx;
+  font-size: 26rpx;
+  background: #fff8f0;
+}
+
+.link {
+  color: var(--primary);
+  font-weight: 600;
+}
+
 .empty-stage {
   min-height: 52vh;
   display: flex;

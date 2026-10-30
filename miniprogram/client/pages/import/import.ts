@@ -153,7 +153,7 @@ Page({
   },
 
   goMyShops() {
-    wx.switchTab({ url: '/pages/my-shops/my-shops' });
+    wx.reLaunch({ url: '/pages/my-shops/my-shops' });
   },
 
   reset() {

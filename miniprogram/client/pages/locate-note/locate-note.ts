@@ -1,9 +1,11 @@
-import { request, buildQuery } from '../../utils/api';
+import { request, buildQuery, ensureLogin } from '../../utils/api';
 import { API_BASE } from '../../utils/config';
 import { shopImageSrc } from '../../utils/media';
 import {
   compressPhotoForUpload,
+  estimatePayloadBytes,
   readPhotoBase64,
+  uploadPhotoPublic,
 } from '../../utils/photo-upload';
 
 type PoiItem = {
@@ -17,18 +19,35 @@ type PoiItem = {
 };
 
 /**
- * 把本地临时图读成 base64 上传，换成长住路径。
- * 先压缩：callContainer 请求体约 100KiB，原图直接传会炸成 -606001。
+ * 上传照片换持久路径。
+ * 200KB 相册图对手机很小，但对 callContainer（约 100KiB）太大——
+ * 先缩边长；仍偏大或内网拒了，再走公网域名直传。
  */
 async function uploadLocalPhoto(tempPath: string): Promise<string> {
   const compressed = await compressPhotoForUpload(tempPath);
   const base64 = await readPhotoBase64(compressed);
-  const res = await request<{ url: string }>('/api/me/photos', {
-    method: 'POST',
-    data: { base64, mime: 'image/jpeg' },
-  });
-  if (!res.url) throw new Error('上传失败');
-  return res.url;
+  const payload = estimatePayloadBytes(base64);
+  const token = await ensureLogin();
+
+  // 预估超 90KB 就别挤内网了，直接公网
+  if (payload > 90 * 1024) {
+    return uploadPhotoPublic(base64, token);
+  }
+
+  try {
+    const res = await request<{ url: string }>('/api/me/photos', {
+      method: 'POST',
+      data: { base64, mime: 'image/jpeg' },
+    });
+    if (!res.url) throw new Error('上传失败');
+    return res.url;
+  } catch (err) {
+    const msg = (err as Error).message || '';
+    if (/太大|606001|上传失败|网络/i.test(msg)) {
+      return uploadPhotoPublic(base64, token);
+    }
+    throw err;
+  }
 }
 
 function formatPoiDistance(meters?: number): string {

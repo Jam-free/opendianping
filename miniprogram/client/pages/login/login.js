@@ -151,11 +151,27 @@ Page({
         catch (err) {
             this.setData({
                 busy: false,
-                error: err.message || '登录失败，请重试',
+                error: friendlyError(err),
             });
         }
     },
 });
+/** 把微信/网络的生硬英文翻成用户能看懂的话 */
+function friendlyError(err) {
+    const raw = ((err === null || err === void 0 ? void 0 : err.message) || String(err || '')).trim();
+    if (!raw)
+        return '登录失败，请重试';
+    if (/fetch failed|request:fail|ERR_CONNECTION|超时|timeout/i.test(raw)) {
+        return '网络没连上云服务，请检查网络后重试；若刚部署过，稍等再试';
+    }
+    if (/照片太大|太大|606001/i.test(raw)) {
+        return '头像有点大，请换一张或再试一次';
+    }
+    if (/上传/i.test(raw)) {
+        return '头像上传失败，请重试；云服务若在更新，稍等一会儿';
+    }
+    return raw.length > 60 ? `${raw.slice(0, 60)}…` : raw;
+}
 function resolveAvatarDisplay(avatar) {
     if (!avatar)
         return '';

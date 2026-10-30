@@ -1,12 +1,20 @@
 <view class="page page-stage">
   <view class="hero">
-    <image class="mark" src="/assets/app-icon.jpg" mode="aspectFill" />
-    <view class="brand">我和我爱吃的朋友们</view>
-    <view class="pitch muted">
-      把大众点评收藏搬进来，记美食、看自己的店，再和好友慢慢共享。
+    <!-- 仅首屏保留品牌；选头像/昵称时改成一句引导，避免挤 -->
+    <block wx:if="{{step === 'avatar' && !draftAvatar}}">
+      <image class="mark" src="/assets/app-icon.jpg" mode="aspectFill" />
+      <view class="brand">我和我爱吃的朋友们</view>
+      <view class="pitch muted">
+        把大众点评收藏搬进来，记美食、看自己的店，再和好友慢慢共享。
+      </view>
+    </block>
+
+    <view class="guide" wx:else>
+      <view class="guide-title">进入后，和朋友共享热爱的美食</view>
+      <view class="muted guide-desc">先选好头像和昵称，好友才能认出你</view>
     </view>
 
-    <!-- 步骤 1：点进入 = 选头像（微信规定必须挂在 button 上，不能代码弹窗） -->
+    <!-- 步骤 1：点进入 = 选头像 -->
     <button
       wx:if="{{step === 'avatar'}}"
       class="login-btn"
@@ -17,10 +25,9 @@
       {{bypass ? '进入' : '微信登录'}}
     </button>
 
-    <!-- 步骤 2：选完头像 → 填/选昵称 → 确认进入 -->
+    <!-- 步骤 2：昵称 -->
     <view class="nick-step" wx:elif="{{step === 'nickname'}}">
       <image class="preview-av" src="{{draftAvatar}}" mode="aspectFill" />
-      <view class="muted step-tip">头像已选，接下来填写昵称</view>
       <input
         class="nick-input"
         type="nickname"

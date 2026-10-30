@@ -8,15 +8,30 @@
 }
 
 .profile-card {
-  padding: 56rpx 40rpx 48rpx;
+  padding: 48rpx 40rpx 40rpx;
   text-align: center;
+}
+
+.avatar-btn {
+  padding: 0;
+  margin: 0 auto;
+  background: transparent;
+  border: none;
+  line-height: 1;
+  width: 144rpx;
+  height: 144rpx;
+  display: block;
+}
+
+.avatar-btn::after {
+  border: none;
 }
 
 .avatar {
   width: 144rpx;
   height: 144rpx;
   border-radius: 50%;
-  margin: 0 auto 24rpx;
+  margin: 0 auto;
   background: var(--placeholder);
   display: block;
 }
@@ -30,14 +45,30 @@
   color: #555;
 }
 
-.nickname {
-  font-size: 36rpx;
-  font-weight: 700;
+.avatar-hint {
+  margin-top: 12rpx;
+  font-size: 22rpx;
+}
+
+.nick-input {
+  margin-top: 28rpx;
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg);
+  border-radius: 16rpx;
+  padding: 24rpx 28rpx;
+  font-size: 32rpx;
+  font-weight: 600;
+  text-align: center;
 }
 
 .tip {
   margin-top: 12rpx;
   line-height: 1.5;
+}
+
+.save-btn {
+  margin-top: 32rpx;
 }
 
 .actions-card {

@@ -1,14 +1,37 @@
 <view class="page page-stage">
   <view class="card profile-card">
-    <image
-      wx:if="{{avatar}}"
-      class="avatar"
-      src="{{avatar}}"
-      mode="aspectFill"
+    <button
+      class="avatar-btn"
+      open-type="chooseAvatar"
+      bindchooseavatar="onChooseAvatar"
+    >
+      <image
+        wx:if="{{avatar}}"
+        class="avatar"
+        src="{{avatar}}"
+        mode="aspectFill"
+      />
+      <view wx:else class="avatar text">{{initial}}</view>
+    </button>
+    <view class="muted avatar-hint">点头像可更换</view>
+
+    <input
+      class="nick-input"
+      type="nickname"
+      placeholder="点这里改微信昵称"
+      value="{{draftNickname}}"
+      bindinput="onNickInput"
+      bindblur="onNickBlur"
     />
-    <view wx:else class="avatar text">{{initial}}</view>
-    <view class="nickname">{{nickname || '未设置昵称'}}</view>
-    <view class="muted tip">头像与昵称来自你在本应用内的名片设置</view>
+    <view class="muted tip">头像与昵称会展示给美食好友</view>
+
+    <button
+      class="btn-primary btn-block save-btn"
+      loading="{{saving}}"
+      bindtap="saveProfile"
+    >
+      保存名片
+    </button>
   </view>
 
   <view class="card actions-card">

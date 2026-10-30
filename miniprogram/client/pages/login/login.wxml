@@ -6,12 +6,12 @@
       把大众点评收藏搬进来，记美食、看自己的店，再和好友慢慢共享。
     </view>
 
-    <!-- 登录前就把头像/昵称摆出来：微信要求用户主动点选，不能静默读取 -->
-    <view class="profile" wx:if="{{!bypass}}">
+    <!-- 始终展示：云上若开了 bypass 也不能藏，否则用户永远选不到头像昵称 -->
+    <view class="profile">
       <button
         class="avatar-btn"
         open-type="chooseAvatar"
-        bind:chooseavatar="onChooseAvatar"
+        bindchooseavatar="onChooseAvatar"
       >
         <image
           wx:if="{{draftAvatar}}"
@@ -21,25 +21,28 @@
         />
         <view wx:else class="avatar placeholder">
           <text class="plus">+</text>
-          <text class="avatar-hint">头像</text>
+          <text class="avatar-hint">选头像</text>
         </view>
       </button>
       <input
         class="nick-input"
         type="nickname"
-        placeholder="点击填写微信昵称"
+        placeholder="点这里选微信昵称"
         value="{{draftNickname}}"
         bindinput="onNickInput"
         bindblur="onNickBlur"
+        bindnicknamereview="onNickReview"
       />
-      <view class="profile-tip muted">朋友靠头像和昵称认出你，登录前先选一下</view>
+      <view class="profile-tip muted">
+        请先选择头像并填写昵称（点输入框可选微信昵称），朋友才能认出你
+      </view>
     </view>
 
     <button class="login-btn" loading="{{busy}}" bindtap="onLogin">
-      {{bypass ? '一键进入' : '微信登录'}}
+      {{bypass ? '进入' : '微信登录'}}
     </button>
     <view class="hint muted" wx:if="{{bypass}}">
-      开发模式：点上方即可进入，无需真实微信授权。
+      开发模式可直接进入，仍需上方头像和昵称。
     </view>
     <view class="hint muted" wx:else>
       登录后才能导入收藏与使用「我的店」。我们不会自动读取你的微信好友。

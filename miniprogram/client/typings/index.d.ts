@@ -77,7 +77,9 @@ declare const wx: {
   getGroupEnterInfo?: (opts: any) => void;
   getFileSystemManager: () => {
     readFileSync: (path: string, encoding?: string) => string | ArrayBuffer;
+    statSync: (path: string) => { size?: number };
   };
+  compressImage: (opts: any) => void;
   showLoading: (opts: any) => void;
   hideLoading: () => void;
   makePhoneCall: (opts: any) => void;

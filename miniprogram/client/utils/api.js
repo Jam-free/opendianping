@@ -219,11 +219,22 @@ async function request(path, options = {}) {
             },
             fail(err) {
                 const raw = (err === null || err === void 0 ? void 0 : err.errMsg) || '';
+                const code = err === null || err === void 0 ? void 0 : err.errCode;
                 if (/resourceAppid|Authorization mismatch|Invalid AppId/i.test(raw)) {
                     reject(new Error('还没连上美食探索的云，请确认资源复用已关联'));
                     return;
                 }
-                if (/invalid_host|102002|service|not exist/i.test(raw)) {
+                if (code === -606001 ||
+                    /-606001/.test(raw) ||
+                    /request entity too large|payload too large|100\s*K/i.test(raw)) {
+                    reject(new Error('这次带的内容太大（照片常见），请换小一点的图再试'));
+                    return;
+                }
+                if (/102002|timeout/i.test(raw)) {
+                    reject(new Error('云服务醒来有点慢，再点一次试试'));
+                    return;
+                }
+                if (/invalid_host|service|not exist/i.test(raw)) {
                     reject(new Error('云服务名对不上，请确认是 feimaocat-api'));
                     return;
                 }

@@ -1,6 +1,10 @@
 import { request, buildQuery } from '../../utils/api';
 import { API_BASE } from '../../utils/config';
 import { shopImageSrc } from '../../utils/media';
+import {
+  compressPhotoForUpload,
+  readPhotoBase64,
+} from '../../utils/photo-upload';
 
 type PoiItem = {
   id: string;
@@ -14,11 +18,11 @@ type PoiItem = {
 
 /**
  * 把本地临时图读成 base64 上传，换成长住路径。
- * 设计决策：走 JSON+base64，避免云托管 callContainer 对 multipart 的坑。
+ * 先压缩：callContainer 请求体约 100KiB，原图直接传会炸成 -606001。
  */
 async function uploadLocalPhoto(tempPath: string): Promise<string> {
-  const fs = wx.getFileSystemManager();
-  const base64 = fs.readFileSync(tempPath, 'base64') as string;
+  const compressed = await compressPhotoForUpload(tempPath);
+  const base64 = await readPhotoBase64(compressed);
   const res = await request<{ url: string }>('/api/me/photos', {
     method: 'POST',
     data: { base64, mime: 'image/jpeg' },

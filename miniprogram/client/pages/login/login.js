@@ -4,8 +4,11 @@ const api_1 = require("../../utils/api");
 const config_1 = require("../../utils/config");
 const avatar_upload_1 = require("../../utils/avatar-upload");
 /**
- * 登录：点进入 → 选头像 → 选昵称后自动进入。
- * 头像只走云托管内网；上传失败也不挡进入（昵称仍会保存）。
+ * 登录：点进入 → 选头像 → 选昵称后进入。
+ *
+ * 微信 type=nickname 的坑：点选昵称时 input 可能连发空值/半截值，
+ * 若一有 input 就进，经常第一次进不去，要连点好几次。
+ * 所以：input 只记昵称；真正进入交给 blur / 确认 /「进入」按钮。
  */
 Page({
     data: {
@@ -15,10 +18,15 @@ Page({
         step: 'avatar',
         draftNickname: '',
         draftAvatar: '',
-        nickFocus: false,
     },
+    /** 同步锁：setData 的 busy 有延迟，防双触发 */
+    _entering: false,
+    _enterTimer: 0,
     onShow() {
         this.bootstrap();
+    },
+    onUnload() {
+        this.clearEnterTimer();
     },
     async bootstrap() {
         try {
@@ -48,11 +56,9 @@ Page({
                     step: 'nickname',
                     draftAvatar: resolveAvatarDisplay(av),
                     draftNickname: '',
-                    nickFocus: true,
                 });
                 return;
             }
-            // 有昵称没头像，或都没有：从头像步走（本地已选的临时头像优先）
             if (nick && !av) {
                 this.setData({
                     busy: false,
@@ -78,62 +84,86 @@ Page({
             draftAvatar: url,
             step: 'nickname',
             error: '',
-            nickFocus: true,
+            // 有服务端旧昵称时预填到草稿，方便直接点「进入」
+            draftNickname: this.data.draftNickname || '',
         });
     },
     backToAvatar() {
+        this.clearEnterTimer();
         this.setData({
             step: 'avatar',
-            nickFocus: false,
             error: '',
             draftNickname: '',
         });
     },
+    /** 只记草稿，不立刻进入——避免点选昵称过程中的空/半截事件把流程打乱 */
     onNickInput(e) {
         const nickname = (e.detail.value || '').trim();
         this.setData({ draftNickname: nickname, error: '' });
+        // 选完微信昵称后，部分机型不发 blur；短延迟兜一次进入
         if (nickname)
-            this.tryEnterWithNickname(nickname);
+            this.scheduleEnter(nickname);
     },
     onNickBlur(e) {
-        const nickname = (e.detail.value || '').trim();
-        this.setData({ draftNickname: nickname, nickFocus: false });
+        const nickname = (e.detail.value || this.data.draftNickname || '').trim();
         if (nickname)
-            this.tryEnterWithNickname(nickname);
+            this.setData({ draftNickname: nickname });
+        if (nickname)
+            this.scheduleEnter(nickname, 80);
     },
     onNickConfirm(e) {
         const nickname = (e.detail.value || this.data.draftNickname || '').trim();
         if (nickname)
-            this.tryEnterWithNickname(nickname);
+            this.enterApp(nickname);
     },
-    tryEnterWithNickname(nickname) {
-        if (this.data.busy)
+    onTapEnter() {
+        const nickname = (this.data.draftNickname || '').trim();
+        if (!nickname) {
+            this.setData({ error: '请先点上方选好昵称' });
+            return;
+        }
+        this.enterApp(nickname);
+    },
+    clearEnterTimer() {
+        if (this._enterTimer) {
+            clearTimeout(this._enterTimer);
+            this._enterTimer = 0;
+        }
+    },
+    scheduleEnter(nickname, delayMs = 360) {
+        this.clearEnterTimer();
+        this._enterTimer = setTimeout(() => {
+            this._enterTimer = 0;
+            this.enterApp(nickname);
+        }, delayMs);
+    },
+    async enterApp(nickname) {
+        const nick = nickname.trim();
+        if (!nick)
+            return;
+        if (this._entering || this.data.busy)
             return;
         if (!this.data.draftAvatar) {
             this.setData({ step: 'avatar', error: '请先选择头像' });
             return;
         }
-        if (!nickname.trim())
-            return;
-        this.enterApp(nickname.trim());
-    },
-    async enterApp(nickname) {
-        if (this.data.busy)
-            return;
-        this.setData({ busy: true, error: '', draftNickname: nickname });
+        this.clearEnterTimer();
+        this._entering = true;
+        this.setData({ busy: true, error: '', draftNickname: nick });
         try {
-            await (0, api_1.ensureLogin)({ force: true, interactive: true });
-            // 头像失败不拦路：昵称先存上，进得去再说
+            // 已有会话就别强制重登，少一次请求、少一次失败机会
+            await (0, api_1.ensureLogin)({ interactive: true });
             const avatarUrl = await (0, avatar_upload_1.uploadAvatarOrEmpty)(this.data.draftAvatar);
             await (0, api_1.request)('/api/me/profile', {
                 method: 'PATCH',
-                data: Object.assign({ nickname }, (avatarUrl ? { avatar: avatarUrl } : {})),
+                data: Object.assign({ nickname: nick }, (avatarUrl ? { avatar: avatarUrl } : {})),
             });
             const me = await (0, api_1.request)('/api/me');
             (0, api_1.saveCachedUser)(me.user);
             (0, api_1.enterAppAfterLogin)();
         }
         catch (err) {
+            this._entering = false;
             this.setData({
                 busy: false,
                 error: friendlyError(err),

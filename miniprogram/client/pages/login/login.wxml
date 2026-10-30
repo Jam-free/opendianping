@@ -26,20 +26,26 @@
     <view class="nick-step" wx:elif="{{step === 'nickname'}}">
       <image class="preview-av" src="{{draftAvatar}}" mode="aspectFill" />
       <!--
-        type=nickname 不要绑受控 value，否则点选微信昵称经常写不进 data，
-        再点确认就会误报「请选昵称」。选完直接进。
+        type=nickname 不要绑受控 value，否则点选微信昵称经常写不进。
+        输入只更新草稿；进入靠延迟兜底 / 失焦 / 下方按钮。
       -->
       <input
         class="nick-input"
         type="nickname"
         placeholder="点这里选微信昵称"
-        focus="{{nickFocus}}"
         bindinput="onNickInput"
         bindblur="onNickBlur"
         bindconfirm="onNickConfirm"
       />
-      <view class="muted nick-hint" wx:if="{{!busy}}">选好昵称后会自动进入</view>
-      <view class="busy-hint muted" wx:if="{{busy}}">正在进入…</view>
+      <button
+        class="login-btn enter-btn"
+        loading="{{busy}}"
+        disabled="{{busy}}"
+        bindtap="onTapEnter"
+      >
+        {{busy ? '正在进入…' : '进入'}}
+      </button>
+      <view class="muted nick-hint" wx:if="{{!busy}}">选好昵称后会自动进入，也可点上方按钮</view>
       <view class="repick muted" bindtap="backToAvatar">重选头像</view>
     </view>
 

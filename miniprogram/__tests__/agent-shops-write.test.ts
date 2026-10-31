@@ -628,8 +628,10 @@ describe('S5 Agent 写入本人店', () => {
     );
     expect(skill).toMatch(/POST \$FEIMAOCAT_API_BASE\/api\/agent\/shops/);
     expect(skill).toMatch(/PATCH \$FEIMAOCAT_API_BASE\/api\/agent\/shops\/:poiKey/);
-    expect(skill).toMatch(/写前向用户确认店名与是否心心念念/);
-    expect(skill).toMatch(/origin: agent/);
+    expect(skill).toMatch(/写前确认/);
+    expect(skill).toMatch(/`agent` Agent 记下/);
+    expect(skill).toMatch(/wishlist 只是加分项/);
+    expect(skill).not.toMatch(/用 `wishlist === true` 做「很想去」主候选/);
     expect(skill).not.toMatch(/^- 只读；/m);
   });
 

@@ -97,7 +97,7 @@
   </swiper>
 </view>
 
-<!-- 悬浮底栏：与 page 同级，避免被裁切 / 被 swiper 盖住 -->
+<!-- 悬浮底栏：白胶囊 + 品牌渐变方标白线图标（与 page 同级，防裁切） -->
 <view class="dock-safe">
   <view class="dock">
     <view class="dock-item" hover-class="dock-item--press" bindtap="goImport">
@@ -105,7 +105,7 @@
       <text class="dock-label">导入</text>
     </view>
     <view class="dock-item" hover-class="dock-item--press" bindtap="goConnectAi">
-      <image class="dock-icon dock-icon--ai" src="/assets/icons/dock/connect-ai.png" mode="aspectFit" />
+      <image class="dock-icon" src="/assets/icons/dock/connect-ai.png" mode="aspectFit" />
       <text class="dock-label">连接 AI</text>
     </view>
     <view class="dock-item" hover-class="dock-item--press" bindtap="goLocate">

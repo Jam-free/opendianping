@@ -100,7 +100,7 @@
 }
 
 .scroll-pad {
-  height: calc(220rpx + env(safe-area-inset-bottom));
+  height: calc(240rpx + env(safe-area-inset-bottom));
 }
 
 .sheet {
@@ -266,14 +266,14 @@
   margin-top: 20rpx;
 }
 
-/* —— 悬浮胶囊底栏（与 page 同级） —— */
+/* —— 悬浮胶囊底栏：极简白线图标 + 品牌渐变方底 —— */
 .dock-safe {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 9999;
-  padding: 0 40rpx calc(20rpx + env(safe-area-inset-bottom));
+  padding: 0 48rpx calc(18rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
   pointer-events: none;
 }
@@ -281,13 +281,14 @@
 .dock {
   pointer-events: auto;
   display: flex;
-  align-items: stretch;
-  height: 120rpx;
+  align-items: center;
+  height: 148rpx;
+  padding: 0 12rpx;
   background: #ffffff;
   border-radius: 999rpx;
   box-shadow:
-    0 10rpx 40rpx rgba(0, 0, 0, 0.1),
-    0 2rpx 8rpx rgba(0, 0, 0, 0.05);
+    0 12rpx 40rpx rgba(0, 0, 0, 0.08),
+    0 2rpx 10rpx rgba(0, 0, 0, 0.04);
 }
 
 .dock-item {
@@ -296,28 +297,26 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6rpx;
-  border-radius: 999rpx;
+  gap: 10rpx;
+  height: 100%;
+  border-radius: 40rpx;
 }
 
 .dock-item--press {
-  background: rgba(255, 107, 74, 0.06);
+  opacity: 0.72;
 }
 
+/* 渐变方标本体已在 png 里，这里只控尺寸 */
 .dock-icon {
-  width: 44rpx;
-  height: 44rpx;
-}
-
-.dock-icon--ai {
-  width: 48rpx;
-  height: 48rpx;
+  width: 64rpx;
+  height: 64rpx;
+  display: block;
 }
 
 .dock-label {
   font-size: 22rpx;
   line-height: 1.2;
-  color: var(--primary);
+  color: #ff6b4a;
   font-weight: 500;
-  letter-spacing: 0.5rpx;
+  letter-spacing: 1rpx;
 }

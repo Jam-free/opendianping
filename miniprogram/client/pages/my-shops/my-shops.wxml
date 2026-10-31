@@ -100,16 +100,26 @@
 <!-- 悬浮底栏：与 page 同级，避免被裁切 / 被 swiper 盖住 -->
 <view class="dock-safe">
   <view class="dock">
+    <!--
+      三个入口仍是「导入 / 连接 AI / 记美食」。
+      图标改成极简白线；白线坐在品牌渐变圆角方块上（灰底预览只是为了看清白线）。
+    -->
     <view class="dock-item" hover-class="dock-item--press" bindtap="goImport">
-      <image class="dock-icon" src="/assets/icons/dock/import.png" mode="aspectFit" />
+      <view class="dock-fab">
+        <image class="dock-icon" src="/assets/icons/dock/import.png" mode="aspectFit" />
+      </view>
       <text class="dock-label">导入</text>
     </view>
     <view class="dock-item" hover-class="dock-item--press" bindtap="goConnectAi">
-      <image class="dock-icon dock-icon--ai" src="/assets/icons/dock/connect-ai.png" mode="aspectFit" />
+      <view class="dock-fab">
+        <image class="dock-icon" src="/assets/icons/dock/connect-ai.png" mode="aspectFit" />
+      </view>
       <text class="dock-label">连接 AI</text>
     </view>
     <view class="dock-item" hover-class="dock-item--press" bindtap="goLocate">
-      <image class="dock-icon" src="/assets/icons/dock/locate.png" mode="aspectFit" />
+      <view class="dock-fab">
+        <image class="dock-icon" src="/assets/icons/dock/locate.png" mode="aspectFit" />
+      </view>
       <text class="dock-label">记美食</text>
     </view>
   </view>

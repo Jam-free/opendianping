@@ -1,16 +1,22 @@
-<!-- 参考：圆角胶囊悬浮条，三等分，图标+短文案，主题色 -->
+<!-- 参考：圆角胶囊悬浮条，三等分，白线图标坐在品牌渐变方块上 -->
 <view class="dock-safe">
   <view class="dock">
     <view class="dock-item" hover-class="dock-item--press" bindtap="onImport">
-      <image class="dock-icon" src="/assets/icons/dock/import.png" mode="aspectFit" />
+      <view class="dock-fab">
+        <image class="dock-icon" src="/assets/icons/dock/import.png" mode="aspectFit" />
+      </view>
       <text class="dock-label">导入</text>
     </view>
     <view class="dock-item" hover-class="dock-item--press" bindtap="onConnectAi">
-      <image class="dock-icon dock-icon--ai" src="/assets/icons/dock/connect-ai.png" mode="aspectFit" />
+      <view class="dock-fab">
+        <image class="dock-icon" src="/assets/icons/dock/connect-ai.png" mode="aspectFit" />
+      </view>
       <text class="dock-label">连接 AI</text>
     </view>
     <view class="dock-item" hover-class="dock-item--press" bindtap="onLocate">
-      <image class="dock-icon" src="/assets/icons/dock/locate.png" mode="aspectFit" />
+      <view class="dock-fab">
+        <image class="dock-icon" src="/assets/icons/dock/locate.png" mode="aspectFit" />
+      </view>
       <text class="dock-label">记美食</text>
     </view>
   </view>

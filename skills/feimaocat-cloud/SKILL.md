@@ -31,17 +31,48 @@ export FEIMAOCAT_TOKEN="fm_……"   # 以用户粘贴为准
 - `GET $FEIMAOCAT_API_BASE/api/agent/shops` — 我的店 + 好友共享店
 - `GET $FEIMAOCAT_API_BASE/api/agent/friends` — 美食好友列表
 - `POST $FEIMAOCAT_API_BASE/api/agent/shops` — 写入**本人**「我的店」/ 心心念念（`origin=agent`）
+- `PATCH $FEIMAOCAT_API_BASE/api/agent/shops/:poiKey` — 改**本人**已有的店（只能改 Token 主人自己的店）
 
-写店示例（一次一家；不要编造点评 shopId）：
+写店字段与小程序「我的店」对齐（一次一家；**不要编造**点评 shopId）：
+
+| 请求字段 | 必填 | 说明 |
+|----------|------|------|
+| `name` | POST 必填 | 店名，用用户原话，≤80 字 |
+| `city` | 否 | 城市，≤40 字 |
+| `district` | 否 | 片区/商圈，≤80 字 |
+| `address` | 否 | 详细地址，≤200 字；**不要**把片区写进地址 |
+| `category` | 否 | 品类，≤80 字 |
+| `phone` | 否 | 电话，≤40 字 |
+| `lat` / `lng` | 否 | 必须成对；仅有坐标仍可能是 `pending` |
+| `note` | 否 | 备注，≤200 字 |
+| `wishlist` | 否 | `true` = 心心念念 |
+| `poiKey` | 否 | 地图 POI id（高德），有则 `status=confirmed` |
+| `sourceShopId` / `source_shop_id` | 否 | **真实**点评数字店 id（6–15 位数字） |
+| `dianpingUrl` / `sourceUrl` | 否 | 点评公开页，如 `https://m.dianping.com/shop/1908397290`；服务端从中取出店 id |
+
+`shopId` 只有本身是点评数字 id 才会收下；像 `fake-dianping-id` 这种字符串会被丢掉。服务端**不会**自己生成点评 id。
+
+同店再次 POST：空字段用新值补上，已有值不覆盖。`note` 追加。
 
 ```bash
 curl -sS -X POST "$FEIMAOCAT_API_BASE/api/agent/shops" \
   -H "Authorization: Bearer $FEIMAOCAT_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"泰式河粉","city":"曼谷","district":"都市酒店天桥下","note":"酒店天桥下那家","wishlist":false}'
+  -d '{"name":"泰式河粉","city":"曼谷","district":"素坤逸","address":"Sukhumvit Soi 11","category":"泰餐","phone":"02-000-0000","note":"酒店天桥下那家","wishlist":true,"sourceShopId":"1908397290"}'
 ```
 
-成功：新店 **201**，同店合并 **200**。响应字段与 GET `mine` 单项一致，含 `status`（`pending` | `confirmed`）。
+改已有店（`poiKey` 用 GET/POST 返回的值；也可以是点评数字 id）：
+
+```bash
+curl -sS -X PATCH "$FEIMAOCAT_API_BASE/api/agent/shops/$POI_KEY" \
+  -H "Authorization: Bearer $FEIMAOCAT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"address":"Sukhumvit Soi 11","category":"泰餐","wishlist":true}'
+```
+
+成功：新店 **201**，同店合并 / PATCH **200**。响应字段与 GET `mine` 单项一致：`poiKey, name, category, district, city, address, lat, lng, note, origin, wishlist, phone, status, sourceShopId`。
+
+点评定位：服务端**没有**可靠的单店经纬度接口（专辑导入才能从官方专辑接口拿到坐标；`m.dianping.com/shop/{id}` 公开页地址打码、坐标为 0）。因此只存了点评 id、本地又没有同 id 的专辑导入记录时，`status` 仍为 `pending`。若本库已通过专辑导入过同一家店，会回填地址/坐标，并标 `confirmed`。
 
 ## 字段语义（做规划时必读）
 
@@ -53,7 +84,9 @@ curl -sS -X POST "$FEIMAOCAT_API_BASE/api/agent/shops" \
 | `origin: from_friend` | 从好友清单加到自己名下 |
 | `origin: agent` | Agent 记下（小程序来源文案「Agent 记下」） |
 | `status: pending` | 只有店名/城市，或仅有未校验坐标；还不能当精确地点 |
-| `status: confirmed` | 请求带了合法 `poiKey`（存为地图 POI，**不是**点评 shopId） |
+| `status: confirmed` | 有合法 `poiKey`（地图 POI），或点评 id 已在专辑导入里核验过 |
+| `sourceShopId` | 真实点评数字店 id；没有则为 `null`。不要编造 |
+| `address` / `category` / `phone` | 与小程序「我的店」同一套字段 |
 | `note` | 用户或导入时留下的短备注 |
 | `friendsShared` | 美食网里朋友共享、但未必在自己列表里的店 |
 
@@ -74,7 +107,7 @@ curl -sS -X POST "$FEIMAOCAT_API_BASE/api/agent/shops" \
 ## 约束
 
 - 可写**本人**店；写前向用户确认店名与是否心心念念。不要写朋友的店、不要代建圈子、不要代导入点评专辑
-- 不要编造 shopId / 大众点评 `source_shop_id`；没有 `poiKey` 时允许 `status=pending`
+- 不要编造 shopId / 大众点评 `sourceShopId`；没有真实点评链接或数字 id 就留空。只存了未核验的点评 id、又没有 `poiKey` 时，`status=pending`
 - `name` 必填且用用户原话（≤80 字），`note` ≤200 字；一次只写一家
 - Token 可被用户随时重置，失败时提示重新打开「连接 AI」页
 - 「心心念念」≠ 收藏夹清空：用户取消心形后店仍可能在 `mine` 里，只是 `wishlist` 为 false

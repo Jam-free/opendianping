@@ -2,25 +2,124 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { config } from './config.js';
+import {
+  assessProductionPersistence,
+  formatPersistenceWarning,
+  isCloudRunDataPath,
+  looksLikeEphemeralDataMount,
+  PERSISTENCE_LOG_PREFIX,
+  readPersistenceCounts,
+  type PersistenceHealth,
+} from './persistence.js';
 
 let db: Database.Database | null = null;
+let openedDbPath: string = config.dbPath;
+let lastPersistenceWarning: string | null = null;
 
-/** 测试可注入内存库，避免污染磁盘 */
-export function openDatabase(dbPath: string = config.dbPath): Database.Database {
+export type OpenDatabaseOptions = {
+  /**
+   * 测试用：把任意临时路径当成云托管 /data 来验证告警。
+   * 生产代码不要传。
+   */
+  treatAsCloudData?: boolean;
+  /** 测试用：覆盖「持久盘根目录」，默认 /data */
+  volumeRoot?: string;
+  logger?: Pick<Console, 'error'>;
+};
+
+/**
+ * 打开 SQLite。Agent Token 和收藏都在这一个文件里，不要拆库。
+ * 产品意图：换镜像只换代码，盘上的「连接 AI」口令和我的店必须还在。
+ */
+export function openDatabase(
+  dbPath: string = config.dbPath,
+  options: OpenDatabaseOptions = {}
+): Database.Database {
+  const logger = options.logger ?? console;
+  const cloudDataPath =
+    dbPath !== ':memory:' &&
+    (options.treatAsCloudData === true || isCloudRunDataPath(dbPath));
+
+  let createdNewFile = false;
+  let ephemeralMount = false;
+
   if (dbPath !== ':memory:') {
+    // 必须先看盘再 mkdir：缺 /data 时 mkdir 会在镜像可写层「成功」，看起来像挂了盘。
+    if (cloudDataPath) {
+      ephemeralMount = looksLikeEphemeralDataMount(
+        options.volumeRoot ?? '/data'
+      );
+    }
+    createdNewFile = !fs.existsSync(dbPath);
     const dir = path.dirname(dbPath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   }
+
   const database = new Database(dbPath);
   database.pragma('journal_mode = WAL');
   database.pragma('foreign_keys = ON');
   initSchema(database);
+
+  const counts = readPersistenceCounts(database);
+  const signals = {
+    dbPath,
+    cloudDataPath,
+    createdNewFile,
+    ephemeralMount,
+    ...counts,
+  };
+  const assessment = assessProductionPersistence(signals);
+  lastPersistenceWarning = assessment.shouldWarn
+    ? formatPersistenceWarning(signals, assessment.reasons)
+    : null;
+  openedDbPath = dbPath;
+  if (lastPersistenceWarning) {
+    logger.error(lastPersistenceWarning);
+  }
   return database;
 }
 
 export function getDb(): Database.Database {
   if (!db) db = openDatabase();
   return db;
+}
+
+export function getOpenedDbPath(): string {
+  return openedDbPath;
+}
+
+export function getLastPersistenceWarning(): string | null {
+  return lastPersistenceWarning;
+}
+
+/**
+ * GET /health 用的只读计数。库打不开时进程仍应活着，把错误放进 JSON。
+ */
+export function getPersistenceHealth(): PersistenceHealth {
+  try {
+    const database = getDb();
+    const counts = readPersistenceCounts(database);
+    return {
+      dbPath: openedDbPath,
+      agentTokenCount: counts.agentTokenCount,
+      favoriteCount: counts.favoriteCount,
+      userCount: counts.userCount,
+      warning: lastPersistenceWarning,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(
+      `${PERSISTENCE_LOG_PREFIX} health 无法读取数据库计数: ${message}`
+    );
+    return {
+      dbPath: openedDbPath || config.dbPath,
+      agentTokenCount: null,
+      favoriteCount: null,
+      userCount: null,
+      warning: lastPersistenceWarning,
+      error: message,
+    };
+  }
 }
 
 /** 仅供测试：重置为全新库 */
@@ -32,6 +131,7 @@ export function resetDbForTests(database?: Database.Database): Database.Database
       /* ignore */
     }
   }
+  lastPersistenceWarning = null;
   db = database || openDatabase(':memory:');
   return db;
 }
@@ -43,6 +143,10 @@ export function closeDb(): void {
   }
 }
 
+/**
+ * 只建表、补索引。禁止在启动时 DROP / DELETE agent_tokens 或 favorites。
+ * Token 只能由用户点「连接 AI」（POST /api/agent-tokens 或 /reset）重置。
+ */
 function initSchema(database: Database.Database): void {
   database.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -155,7 +259,10 @@ function initSchema(database: Database.Database): void {
   migrateSchema(database);
 }
 
-/** 兼容已有磁盘库：补列不破坏数据 */
+/**
+ * 兼容已有磁盘库：只 ADD COLUMN / CREATE TABLE IF NOT EXISTS。
+ * 不要 DROP TABLE，也不要 DELETE FROM agent_tokens / favorites。
+ */
 function migrateSchema(database: Database.Database): void {
   const shopCols = database
     .prepare(`PRAGMA table_info(shops)`)

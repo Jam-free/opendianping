@@ -386,6 +386,26 @@ export function createApp() {
     })
   );
 
+  /**
+   * Agent 改本人店。鉴权只认 Agent Token；只能改自己收藏里的店。
+   */
+  app.patch(
+    '/api/agent/shops/:poiKey',
+    requireAgentAuth,
+    asyncHandler(async (req, res) => {
+      if (Array.isArray(req.body) || Array.isArray(req.body?.shops)) {
+        res.status(400).json({ error: '一次只能改一家店' });
+        return;
+      }
+      const shop = await network.updateAgentShop(
+        req.userId!,
+        String(req.params.poiKey || ''),
+        (req.body || {}) as Record<string, unknown>
+      );
+      res.json(shop);
+    })
+  );
+
   app.get(
     '/api/agent/friends',
     requireAgentAuth,

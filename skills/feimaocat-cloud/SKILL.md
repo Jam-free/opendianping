@@ -1,61 +1,99 @@
-# 美食肥猫 · 云端 Agent Skill
+---
+name: feimaocat-cloud
+description: >-
+  用户想找地方吃饭、问吃点啥/带谁去吃，或提到美食肥猫、「我和我爱吃的朋友们」、好友共享店、「记个美食/帮我记下这家店」（文字、图文、链接）时使用：先理解这顿饭的真实需求，把云端收藏当口味线索与新店一起挑；或把店写入本人收藏。
+---
+# 美食肥猫 · 云端读写接口
 
-把用户在「我和我爱吃的朋友们」小程序里导入 / 记下 / 好友共享的店，开放给你的 AI（只读），用于出行规划与美食筛选。
+用户在小程序「我和我爱吃的朋友们」里导入、记下或好友共享的店，通过 Agent Token 开放给 AI：可读可写（只写本人数据）。
 
-## 安装（任选一种）
+## 何时用
+- **读**：帮用户决定吃什么、带谁吃、规划路线时，作为了解其口味的线索之一。
+- **写（记个美食）**：用户说「记一下」「收藏」「心心念念」「加进肥猫」等，并给出纯文字、图片+文字、或美食链接。
 
-### A. 用户粘贴「一键复制」内容（推荐，Grok / 任意 Bot 都适用）
+## 凭证
+- 本机 `~/.config/feimaocat/env`（`FEIMAOCAT_API_BASE`、`FEIMAOCAT_TOKEN`），`source` 读入；也可从同目录 `token` 文件读 Token。
+- **绝不**在聊天、日志、截图说明里输出完整 Token。
+- 401/403：请用户打开小程序「连接 AI」页重新一键复制指令 / 重置 Token 后再粘贴给你。
 
-小程序「连接 AI」→ **一键复制完整指令** → 粘贴给你。  
-里面已有 `FEIMAOCAT_API_BASE`、真实 `FEIMAOCAT_TOKEN` 和下面两个接口；**不必再装 npm 包，也不必能访问 GitHub 才开始工作**。
+## 接口
+Header 一律：`Authorization: Bearer $FEIMAOCAT_TOKEN`，`Content-Type: application/json`（写时）。
 
-### B. 从公开仓库读取本说明
+### 读
+- `GET $FEIMAOCAT_API_BASE/api/agent/shops` → `mine`（我的店）+ `friendsShared`（好友共享）
+- `GET $FEIMAOCAT_API_BASE/api/agent/friends` → 美食好友
 
-仓库公开：https://github.com/Jam-free/opendianping  
-本文件在 **默认分支 main**：
-
-- 目录：https://github.com/Jam-free/opendianping/tree/main/skills/feimaocat-cloud  
-- 原文：https://raw.githubusercontent.com/Jam-free/opendianping/main/skills/feimaocat-cloud/SKILL.md  
-
-```bash
-export FEIMAOCAT_API_BASE="https://feimaocat-api-311874-12-1485452020.sh.run.tcloudbase.com"
-export FEIMAOCAT_TOKEN="fm_……"   # 以用户粘贴为准
+### 写（与小程序「记美食」对齐）
+- `POST $FEIMAOCAT_API_BASE/api/agent/shops`
+- Body：
+```json
+{
+  "name": "店名原文",
+  "city": "城市",
+  "district": "片区或地标",
+  "lat": null,
+  "lng": null,
+  "poiKey": null,
+  "note": "≤200字备注",
+  "wishlist": false
+}
 ```
+- `name` 必填且必须来自用户/链接/图里的原文，禁止臆造。
+- `wishlist: true` = 心心念念；用户没说「很想去/心心念念」时默认 `false`。
+- 注意（截至 2026-10-31 的服务端）：`address`、`category`、点评 shopId 会被丢弃，Agent 也没有修改接口。所以完整地址、电话、核验过的点评链接要写进 `note`，并告诉用户这些暂时只在备注里。服务端支持这些字段后再改用正式字段。
+- 写入前先尝试找到这家店的大众点评公开链接（搜索后用 `https://m.dianping.com/shop/{id}` 核验店名和城市），有坐标就传 `lat`/`lng`；找不到就照写，并说明没找到。不编造 shopId。
+- 期望：201 新建；同名同城命中则 200 合并（只补空字段，备注追加，wishlist 覆盖）。
+- 限频约 ≤30 次/分钟、≤200 次/天；超限 429 后告知稍后再试。
+- 若返回 **404 / Cannot POST**：不要假装已入库，说明接口没上线。
 
-不要使用 `npx skills add feimaocat/food-network`——该包不存在。
+## 字段（读结果）
+- `wishlist: true`：用户很想去；为 false 不代表不喜欢。
+- `origin`：`imported` 点评专辑 / `checkin` 小程序自己记 / `from_friend` 好友 / `agent` Agent 记下。
+- `note`、`poiKey`、`lat`/`lng`、`address`、`category`、`status`（`confirmed` / `pending`）。
 
-## 调用
+---
 
-所有请求带 Header：`Authorization: Bearer $FEIMAOCAT_TOKEN`
+## 记个美食：三种输入怎么抽字段
 
-- `GET $FEIMAOCAT_API_BASE/api/agent/shops` — 我的店 + 好友共享店
-- `GET $FEIMAOCAT_API_BASE/api/agent/friends` — 美食好友列表
+一次只处理用户本轮明确要记的店；多店时逐家确认。
 
-## 字段语义（做规划时必读）
+### A. 纯文字
+从原文抽出 `name`、`city`、`district`/地标、`note`、是否 wishlist。店名不确定时用用户原称呼，不要猜成另一家。
 
-| 字段 | 含义 |
-|------|------|
-| `wishlist: true` | **心心念念**——用户很想去的店。筛「想去哪」时优先用这些；熄灭不等于删店 |
-| `origin: imported` | 从大众点评专辑导入 |
-| `origin: checkin` | 用户自己「记美食」落下的店 |
-| `origin: from_friend` | 从好友清单加到自己名下 |
-| `note` | 用户或导入时留下的短备注 |
-| `friendsShared` | 美食网里朋友共享、但未必在自己列表里的店 |
+### B. 图片 + 文字
+1. 看图里可见的店名、地址、菜名。
+2. 结合配文；冲突时以配文为准，图上多出的信息放进 `note`。
+3. 看不清店名就先问一句。
+4. 接口不传图片；要带图入库请用户在小程序「记美食」里拍。
 
-**推荐用法**
+### C. 美食链接
+1. 只取页面上真实出现的店名、地址、城市、坐标。
+2. 打不开或有登录墙：用用户文字 + 公开标题；仍不够再问店名与城市。
+3. 一个链接多家店：列候选让用户选。
 
-1. 先问清楚场景（今晚附近 / 周末片区 / 带父母…）
-2. 用 `wishlist === true` 做「很想去」主候选；不够再扩到全部 `mine`
-3. 可用 `friendsShared` 与好友口味交叉，但说清楚哪些是朋友的
-4. 结合公开联网信息补营业、排队、季节菜；不要编造 shopId
+### 写前确认（必做）
+一两句复述店名、位置、备注要点、是否心心念念，用户点头再 POST（用户说「直接记」可跳过）。写完 GET 核对，并如实说哪些字段没存上。
 
-## 能力
+---
 
-- 查看我的店、心心念念清单、附近推荐、好友口味、导出清单、路线建议、搜索店铺  
-  （基于上述 JSON，由你本地推理完成；本网关不跑模型）
+## 读：筛店与推荐（先懂人，再用收藏）
+核心：收藏是了解用户口味的线索，不是推荐范围。目标是这一顿吃得对，不是把收藏清单念一遍。
+
+1. **先读需求再碰数据**：谁吃（一个人/朋友/外地同学/家人）、几点、在哪、怎么去（开车/步行/顺路）、想要什么感觉（随便填饱/体面招待/想吃某样东西）、时间限制（到得晚就要营业到够晚）。只有缺了会明显改变结果的那一项才问，问一句；其余自己合理假设并说明。
+2. **收藏和新店同台竞争**：先按需求定标准，再从收藏和联网新店里一起挑，谁合适谁上。收藏里没有真正合适的就推新店，不要硬塞收藏凑数。
+3. **wishlist 只是加分项**：同等合适时优先，但压不过距离、营业时间、人数、场合这些硬条件。
+4. **说话自然，像懂吃的朋友**：
+   - 回复里不要反复出现「心心念念」「收藏」「清单」这些词；一次回复最多自然提一次，而且只在能帮用户做决定时提（如「你之前就想去这家，正好顺路」）。
+   - 不给每家贴来源标签，不分「收藏组/新店组」。
+   - 理由围绕这次需求写：为什么适合今天、这些人、这个时间，而不是复述店铺属性。
+5. **少而准**：默认一个首选加一两个备选，各有清楚的取舍；用户要更多再加。
+6. 联网补营业时间、排队、评分、图片；每家尽量配图，评分写出处；查不到明说，不编。
+7. 用 `friendsShared` 时说清是哪位朋友推荐的，熟人口碑可以自然带出。
+
+**发出前自查**：这份推荐换个人、换个场景是不是也一样？是的话说明没贴合需求，重来。
 
 ## 约束
-
-- 只读；不要编造 shopId；不要索要点评账号密码
-- Token 可被用户随时重置，失败时提示重新打开「连接 AI」页
-- 「心心念念」≠ 收藏夹清空：用户取消心形后店仍可能在 `mine` 里，只是 `wishlist` 为 false
+- 只读写当前 Token 对应用户的数据；不写朋友的店。
+- 不编造 shopId、坐标、店名；不索要点评账号密码；Token 不进聊天。
+- `name`≤80 字、`note`≤200 字；批量一次不超过约 20 家。
+- 可与 `opendianping`（点评收藏专辑 MCP）并用。

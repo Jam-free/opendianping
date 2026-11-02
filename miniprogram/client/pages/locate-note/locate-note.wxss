@@ -1,133 +1,40 @@
 .page {
-  padding: 32rpx 32rpx calc(48rpx + env(safe-area-inset-bottom));
-}
-
-.block {
-  padding: 36rpx 28rpx;
-}
-
-.h1 {
-  font-size: 36rpx;
-  font-weight: 700;
-}
-
-.tip {
-  margin: 8rpx 0 28rpx;
-  line-height: 1.5;
-}
-
-.loc-card {
-  background: var(--bg);
-  border-radius: 16rpx;
-  padding: 24rpx;
-  margin-bottom: 28rpx;
-}
-
-.loc-label {
-  font-size: 22rpx;
-  margin-bottom: 8rpx;
-}
-
-.addr-main {
-  font-size: 30rpx;
-  font-weight: 600;
-  line-height: 1.4;
-  margin-bottom: 8rpx;
-}
-
-.coords {
-  font-size: 22rpx;
-  font-variant-numeric: tabular-nums;
-  margin-bottom: 16rpx;
-}
-
-.mini {
-  margin: 0;
-  min-height: 56rpx !important;
-  font-size: 24rpx !important;
-}
-
-.field {
-  margin-bottom: 28rpx;
-}
-
-.label {
-  font-size: 26rpx;
-  color: var(--sub);
-  margin-bottom: 12rpx;
-}
-
-.input,
-.textarea {
-  width: 100%;
-  background: var(--bg);
-  border-radius: 12rpx;
-  padding: 22rpx 24rpx;
+  min-height: 100vh;
+  padding: 24rpx 24rpx calc(140rpx + env(safe-area-inset-bottom));
   box-sizing: border-box;
-  font-size: 28rpx;
 }
 
-/* 加高输入区，减轻键盘/安全区遮挡 */
-.input-lg {
-  min-height: 88rpx;
-  font-size: 32rpx;
-  font-weight: 600;
-  padding: 26rpx 24rpx;
+.editor {
+  padding: 28rpx 28rpx 8rpx;
 }
 
-.textarea {
+.thought {
+  width: 100%;
   min-height: 160rpx;
-  line-height: 1.5;
-  padding-bottom: 28rpx;
-}
-
-.poi-list {
-  max-height: 360rpx;
-  background: var(--bg);
-  border-radius: 12rpx;
-}
-
-.poi-item {
-  padding: 22rpx 24rpx;
-  border-bottom: 1rpx solid var(--line);
-}
-
-.poi-item:last-child {
-  border-bottom: none;
-}
-
-.poi-item.on {
-  background: rgba(255, 107, 74, 0.08);
-}
-
-.poi-title {
-  font-size: 28rpx;
-  font-weight: 600;
-}
-
-.poi-meta {
-  margin-top: 6rpx;
-  font-size: 22rpx;
-  line-height: 1.4;
-}
-
-.tip-inline {
-  margin: -8rpx 0 24rpx;
-  font-size: 24rpx;
-  line-height: 1.4;
+  font-size: 30rpx;
+  line-height: 1.55;
+  box-sizing: border-box;
+  padding: 0 0 16rpx;
 }
 
 .photos {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   gap: 16rpx;
+  padding: 8rpx 0 24rpx;
+}
+
+.photo-wrap {
+  position: relative;
+  width: 160rpx;
+  height: 160rpx;
 }
 
 .photo,
 .add-photo {
   width: 160rpx;
   height: 160rpx;
-  border-radius: 12rpx;
+  border-radius: 8rpx;
   background: var(--bg);
 }
 
@@ -137,9 +44,78 @@
   justify-content: center;
   font-size: 56rpx;
   color: #bbb;
-  border: 1rpx dashed #ccc;
 }
 
-.remove {
-  font-size: 24rpx;
+.photo-x {
+  position: absolute;
+  top: -8rpx;
+  right: -8rpx;
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 28rpx;
+  line-height: 40rpx;
+  text-align: center;
+}
+
+.place-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 24rpx 0;
+  border-top: 1rpx solid var(--line);
+}
+
+.place-row--press {
+  opacity: 0.7;
+}
+
+.place-ico {
+  font-size: 28rpx;
+  width: 40rpx;
+  text-align: center;
+}
+
+.place-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.place-label {
+  font-size: 28rpx;
+  margin-bottom: 4rpx;
+}
+
+.place-value {
+  font-size: 26rpx;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.place-value.placeholder {
+  font-weight: 400;
+  color: var(--sub);
+}
+
+.place-sub {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  line-height: 1.35;
+}
+
+.chev {
+  font-size: 36rpx;
+  padding: 0 4rpx;
+}
+
+.dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 16rpx 28rpx calc(16rpx + env(safe-area-inset-bottom));
+  background: rgba(245, 245, 245, 0.96);
+  box-sizing: border-box;
 }

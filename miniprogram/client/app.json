@@ -7,6 +7,7 @@
     "pages/import/import",
     "pages/account/account",
     "pages/locate-note/locate-note",
+    "pages/place-pick/place-pick",
     "pages/connect-ai/connect-ai",
     "pages/shop-detail/shop-detail",
     "pages/friend-shops/friend-shops"

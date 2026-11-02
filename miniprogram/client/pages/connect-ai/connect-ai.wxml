@@ -1,49 +1,45 @@
-<!-- 不用 scroll-view + 100vh：真机导航栏/底部安全区容易把末尾挤乱 -->
 <view class="page">
   <view class="intro card">
-    <view class="intro-title">把你的店交给 AI 助手</view>
+    <view class="intro-title">把你的店交给 AI</view>
     <view class="muted intro-desc">
-      一键复制完整指令（已含专属口令），粘贴给你的 AI。它可以读你的店，也可以在向你确认店名和是否「心心念念」之后，写入你自己的「我的店」。不能改朋友的数据。
+      复制下面这段给 Cursor / Claude / Grok 等。它可以读你的店，确认后也能帮你记下。改不了朋友的数据。
     </view>
   </view>
 
   <view class="block card">
-    <view class="step">发给 AI 的完整指令</view>
-    <view class="muted tip">
-      点下方一次即可：自动生成/带上 Token，整段复制。若本页还没有明文口令，会重新签发（旧口令立刻失效）。
-    </view>
+    <view class="step">发给 AI 的指令</view>
     <view class="code">{{installCmd}}</view>
     <button
       class="btn-primary btn-block"
       loading="{{busy}}"
       bindtap="copyInstall"
     >
-      一键复制完整指令
+      一键复制
     </button>
   </view>
 
   <view class="block card">
-    <view class="step">Token 状态</view>
-    <view class="muted tip">一般不用单独管；丢了或泄露就点重置。</view>
+    <view class="step">Token</view>
+    <view class="muted tip">一般不用管；泄露了就重置。</view>
 
     <view class="token-box" wx:if="{{hasToken}}">
       <text class="token">{{showToken && plainToken ? plainToken : maskedToken}}</text>
       <text class="eye" bindtap="toggleToken">{{showToken ? '隐藏' : '显示'}}</text>
     </view>
-    <view class="token-box muted" wx:else>还没有 Token（点上方一键复制会生成）</view>
+    <view class="token-box muted" wx:else>还没有（点上方复制会生成）</view>
 
     <view class="token-actions" wx:if="{{hasToken || plainToken}}">
       <button class="btn-ghost half" bindtap="copyToken" disabled="{{!plainToken}}">
         只复制 Token
       </button>
-      <button class="btn-ghost half" loading="{{busy}}" bindtap="resetToken">重置 Token</button>
+      <button class="btn-ghost half" loading="{{busy}}" bindtap="resetToken">重置</button>
     </view>
     <view class="muted dates" wx:if="{{createdAt}}">
       创建于 {{createdAt}}<text wx:if="{{lastUsedAt}}"> · 最近使用 {{lastUsedAt}}</text>
     </view>
   </view>
 
-  <view class="section-label">AI 能帮你做什么</view>
+  <view class="section-label">能帮你做什么</view>
   <view class="cap-list card">
     <block wx:for="{{capabilities}}" wx:key="title">
       <view class="cap-row {{index + 1 < capabilities.length ? 'hairline' : ''}}">
@@ -54,9 +50,5 @@
         </view>
       </view>
     </block>
-  </view>
-
-  <view class="foot muted">
-    仓库公开。外部 Agent 若装不了 GitHub Skill，直接用指令里的 GET / POST 即可。重置后旧口令立即失效。若 POST 返回 404，说明云端还没发这版，不要假装已经记下。
   </view>
 </view>

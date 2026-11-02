@@ -12,6 +12,7 @@ import { getActiveCircleId, setActiveCircleId } from '../../utils/circle';
 import { avatarInitial } from '../../utils/format';
 import { API_BASE } from '../../utils/config';
 import { userAvatarSrc } from '../../utils/media';
+import { startLocateFlow } from '../../utils/locate-draft';
 
 type Friend = {
   id: string;
@@ -36,6 +37,8 @@ Page({
   data: {
     panel: 0 as 0 | 1,
     statusPad: 48,
+    /** 与右上角胶囊同高，保证头像不被裁切 */
+    navRowHeight: 32,
     shopsLoading: true,
     friendsLoading: true,
     shops: [] as any[],
@@ -49,16 +52,22 @@ Page({
 
   onLoad(query: Record<string, string | undefined>) {
     const panel = query.panel === '1' || query.panel === 'rank' ? 1 : 0;
-    // 自定义顶栏：避开状态栏；头像尽量对齐右上角胶囊
+    // 自定义顶栏：标题行与右上角胶囊对齐，避免头像顶进状态栏被挡
     try {
       const wxAny = wx as any;
       const sys = wxAny.getSystemInfoSync?.() || {};
       const menu = wxAny.getMenuButtonBoundingClientRect?.() || {};
-      // 标题行垂直对齐胶囊中线附近，整体更贴系统顶栏
-      const statusPad = menu.bottom
-        ? Math.max(menu.bottom - 6, (sys.statusBarHeight || 20) + 8)
-        : (sys.statusBarHeight || 20) + 12;
-      this.setData({ statusPad, ...(panel ? { panel } : {}) });
+      const statusBar = Number(sys.statusBarHeight) || 20;
+      const menuTop = Number(menu.top) || 0;
+      const menuHeight = Number(menu.height) || 32;
+      // 顶到胶囊上沿即可；再往上会被系统栏裁掉
+      const statusPad = menuTop > 0 ? menuTop : statusBar + 6;
+      const navRowHeight = menuHeight > 0 ? menuHeight : 32;
+      this.setData({
+        statusPad,
+        navRowHeight,
+        ...(panel ? { panel } : {}),
+      });
     } catch {
       if (panel) this.setData({ panel });
     }
@@ -210,7 +219,7 @@ Page({
   },
 
   goLocate() {
-    wx.navigateTo({ url: '/pages/locate-note/locate-note' });
+    startLocateFlow();
   },
 
   /** 长按店铺行 → 确认后从「我的店」移除 */
@@ -267,8 +276,11 @@ Page({
     const name = encodeURIComponent(
       String(e.currentTarget.dataset.name || '朋友')
     );
+    const avatar = encodeURIComponent(
+      String(e.currentTarget.dataset.avatar || '')
+    );
     wx.navigateTo({
-      url: `/pages/friend-shops/friend-shops?c=${this.data.networkId}&m=${id}&n=${name}`,
+      url: `/pages/friend-shops/friend-shops?c=${this.data.networkId}&m=${id}&n=${name}&a=${avatar}`,
     });
   },
 

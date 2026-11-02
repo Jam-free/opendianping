@@ -109,8 +109,9 @@ export async function renameCircle(
 
 /**
  * 加入收藏圈：必须主动调用；校验 token 未过期且未被重置。
+ * 美食好友是互相的：加入对方网的同时，把对方也请进自己的「我的美食网」。
  */
-export function joinCircle(
+export async function joinCircle(
   userId: string,
   circleId: string,
   token: string,
@@ -123,6 +124,7 @@ export function joinCircle(
     | {
         id: string;
         name: string;
+        owner_id: string;
         invite_token: string;
         token_expires_at: string;
         opengid: string | null;
@@ -153,25 +155,74 @@ export function joinCircle(
       `SELECT role FROM circle_members WHERE circle_id = ? AND user_id = ?`
     )
     .get(circleId, userId);
-  if (existing) {
-    return { circleId, name: circle.name, alreadyMember: true };
+
+  if (!existing) {
+    const count = (
+      db
+        .prepare(`SELECT COUNT(*) AS c FROM circle_members WHERE circle_id = ?`)
+        .get(circleId) as { c: number }
+    ).c;
+    if (count >= circle.member_limit) {
+      throw Object.assign(new Error('收藏圈人数已满'), { status: 403 });
+    }
+
+    db.prepare(
+      `INSERT INTO circle_members (circle_id, user_id, role, joined_at)
+       VALUES (?, ?, 'member', ?)`
+    ).run(circleId, userId, nowIso());
   }
 
+  // 互加：邀请方也出现在加入者的吃货排行里，双方都能看到对方共享店
+  if (circle.owner_id && circle.owner_id !== userId) {
+    await ensureOwnerInJoinerNetwork(userId, circle.owner_id);
+  }
+
+  return {
+    circleId,
+    name: circle.name,
+    alreadyMember: Boolean(existing),
+  };
+}
+
+/** 把邀请人写进加入者自己的美食网，形成双向好友 */
+async function ensureOwnerInJoinerNetwork(
+  joinerId: string,
+  ownerId: string
+): Promise<void> {
+  const db = getDb();
+  const owned = db
+    .prepare(
+      `SELECT id FROM circles WHERE owner_id = ? ORDER BY created_at ASC LIMIT 1`
+    )
+    .get(joinerId) as { id: string } | undefined;
+
+  let networkId = owned?.id;
+  if (!networkId) {
+    const created = await createCircle(joinerId, '我的美食网');
+    networkId = created.id;
+  }
+
+  const already = db
+    .prepare(
+      `SELECT 1 AS ok FROM circle_members WHERE circle_id = ? AND user_id = ?`
+    )
+    .get(networkId, ownerId) as { ok: number } | undefined;
+  if (already) return;
+
+  const circle = db
+    .prepare(`SELECT member_limit FROM circles WHERE id = ?`)
+    .get(networkId) as { member_limit: number } | undefined;
   const count = (
     db
       .prepare(`SELECT COUNT(*) AS c FROM circle_members WHERE circle_id = ?`)
-      .get(circleId) as { c: number }
+      .get(networkId) as { c: number }
   ).c;
-  if (count >= circle.member_limit) {
-    throw Object.assign(new Error('收藏圈人数已满'), { status: 403 });
-  }
+  if (circle && count >= circle.member_limit) return;
 
   db.prepare(
     `INSERT INTO circle_members (circle_id, user_id, role, joined_at)
      VALUES (?, ?, 'member', ?)`
-  ).run(circleId, userId, nowIso());
-
-  return { circleId, name: circle.name, alreadyMember: false };
+  ).run(networkId, ownerId, nowIso());
 }
 
 export function leaveCircle(userId: string, circleId: string): void {
@@ -627,12 +678,13 @@ export function listCircleMembers(userId: string, circleId: string) {
     .all(circleId, circleId, circleId);
 }
 
-/** 记美食：对圈内已有 shop 追加收藏（带备注），默认可被圈友看见 */
+/** 从圈友店里加进自己的私藏；记下推荐人，私藏列表可显示「XX推荐」 */
 export function addFavoriteFromCircleShop(
   userId: string,
   circleId: string,
   poiKey: string,
-  note: string
+  note: string,
+  fromUserId?: string
 ) {
   assertMember(circleId, userId);
   const trimmed = note.trim().slice(0, 200);
@@ -658,16 +710,45 @@ export function addFavoriteFromCircleShop(
 
   if (existing) {
     db.prepare(
-      `UPDATE favorites SET note = ?, visibility = 'circles' WHERE id = ?`
-    ).run(trimmed || null, existing.id);
+      `UPDATE favorites
+       SET note = ?, visibility = 'circles',
+           from_user_id = COALESCE(from_user_id, ?)
+       WHERE id = ?`
+    ).run(
+      trimmed || null,
+      fromUserId && fromUserId !== userId ? fromUserId : null,
+      existing.id
+    );
     return { favoriteId: existing.id, updated: true };
+  }
+
+  // 没显式传推荐人时，用圈里最早共享这家店的其他人
+  let recommender =
+    fromUserId && fromUserId !== userId ? fromUserId : null;
+  if (!recommender) {
+    const hit = db
+      .prepare(
+        `SELECT f.user_id AS uid
+         FROM favorites f
+         JOIN circle_members cm
+           ON cm.user_id = f.user_id AND cm.circle_id = ?
+         WHERE f.shop_id = ?
+           AND f.user_id != ?
+           AND f.visibility = 'circles'
+         ORDER BY f.created_at ASC
+         LIMIT 1`
+      )
+      .get(circleId, shop.id, userId) as { uid: string } | undefined;
+    recommender = hit?.uid || null;
   }
 
   const favId = uuidv4();
   db.prepare(
-    `INSERT INTO favorites (id, user_id, shop_id, note, visibility, import_batch_id, created_at)
-     VALUES (?, ?, ?, ?, 'circles', NULL, ?)`
-  ).run(favId, userId, shop.id, trimmed || null, nowIso());
+    `INSERT INTO favorites (
+       id, user_id, shop_id, note, visibility, import_batch_id,
+       created_at, from_user_id
+     ) VALUES (?, ?, ?, ?, 'circles', NULL, ?, ?)`
+  ).run(favId, userId, shop.id, trimmed || null, nowIso(), recommender);
 
   return { favoriteId: favId, updated: false };
 }

@@ -15,8 +15,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8rpx 40rpx 20rpx;
+  /* 上下内边距交给胶囊高度；头像与标题垂直居中，不再往上顶 */
+  padding: 0 40rpx;
   gap: 24rpx;
+  box-sizing: border-box;
 }
 
 .titles {
@@ -82,7 +84,7 @@
 .header-line {
   flex: none;
   height: 1rpx;
-  margin: 0 40rpx;
+  margin: 16rpx 40rpx 0;
   background: #f0f0f0;
 }
 

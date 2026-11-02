@@ -3,25 +3,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const api_1 = require("../../utils/api");
 const config_1 = require("../../utils/config");
 const media_1 = require("../../utils/media");
+const locate_draft_1 = require("../../utils/locate-draft");
 const photo_upload_1 = require("../../utils/photo-upload");
-function shortCategory(category) {
-    if (!category)
-        return '';
-    // 腾讯「美食:火锅」/ 高德「餐饮服务;中餐厅;火锅」→ 末段
-    const parts = category.split(/[:;｜|]/).map((s) => s.trim()).filter(Boolean);
-    return parts[parts.length - 1] || '';
-}
-/**
- * 上传照片换持久路径。
- * 200KB 相册图对手机很小，但对 callContainer（约 100KiB）太大——
- * 先缩边长；仍偏大或内网拒了，再走公网域名直传。
- */
 async function uploadLocalPhoto(tempPath) {
     const compressed = await (0, photo_upload_1.compressPhotoForUpload)(tempPath);
     const base64 = await (0, photo_upload_1.readPhotoBase64)(compressed);
     const payload = (0, photo_upload_1.estimatePayloadBytes)(base64);
     const token = await (0, api_1.ensureLogin)();
-    // 预估超 90KB 就别挤内网了，直接公网
     if (payload > 90 * 1024) {
         return (0, photo_upload_1.uploadPhotoPublic)(base64, token);
     }
@@ -42,43 +30,66 @@ async function uploadLocalPhoto(tempPath) {
         throw err;
     }
 }
-function formatPoiDistance(meters) {
-    if (meters == null || !Number.isFinite(meters))
-        return '';
-    if (meters < 1000)
-        return `${Math.round(meters)}m`;
-    return `${(meters / 1000).toFixed(1)}km`;
+function isTempPath(path) {
+    if (!path)
+        return false;
+    if (path.startsWith('/api/media/'))
+        return false;
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+        return path.indexOf('://tmp') >= 0;
+    }
+    return true;
 }
 Page({
     data: {
         editing: false,
         favoriteId: '',
-        name: '',
         note: '',
-        lat: 0,
-        lng: 0,
-        latLabel: '',
-        lngLabel: '',
-        address: '',
-        locReady: false,
-        locError: '',
-        photoPath: '',
-        /** 已上传的持久路径 /api/media/local/... */
+        photos: [],
+        /** 已上传封面（编辑态或本轮上传结果） */
         photoUrl: '',
-        pois: [],
-        selectedPoiId: '',
+        maxPhotos: locate_draft_1.MAX_LOCATE_PHOTOS,
+        place: null,
+        placeName: '',
+        placeSub: '',
         saving: false,
     },
     onLoad(query) {
-        if (query.name) {
-            this.setData({ name: decodeURIComponent(query.name) });
-        }
         if (query.fav) {
             this.setData({ editing: true, favoriteId: query.fav });
             this.loadEdit(query.fav);
             return;
         }
-        this.refreshLoc();
+        this.hydrateFromDraft();
+    },
+    onShow() {
+        // 从选点页返回时刷新美食地点；编辑已有记录不走草稿
+        if (this.data.editing)
+            return;
+        this.hydratePlaceFromDraft();
+    },
+    hydrateFromDraft() {
+        const draft = (0, locate_draft_1.readLocateDraft)();
+        this.applyPlace(draft.place || null);
+        this.setData({
+            note: draft.note || '',
+            photos: (draft.photos || []).slice(0, locate_draft_1.MAX_LOCATE_PHOTOS),
+        });
+    },
+    hydratePlaceFromDraft() {
+        const draft = (0, locate_draft_1.readLocateDraft)();
+        if (draft.place)
+            this.applyPlace(draft.place);
+    },
+    applyPlace(place) {
+        const placeSub = place
+            ? [place.distanceLabel, place.address].filter(Boolean).join(' · ')
+            : '';
+        this.setData({
+            place,
+            placeName: (place === null || place === void 0 ? void 0 : place.name) || '',
+            placeSub,
+        });
     },
     async loadEdit(favoriteId) {
         try {
@@ -86,199 +97,213 @@ Page({
             const display = row.photoUrl
                 ? `${config_1.API_BASE}${row.photoUrl}`
                 : (0, media_1.shopImageSrc)(config_1.API_BASE, row.headImgProxy);
+            const place = row.lat != null && row.lng != null
+                ? {
+                    id: 'edit',
+                    name: row.name || '',
+                    address: row.address || '',
+                    lat: row.lat,
+                    lng: row.lng,
+                }
+                : null;
+            this.applyPlace(place);
             this.setData({
-                name: row.name || '',
                 note: '',
-                address: row.address || '',
-                lat: row.lat || 0,
-                lng: row.lng || 0,
-                latLabel: row.lat != null ? row.lat.toFixed(5) : '',
-                lngLabel: row.lng != null ? row.lng.toFixed(5) : '',
-                locReady: true,
                 photoUrl: row.photoUrl || '',
-                photoPath: row.photoUrl || row.headImgProxy ? display : '',
+                photos: display ? [display] : [],
             });
         }
         catch (err) {
             wx.showToast({ title: err.message, icon: 'none' });
         }
     },
-    onName(e) {
-        this.setData({ name: e.detail.value, selectedPoiId: '' });
-    },
     onNote(e) {
-        this.setData({ note: e.detail.value });
+        const note = e.detail.value || '';
+        this.setData({ note });
+        if (!this.data.editing)
+            (0, locate_draft_1.writeLocateDraft)({ note });
     },
-    pickPoi(e) {
-        const id = String(e.currentTarget.dataset.id || '');
-        const poi = this.data.pois.find((p) => p.id === id);
-        if (!poi)
+    async addPhoto() {
+        const source = await new Promise((resolve) => {
+            wx.showActionSheet({
+                itemList: ['拍摄', '从相册选择'],
+                success: (r) => resolve(r.tapIndex === 0 ? 'camera' : r.tapIndex === 1 ? 'album' : null),
+                fail: () => resolve(null),
+            });
+        });
+        if (!source)
             return;
-        this.setData({
-            selectedPoiId: id,
-            name: poi.title,
-            address: poi.address || this.data.address,
-            lat: poi.lat != null ? poi.lat : this.data.lat,
-            lng: poi.lng != null ? poi.lng : this.data.lng,
-            latLabel: poi.lat != null ? poi.lat.toFixed(5) : this.data.latLabel,
-            lngLabel: poi.lng != null ? poi.lng.toFixed(5) : this.data.lngLabel,
-        });
-    },
-    async refreshLoc() {
-        this.setData({
-            locReady: false,
-            locError: '',
-            address: '',
-            pois: [],
-            selectedPoiId: '',
-        });
-        try {
-            const res = await new Promise((resolve, reject) => {
-                wx.getLocation({ type: 'gcj02', success: resolve, fail: reject });
-            });
-            const lat = res.latitude;
-            const lng = res.longitude;
-            this.setData({
-                lat,
-                lng,
-                latLabel: lat.toFixed(5),
-                lngLabel: lng.toFixed(5),
-                locReady: true,
-                address: '正在解析地址…',
-            });
-            try {
-                const qs = (0, api_1.buildQuery)({ lat, lng });
-                const geo = await (0, api_1.request)(`/api/geo/reverse?${qs}`);
-                const address = geo.address || '';
-                const pois = (geo.pois || []).map((p) => (Object.assign(Object.assign({}, p), { categoryLabel: shortCategory(p.category), distanceLabel: formatPoiDistance(p.distance) })));
-                const patch = { address, pois };
-                if (!this.data.name.trim() && pois[0]) {
-                    patch.name = pois[0].title;
-                    patch.selectedPoiId = pois[0].id;
-                    if (pois[0].address)
-                        patch.address = pois[0].address;
-                    if (pois[0].lat != null) {
-                        patch.lat = pois[0].lat;
-                        patch.latLabel = pois[0].lat.toFixed(5);
-                    }
-                    if (pois[0].lng != null) {
-                        patch.lng = pois[0].lng;
-                        patch.lngLabel = pois[0].lng.toFixed(5);
-                    }
-                }
-                else if (!this.data.name.trim() && address) {
-                    const short = geo.district ||
-                        address.split(/省|市|区|县/).filter(Boolean).pop() ||
-                        address.slice(0, 20);
-                    patch.name = String(short).trim();
-                }
-                this.setData(patch);
-            }
-            catch (_a) {
-                this.setData({
-                    address: `已定位（${lat.toFixed(4)}, ${lng.toFixed(4)}）`,
-                });
-            }
-        }
-        catch (_b) {
-            this.setData({
-                locError: '无法获取定位，请在设置中开启位置权限后重试',
-            });
-        }
-    },
-    pickPhoto() {
-        wx.chooseMedia({
-            count: 1,
-            mediaType: ['image'],
-            sourceType: ['album', 'camera'],
-            success: (res) => {
-                var _a, _b;
-                const path = ((_b = (_a = res === null || res === void 0 ? void 0 : res.tempFiles) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.tempFilePath) || '';
-                if (path) {
-                    this.setData({ photoPath: path, photoUrl: '' });
-                }
-            },
-        });
-    },
-    clearPhoto() {
-        this.setData({ photoPath: '', photoUrl: '' });
-    },
-    previewPhoto() {
-        if (!this.data.photoPath)
+        const more = await (0, locate_draft_1.chooseLocatePhotos)(source, this.data.photos.length);
+        if (!more.length)
             return;
-        wx.previewImage({ urls: [this.data.photoPath] });
+        const photos = [...this.data.photos, ...more].slice(0, locate_draft_1.MAX_LOCATE_PHOTOS);
+        this.setData({ photos, photoUrl: '' });
+        if (!this.data.editing)
+            (0, locate_draft_1.writeLocateDraft)({ photos });
     },
-    async resolvePhotoUrl() {
-        // 已有持久路径且没换新临时图
+    removePhoto(e) {
+        const index = Number(e.currentTarget.dataset.index);
+        if (!Number.isFinite(index))
+            return;
+        const photos = this.data.photos.filter((_, i) => i !== index);
+        this.setData({ photos, photoUrl: '' });
+        if (!this.data.editing)
+            (0, locate_draft_1.writeLocateDraft)({ photos });
+    },
+    previewPhoto(e) {
+        const src = String(e.currentTarget.dataset.src || '');
+        if (!src)
+            return;
+        wx.previewImage({ current: src, urls: this.data.photos });
+    },
+    goPickPlace() {
+        if (this.data.editing) {
+            wx.showToast({ title: '改地点暂不支持，可删了重记', icon: 'none' });
+            return;
+        }
+        (0, locate_draft_1.writeLocateDraft)({
+            photos: this.data.photos,
+            note: this.data.note,
+            place: this.data.place,
+        });
+        wx.navigateTo({ url: '/pages/place-pick/place-pick' });
+    },
+    /**
+     * 封面只用第一张：上传持久化后写入店铺头图。
+     */
+    async resolveCoverUrl() {
         if (this.data.photoUrl &&
-            this.data.photoUrl.startsWith('/api/media/local/')) {
+            this.data.photoUrl.startsWith('/api/media/local/') &&
+            this.data.photos[0] &&
+            !isTempPath(this.data.photos[0])) {
             return this.data.photoUrl;
         }
-        const path = this.data.photoPath;
-        if (!path)
+        const first = this.data.photos[0];
+        if (!first) {
+            // 编辑态清空了图
+            if (this.data.editing && !this.data.photos.length)
+                return '';
             return undefined;
-        // 本地临时文件才上传
-        if (path.startsWith('wxfile://') ||
-            path.startsWith('http://tmp') ||
-            path.indexOf('://tmp') >= 0 ||
-            !path.startsWith('http')) {
-            wx.showLoading({ title: '上传图片…', mask: true });
-            try {
-                const url = await uploadLocalPhoto(path);
-                this.setData({ photoUrl: url });
-                return url;
-            }
-            finally {
-                wx.hideLoading();
-            }
         }
-        return undefined;
+        if (!isTempPath(first)) {
+            if (first.startsWith('/api/media/local/'))
+                return first;
+            if (first.includes('/api/media/local/')) {
+                const idx = first.indexOf('/api/media/local/');
+                return first.slice(idx);
+            }
+            return this.data.photoUrl || undefined;
+        }
+        wx.showLoading({ title: '上传图片…', mask: true });
+        try {
+            const url = await uploadLocalPhoto(first);
+            this.setData({ photoUrl: url });
+            return url;
+        }
+        finally {
+            wx.hideLoading();
+        }
+    },
+    askNeedPlace() {
+        return new Promise((resolve) => {
+            wx.showModal({
+                title: '还没选美食地点',
+                content: '选家附近的店，或先记在你现在的位置。',
+                confirmText: '去完善',
+                confirmColor: '#ff6b4a',
+                cancelText: '放弃记录',
+                success: (r) => {
+                    if (r.confirm)
+                        resolve('fix');
+                    else if (r.cancel)
+                        resolve('abort');
+                    else
+                        resolve(null);
+                },
+                fail: () => resolve(null),
+            });
+        });
     },
     async onSave() {
-        if (!this.data.editing && !this.data.locReady) {
-            wx.showToast({ title: '请先获取定位', icon: 'none' });
+        if (this.data.saving)
             return;
-        }
-        const name = this.data.name.trim() ||
-            this.data.address ||
-            `记下的位置 ${this.data.latLabel},${this.data.lngLabel}`;
-        this.setData({ saving: true });
-        try {
-            const photoUrl = await this.resolvePhotoUrl();
-            if (this.data.editing) {
-                await (0, api_1.request)(`/api/me/checkins/${this.data.favoriteId}`, {
-                    method: 'PATCH',
-                    data: {
-                        name,
-                        address: this.data.address || undefined,
-                        note: this.data.note || undefined,
-                        photoUrl: photoUrl !== undefined
-                            ? photoUrl
-                            : this.data.photoPath
-                                ? undefined
-                                : '',
-                    },
-                });
-                wx.showToast({ title: '已保存' });
-                setTimeout(() => wx.navigateBack(), 400);
+        if (!this.data.editing && !this.data.place) {
+            const choice = await this.askNeedPlace();
+            if (choice === 'fix') {
+                this.goPickPlace();
                 return;
             }
+            if (choice === 'abort') {
+                (0, locate_draft_1.clearLocateDraft)();
+                wx.navigateBack({ fail: () => wx.reLaunch({ url: '/pages/my-shops/my-shops' }) });
+            }
+            return;
+        }
+        if (this.data.editing) {
+            await this.saveEdit();
+            return;
+        }
+        await this.saveNew();
+    },
+    async saveNew() {
+        const place = this.data.place;
+        if (!place || !Number.isFinite(place.lat) || !Number.isFinite(place.lng)) {
+            wx.showToast({ title: '先选一个美食地点', icon: 'none' });
+            return;
+        }
+        this.setData({ saving: true });
+        try {
+            const photoUrl = await this.resolveCoverUrl();
             await (0, api_1.request)('/api/me/checkins', {
                 method: 'POST',
                 data: {
-                    name,
-                    note: this.data.note,
-                    lat: this.data.lat,
-                    lng: this.data.lng,
-                    address: this.data.address || undefined,
+                    name: place.name,
+                    note: (this.data.note || '').trim() || undefined,
+                    lat: place.lat,
+                    lng: place.lng,
+                    address: place.address || undefined,
                     photoUrl,
-                    poiId: this.data.selectedPoiId || undefined,
+                    poiId: place.poiId || undefined,
                 },
             });
+            (0, locate_draft_1.clearLocateDraft)();
             wx.showToast({ title: '已记下' });
             setTimeout(() => {
                 wx.reLaunch({ url: '/pages/my-shops/my-shops' });
             }, 400);
+        }
+        catch (err) {
+            wx.showToast({ title: err.message, icon: 'none' });
+        }
+        finally {
+            this.setData({ saving: false });
+        }
+    },
+    async saveEdit() {
+        var _a;
+        const name = (this.data.placeName || '').trim();
+        if (!name) {
+            wx.showToast({ title: '店名不能为空', icon: 'none' });
+            return;
+        }
+        this.setData({ saving: true });
+        try {
+            const photoUrl = await this.resolveCoverUrl();
+            await (0, api_1.request)(`/api/me/checkins/${this.data.favoriteId}`, {
+                method: 'PATCH',
+                data: {
+                    name,
+                    address: ((_a = this.data.place) === null || _a === void 0 ? void 0 : _a.address) || undefined,
+                    note: (this.data.note || '').trim() || undefined,
+                    photoUrl: photoUrl !== undefined
+                        ? photoUrl
+                        : this.data.photos.length
+                            ? undefined
+                            : '',
+                },
+            });
+            wx.showToast({ title: '已保存' });
+            setTimeout(() => wx.navigateBack(), 400);
         }
         catch (err) {
             wx.showToast({ title: err.message, icon: 'none' });

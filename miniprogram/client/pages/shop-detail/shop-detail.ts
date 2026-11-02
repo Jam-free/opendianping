@@ -55,12 +55,15 @@ Page({
     canEditCheckin: false,
     canDelete: false,
     canNav: false,
+    /** 从谁的收藏点进来的（亮心进私藏时记为推荐人） */
+    fromUserId: '',
   },
 
   onLoad(query: Record<string, string | undefined>) {
     this.setData({
       circleId: query.c || '',
       poiKey: decodeURIComponent(query.p || ''),
+      fromUserId: query.from ? decodeURIComponent(query.from) : '',
     });
     this.load();
   },
@@ -158,9 +161,20 @@ Page({
     const next = !this.data.wishlist;
     this.setData({ wishlist: next });
     try {
+      const collectors = (this.data.shop?.collectors || []) as Array<{
+        userId?: string;
+      }>;
+      const fromUserId =
+        this.data.fromUserId ||
+        collectors.find((c) => c.userId)?.userId ||
+        '';
       await request('/api/me/wishlist', {
         method: 'POST',
-        data: { poiKey: this.data.poiKey, wishlist: next },
+        data: {
+          poiKey: this.data.poiKey,
+          wishlist: next,
+          fromUserId: fromUserId || undefined,
+        },
       });
       wx.showToast({
         title: next ? '已标心心念念' : '已取消心心念念',

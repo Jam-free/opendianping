@@ -1,10 +1,16 @@
 import { request, buildQuery } from '../../utils/api';
+import { API_BASE } from '../../utils/config';
+import { avatarInitial } from '../../utils/format';
 import { getUserLocation } from '../../utils/location';
+import { userAvatarSrc } from '../../utils/media';
 
 Page({
   data: {
     circleId: '',
     memberId: '',
+    friendName: '朋友',
+    avatarSrc: '',
+    initial: '友',
     shops: [] as any[],
     loading: true,
   },
@@ -12,10 +18,21 @@ Page({
   onLoad(query: Record<string, string | undefined>) {
     const circleId = query.c || '';
     const memberId = query.m || '';
-    const name = query.n ? decodeURIComponent(query.n) : '朋友';
-    this.setData({ circleId, memberId });
-    wx.setNavigationBarTitle({ title: `${name} 的收藏` });
+    const friendName = query.n ? decodeURIComponent(query.n) : '朋友';
+    const avatarRaw = query.a ? decodeURIComponent(query.a) : '';
+    this.setData({
+      circleId,
+      memberId,
+      friendName,
+      avatarSrc: userAvatarSrc(API_BASE, avatarRaw) || avatarRaw,
+      initial: avatarInitial(friendName),
+    });
+    wx.setNavigationBarTitle({ title: `${friendName}的收藏` });
     this.load();
+  },
+
+  onAvatarError() {
+    this.setData({ avatarSrc: '' });
   },
 
   async load() {
@@ -31,8 +48,18 @@ Page({
       const res = await request<{ items: any[] }>(
         `/api/circles/${this.data.circleId}/shops?${qs}`
       );
+      const shops = (res.items || []).map((s) => ({
+        ...s,
+        // 店铺行里的圈友头像也补全可访问地址
+        collectors: (s.collectors || []).map(
+          (c: { avatar?: string | null; [k: string]: unknown }) => ({
+            ...c,
+            avatar: userAvatarSrc(API_BASE, c.avatar) || c.avatar || '',
+          })
+        ),
+      }));
       this.setData({
-        shops: res.items || [],
+        shops,
         loading: false,
       });
     } catch (err) {
@@ -47,8 +74,11 @@ Page({
       wx.showToast({ title: '店铺信息还没准备好', icon: 'none' });
       return;
     }
+    const from = this.data.memberId
+      ? `&from=${encodeURIComponent(this.data.memberId)}`
+      : '';
     wx.navigateTo({
-      url: `/pages/shop-detail/shop-detail?c=${this.data.circleId}&p=${encodeURIComponent(shop.poiKey)}`,
+      url: `/pages/shop-detail/shop-detail?c=${this.data.circleId}&p=${encodeURIComponent(shop.poiKey)}${from}`,
     });
   },
 });

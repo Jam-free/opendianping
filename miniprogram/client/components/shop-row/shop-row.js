@@ -6,7 +6,7 @@ const media_1 = require("../../utils/media");
 Component({
     properties: {
         shop: { type: Object, value: {} },
-        /** 覆盖推荐行文案，如「我导入」「来自小王」 */
+        /** 覆盖推荐行文案，如「我导入」「小王推荐」 */
         sourceTag: { type: String, value: '' },
     },
     data: {
@@ -28,7 +28,8 @@ Component({
                 metaLine: parts.join(' · '),
                 previewAvatars: preview.map((c) => ({
                     userId: c.userId,
-                    avatar: c.avatar || '',
+                    // 本地上传头像要拼 API_BASE，否则吃货/推荐行空白
+                    avatar: (0, media_1.userAvatarSrc)(config_1.API_BASE, c.avatar),
                     initial: (0, format_1.avatarInitial)(c.nickname),
                 })),
                 // 无 headImgProxy 也直接用兜底，不留空灰块

@@ -2,6 +2,41 @@
   padding: 24rpx 32rpx calc(48rpx + env(safe-area-inset-bottom));
 }
 
+.friend-head {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+}
+
+.friend-av {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  background: var(--placeholder);
+  flex: none;
+}
+
+.friend-av.text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36rpx;
+  font-weight: 600;
+  color: #555;
+}
+
+.friend-name {
+  font-size: 34rpx;
+  font-weight: 600;
+}
+
+.friend-sub {
+  margin-top: 6rpx;
+  font-size: 24rpx;
+}
+
 .list {
   padding: 8rpx 28rpx;
 }

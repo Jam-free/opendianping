@@ -61,9 +61,38 @@ export async function ensurePersonalNetwork(userId: string) {
   };
 }
 
-/** Tab1：通过我的邀请进入的美食好友（不含自己） */
+/**
+ * 补历史单向好友：我加入过别人的美食网，但对方还没进我的网。
+ * 读列表时顺手修好，老用户不用重新点邀请。
+ */
+function healInboundFriendships(userId: string, myNetworkId: string) {
+  const db = getDb();
+  const owners = db
+    .prepare(
+      `SELECT DISTINCT c.owner_id AS owner_id
+       FROM circle_members cm
+       JOIN circles c ON c.id = cm.circle_id
+       WHERE cm.user_id = ?
+         AND cm.role = 'member'
+         AND c.owner_id != ?`
+    )
+    .all(userId, userId) as Array<{ owner_id: string }>;
+
+  const insert = db.prepare(
+    `INSERT OR IGNORE INTO circle_members (circle_id, user_id, role, joined_at)
+     VALUES (?, ?, 'member', ?)`
+  );
+  const joinedAt = nowIso();
+  for (const row of owners) {
+    insert.run(myNetworkId, row.owner_id, joinedAt);
+  }
+}
+
+/** Tab1：美食好友（不含自己）；含我邀请的，以及我点开对方邀请后互加的 */
 export async function listFoodFriends(userId: string) {
   const network = await ensurePersonalNetwork(userId);
+  healInboundFriendships(userId, network.id);
+
   const members = listCircleMembers(userId, network.id) as Array<{
     id: string;
     nickname: string | null;
@@ -73,11 +102,12 @@ export async function listFoodFriends(userId: string) {
     shared_shop_count: number;
   }>;
 
+  const refreshed = await ensurePersonalNetwork(userId);
   return {
-    networkId: network.id,
-    inviteToken: network.inviteToken,
-    tokenExpiresAt: network.tokenExpiresAt,
-    memberCount: network.memberCount,
+    networkId: refreshed.id,
+    inviteToken: refreshed.inviteToken,
+    tokenExpiresAt: refreshed.tokenExpiresAt,
+    memberCount: refreshed.memberCount,
     friends: members
       .filter((m) => m.id !== userId)
       .map((m) => ({
@@ -119,9 +149,49 @@ type MyShopRow = {
 const MY_SHOP_ORIGIN_LABEL: Record<string, string> = {
   imported: '我导入',
   checkin: '我记下',
-  from_friend: '来自好友',
+  from_friend: '好友推荐',
   agent: 'Agent 记下',
 };
+
+type FriendRecommender = {
+  userId: string;
+  nickname: string | null;
+  avatar: string | null;
+};
+
+/** 在我的美食网里，还有谁也共享了这家店（用来标「XX推荐」） */
+function findFriendRecommenders(
+  userId: string,
+  networkId: string,
+  shopId: string,
+  preferredUserId?: string | null
+): FriendRecommender[] {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT u.id AS userId, u.nickname, u.avatar
+       FROM favorites f
+       JOIN users u ON u.id = f.user_id
+       JOIN circle_members cm
+         ON cm.user_id = f.user_id AND cm.circle_id = ?
+       WHERE f.shop_id = ?
+         AND f.user_id != ?
+         AND f.visibility = 'circles'
+       ORDER BY CASE WHEN f.user_id = ? THEN 0 ELSE 1 END, f.created_at ASC
+       LIMIT 3`
+    )
+    .all(networkId, shopId, userId, preferredUserId || '') as FriendRecommender[];
+  return rows;
+}
+
+function friendRecommendLabel(recs: FriendRecommender[]): string {
+  const names = recs
+    .map((r) => (r.nickname || '').trim())
+    .filter(Boolean);
+  if (names[0]) return `${names[0]}推荐`;
+  if (recs.length) return '好友推荐';
+  return MY_SHOP_ORIGIN_LABEL.from_friend;
+}
 
 /**
  * H3：有合法 poiKey（amap_poi_id）或专辑导入带来的真实点评 id → confirmed。
@@ -205,7 +275,9 @@ export async function listMyShops(
   userId: string,
   opts?: { lat?: number; lng?: number; userCity?: string }
 ) {
-  await ensurePersonalNetwork(userId);
+  const network = await ensurePersonalNetwork(userId);
+  healInboundFriendships(userId, network.id);
+
   const rows = getDb()
     .prepare(
       `SELECT f.id AS favorite_id, s.id AS shop_id,
@@ -213,6 +285,7 @@ export async function listMyShops(
               s.raw_name AS name, s.avg_price, s.category, s.district, s.city,
               s.address, s.lat, s.lng, s.source_type, s.head_img, s.phone,
               f.note, f.visibility, f.created_at, f.wishlist, f.photo_url,
+              f.from_user_id,
               s.amap_poi_id, s.source_shop_id,
               CASE
                 WHEN s.source_type = 'agent' THEN 'agent'
@@ -236,6 +309,7 @@ export async function listMyShops(
       amap_poi_id: string | null;
       source_shop_id: string | null;
       dianping_verified: number;
+      from_user_id: string | null;
     }
   >;
 
@@ -256,6 +330,21 @@ export async function listMyShops(
     }
     const head = r.photo_url || r.head_img;
     const status = deriveShopStatus(r);
+
+    let sourceTag = MY_SHOP_ORIGIN_LABEL[r.origin] || '';
+    let recommendersLine = sourceTag;
+    let collectors: FriendRecommender[] = [];
+    if (r.origin === 'from_friend') {
+      collectors = findFriendRecommenders(
+        userId,
+        network.id,
+        r.shop_id,
+        r.from_user_id
+      );
+      sourceTag = friendRecommendLabel(collectors);
+      recommendersLine = sourceTag;
+    }
+
     return {
       favoriteId: r.favorite_id,
       shopId: r.shop_id,
@@ -279,13 +368,19 @@ export async function listMyShops(
       origin: r.origin,
       status,
       wishlist: Boolean(r.wishlist),
-      sourceTag: MY_SHOP_ORIGIN_LABEL[r.origin] || '',
+      sourceTag,
       hasCoords: r.lat != null && r.lng != null,
       distanceMeters,
       distanceLabel,
-      recommendersLine: MY_SHOP_ORIGIN_LABEL[r.origin] || '',
-      collectors: [],
-      collectorCount: 0,
+      recommendersLine,
+      collectors: collectors.map((c) => ({
+        userId: c.userId,
+        nickname: c.nickname,
+        avatar: c.avatar,
+        note: null,
+        favoritedAt: r.created_at,
+      })),
+      collectorCount: collectors.length,
     };
   });
 
@@ -515,12 +610,13 @@ export function updateCheckin(
 
 /**
  * 心心念念开关：只改亮/灭，不从「我的店」删除。
- * 若尚无收藏行（在朋友圈里看到的店），亮心时自动加一条。
+ * 若尚无收藏行（在朋友圈里看到的店），亮心时自动加一条，并尽量记下推荐人。
  */
-export function setWishlistByPoi(
+export async function setWishlistByPoi(
   userId: string,
   poiKey: string,
-  wishlist: boolean
+  wishlist: boolean,
+  fromUserId?: string
 ) {
   const db = getDb();
   const shop = db
@@ -550,13 +646,24 @@ export function setWishlistByPoi(
     return { favoriteId: null as string | null, wishlist: false };
   }
 
+  const network = await ensurePersonalNetwork(userId);
+  const preferred =
+    fromUserId && fromUserId !== userId ? fromUserId : undefined;
+  const recs = findFriendRecommenders(
+    userId,
+    network.id,
+    shop.id,
+    preferred || null
+  );
+  const recommenderId = preferred || recs[0]?.userId || null;
+
   const favId = uuidv4();
   db.prepare(
     `INSERT INTO favorites (
        id, user_id, shop_id, note, visibility, import_batch_id,
-       created_at, wishlist
-     ) VALUES (?, ?, ?, NULL, 'circles', NULL, ?, 1)`
-  ).run(favId, userId, shop.id, nowIso());
+       created_at, wishlist, from_user_id
+     ) VALUES (?, ?, ?, NULL, 'circles', NULL, ?, 1, ?)`
+  ).run(favId, userId, shop.id, nowIso(), recommenderId);
   return { favoriteId: favId, wishlist: true };
 }
 

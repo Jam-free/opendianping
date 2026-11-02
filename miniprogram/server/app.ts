@@ -92,6 +92,20 @@ export function createApp() {
     })
   );
 
+  /** 记美食：按店名搜附近/全城餐饮 */
+  app.get(
+    '/api/geo/search',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const { searchFoodPlaces } = await import('./services/geo.js');
+      const keyword = String(req.query.q || req.query.keyword || '');
+      const lat = req.query.lat != null ? Number(req.query.lat) : undefined;
+      const lng = req.query.lng != null ? Number(req.query.lng) : undefined;
+      const pois = await searchFoodPlaces({ keyword, lat, lng });
+      res.json({ pois });
+    })
+  );
+
   /**
    * 图片代理：上游失败也返回 200 占位图，避免小程序 image 反复 404 刷屏。
    * 产品意图：图挂了就静默浅色块，列表仍可读；客户端另有本地兜底图。
@@ -287,10 +301,11 @@ export function createApp() {
         return;
       }
       res.json(
-        network.setWishlistByPoi(
+        await network.setWishlistByPoi(
           req.userId!,
           poiKey,
-          Boolean(req.body?.wishlist)
+          Boolean(req.body?.wishlist),
+          req.body?.fromUserId ? String(req.body.fromUserId) : undefined
         )
       );
     })
@@ -531,7 +546,7 @@ export function createApp() {
     '/api/circles/:id/join',
     requireAuth,
     asyncHandler(async (req, res) => {
-      const result = circles.joinCircle(
+      const result = await circles.joinCircle(
         req.userId!,
         req.params.id,
         String(req.body?.token || ''),
@@ -642,7 +657,8 @@ export function createApp() {
         req.userId!,
         req.params.id,
         String(req.body?.poiKey || ''),
-        String(req.body?.note || '')
+        String(req.body?.note || ''),
+        req.body?.fromUserId ? String(req.body.fromUserId) : undefined
       );
       res.json(result);
     })

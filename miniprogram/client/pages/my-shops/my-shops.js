@@ -6,6 +6,7 @@ const circle_1 = require("../../utils/circle");
 const format_1 = require("../../utils/format");
 const config_1 = require("../../utils/config");
 const media_1 = require("../../utils/media");
+const locate_draft_1 = require("../../utils/locate-draft");
 function friendAvatarSrc(avatar) {
     if (!avatar)
         return '';
@@ -21,6 +22,8 @@ Page({
     data: {
         panel: 0,
         statusPad: 48,
+        /** 与右上角胶囊同高，保证头像不被裁切 */
+        navRowHeight: 32,
         shopsLoading: true,
         friendsLoading: true,
         shops: [],
@@ -34,16 +37,19 @@ Page({
     onLoad(query) {
         var _a, _b;
         const panel = query.panel === '1' || query.panel === 'rank' ? 1 : 0;
-        // 自定义顶栏：避开状态栏；头像尽量对齐右上角胶囊
+        // 自定义顶栏：标题行与右上角胶囊对齐，避免头像顶进状态栏被挡
         try {
             const wxAny = wx;
             const sys = ((_a = wxAny.getSystemInfoSync) === null || _a === void 0 ? void 0 : _a.call(wxAny)) || {};
             const menu = ((_b = wxAny.getMenuButtonBoundingClientRect) === null || _b === void 0 ? void 0 : _b.call(wxAny)) || {};
-            // 标题行垂直对齐胶囊中线附近，整体更贴系统顶栏
-            const statusPad = menu.bottom
-                ? Math.max(menu.bottom - 6, (sys.statusBarHeight || 20) + 8)
-                : (sys.statusBarHeight || 20) + 12;
-            this.setData(Object.assign({ statusPad }, (panel ? { panel } : {})));
+            const statusBar = Number(sys.statusBarHeight) || 20;
+            const menuTop = Number(menu.top) || 0;
+            const menuHeight = Number(menu.height) || 32;
+            // 顶到胶囊上沿即可；再往上会被系统栏裁掉
+            const statusPad = menuTop > 0 ? menuTop : statusBar + 6;
+            const navRowHeight = menuHeight > 0 ? menuHeight : 32;
+            this.setData(Object.assign({ statusPad,
+                navRowHeight }, (panel ? { panel } : {})));
         }
         catch (_c) {
             if (panel)
@@ -176,7 +182,7 @@ Page({
         wx.navigateTo({ url: '/pages/connect-ai/connect-ai' });
     },
     goLocate() {
-        wx.navigateTo({ url: '/pages/locate-note/locate-note' });
+        (0, locate_draft_1.startLocateFlow)();
     },
     /** 长按店铺行 → 确认后从「我的店」移除 */
     onDeleteShop(e) {
@@ -227,8 +233,9 @@ Page({
     openFriend(e) {
         const id = String(e.currentTarget.dataset.id || '');
         const name = encodeURIComponent(String(e.currentTarget.dataset.name || '朋友'));
+        const avatar = encodeURIComponent(String(e.currentTarget.dataset.avatar || ''));
         wx.navigateTo({
-            url: `/pages/friend-shops/friend-shops?c=${this.data.networkId}&m=${id}&n=${name}`,
+            url: `/pages/friend-shops/friend-shops?c=${this.data.networkId}&m=${id}&n=${name}&a=${avatar}`,
         });
     },
     async openShop(e) {

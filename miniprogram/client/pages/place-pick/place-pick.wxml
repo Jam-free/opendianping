@@ -1,0 +1,62 @@
+<view class="page">
+  <map
+    class="map"
+    latitude="{{mapLat}}"
+    longitude="{{mapLng}}"
+    scale="16"
+    show-location
+    markers="{{markers}}"
+    enable-scroll="{{false}}"
+    enable-zoom="{{false}}"
+  />
+
+  <view class="search-wrap">
+    <view class="search">
+      <text class="search-ico">⌕</text>
+      <input
+        class="search-input"
+        placeholder="搜店名"
+        value="{{keyword}}"
+        bindinput="onKeyword"
+        confirm-type="search"
+        bindconfirm="onSearch"
+        adjust-position="{{true}}"
+      />
+      <text class="search-clear muted" wx:if="{{keyword}}" bindtap="clearKeyword">清除</text>
+    </view>
+  </view>
+
+  <view class="list-label muted">{{listLabel}}</view>
+
+  <scroll-view scroll-y class="list" enhanced show-scrollbar="{{false}}">
+    <view wx:if="{{loading}}" class="muted tip">正在找附近…</view>
+    <view wx:elif="{{locError}}" class="muted tip">{{locError}}</view>
+    <block wx:else>
+      <view
+        wx:for="{{items}}"
+        wx:key="id"
+        class="item"
+        data-id="{{item.id}}"
+        bindtap="onPick"
+      >
+        <view class="item-main">
+          <view class="item-name">{{item.title}}</view>
+          <view class="item-meta muted">
+            <text wx:if="{{item.distanceLabel}}">{{item.distanceLabel}} · </text>
+            <text>{{item.address || '附近'}}</text>
+          </view>
+        </view>
+        <text class="check" wx:if="{{selectedId === item.id}}">✓</text>
+      </view>
+      <view wx:if="{{!items.length}}" class="muted tip">
+        {{keyword ? '没搜到，换个词，或选「我当前位置」' : '附近暂时没有店，可选「我当前位置」'}}
+      </view>
+    </block>
+  </scroll-view>
+
+  <view class="dock">
+    <button class="btn-primary btn-block" loading="{{saving}}" bindtap="onDone">
+      完成
+    </button>
+  </view>
+</view>

@@ -1,0 +1,102 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  box-sizing: border-box;
+  background: var(--bg);
+}
+
+.map {
+  width: 100%;
+  height: 320rpx;
+  flex-shrink: 0;
+}
+
+.search-wrap {
+  padding: 16rpx 24rpx 8rpx;
+  background: var(--card);
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  background: var(--bg);
+  border-radius: 16rpx;
+  padding: 0 24rpx;
+  min-height: 72rpx;
+}
+
+.search-ico {
+  color: var(--sub);
+  font-size: 28rpx;
+}
+
+.search-input {
+  flex: 1;
+  font-size: 28rpx;
+  min-width: 0;
+  height: 72rpx;
+}
+
+.search-clear {
+  font-size: 24rpx;
+  padding: 8rpx;
+}
+
+.list-label {
+  padding: 12rpx 28rpx 4rpx;
+  font-size: 22rpx;
+  background: var(--card);
+}
+
+.list {
+  flex: 1;
+  height: 0;
+  background: var(--card);
+  padding-bottom: 24rpx;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 24rpx 28rpx;
+  border-bottom: 1rpx solid var(--line);
+}
+
+.item-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.item-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  margin-bottom: 6rpx;
+}
+
+.item-meta {
+  font-size: 22rpx;
+  line-height: 1.4;
+}
+
+.check {
+  color: var(--primary);
+  font-size: 34rpx;
+  font-weight: 600;
+  width: 40rpx;
+  text-align: right;
+}
+
+.tip {
+  padding: 32rpx 28rpx;
+  line-height: 1.5;
+}
+
+.dock {
+  flex-shrink: 0;
+  padding: 16rpx 28rpx calc(16rpx + env(safe-area-inset-bottom));
+  background: var(--card);
+  border-top: 1rpx solid var(--line);
+}

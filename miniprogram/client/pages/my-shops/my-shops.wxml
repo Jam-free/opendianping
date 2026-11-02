@@ -7,7 +7,7 @@
     标题相对位置固定：左「私藏好店」右「吃货排行」；
     只切换字号/字色（当前大橙、另一页小灰），很常见的 UX。
   -->
-  <view class="header">
+  <view class="header" style="min-height: {{navRowHeight}}px;">
     <view class="titles">
       <view class="title-hit" bindtap="goPanel" data-panel="0">
         <text class="title {{panel === 0 ? 'title--on' : 'title--off'}}">私藏好店</text>
@@ -68,6 +68,7 @@
               bindtap="openFriend"
               data-id="{{item.id}}"
               data-name="{{item.nickname}}"
+              data-avatar="{{item.avatarSrc}}"
             >
               <view class="rank {{index < 3 ? 'rank--top' : ''}}">{{index + 1}}</view>
               <image wx:if="{{item.avatarSrc}}" class="fav" src="{{item.avatarSrc}}" mode="aspectFill" />

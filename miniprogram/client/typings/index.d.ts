@@ -59,6 +59,7 @@ declare const wx: {
   showShareMenu: (opts: any) => void;
   showToast: (opts: any) => void;
   showModal: (opts: any) => void;
+  showActionSheet: (opts: any) => void;
   navigateTo: (opts: any) => void;
   redirectTo: (opts: any) => void;
   reLaunch: (opts: any) => void;

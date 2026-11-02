@@ -183,6 +183,10 @@ function migrateSchema(database: Database.Database): void {
       `UPDATE favorites SET wishlist = 1 WHERE import_batch_id IS NOT NULL`
     );
   }
+  // 从哪位好友那里加进私藏（用于「XX推荐」）
+  if (!favCols.some((c) => c.name === 'from_user_id')) {
+    database.exec(`ALTER TABLE favorites ADD COLUMN from_user_id TEXT`);
+  }
 
   database.exec(`
     CREATE TABLE IF NOT EXISTS agent_tokens (

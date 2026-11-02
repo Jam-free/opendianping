@@ -1,4 +1,19 @@
 <view class="page">
+  <view class="friend-head card">
+    <image
+      wx:if="{{avatarSrc}}"
+      class="friend-av"
+      src="{{avatarSrc}}"
+      mode="aspectFill"
+      binderror="onAvatarError"
+    />
+    <view wx:else class="friend-av text">{{initial}}</view>
+    <view class="friend-meta">
+      <view class="friend-name">{{friendName}}</view>
+      <view class="muted friend-sub">共享 {{shops.length}} 家</view>
+    </view>
+  </view>
+
   <view class="card list" wx:if="{{shops.length}}">
     <block wx:for="{{shops}}" wx:key="poiKey">
       <view class="item hairline">

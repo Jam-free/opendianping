@@ -1,93 +1,50 @@
 <view class="page">
-  <view class="card block">
-    <view class="h1">{{editing ? '改一改' : '记美食'}}</view>
-    <view class="muted tip">
-      {{editing ? '可以改店名、换图，或再写一句评论。' : '选附近一家店，可拍照、写一句；默认与美食好友共享。'}}
-    </view>
+  <view class="editor card">
+    <textarea
+      class="thought"
+      placeholder="口味、推荐菜、避雷…"
+      maxlength="500"
+      value="{{note}}"
+      bindinput="onNote"
+      auto-height
+      adjust-position="{{true}}"
+      show-confirm-bar="{{false}}"
+    />
 
-    <view class="loc-card" wx:if="{{!editing}}">
-      <view class="loc-label muted">当前位置</view>
-      <view class="loc-main" wx:if="{{locReady}}">
-        <view class="addr-main">{{address || '定位成功'}}</view>
-        <view class="coords muted">{{latLabel}}, {{lngLabel}}</view>
-      </view>
-      <view class="loc-main muted" wx:elif="{{locError}}">{{locError}}</view>
-      <view class="loc-main muted" wx:else>正在获取定位…</view>
-      <button class="btn-ghost mini" size="mini" bindtap="refreshLoc">重新定位</button>
-    </view>
-
-    <view class="field" wx:if="{{!editing && pois.length}}">
-      <view class="label">附近的餐饮店（点选）</view>
-      <scroll-view scroll-y class="poi-list">
-        <view
-          wx:for="{{pois}}"
-          wx:key="id"
-          class="poi-item {{selectedPoiId === item.id ? 'on' : ''}}"
-          data-id="{{item.id}}"
-          bindtap="pickPoi"
-        >
-          <view class="poi-title">{{item.title}}</view>
-          <view class="poi-meta muted">
-            <text wx:if="{{item.categoryLabel}}">{{item.categoryLabel}} · </text>
-            <text wx:if="{{item.distanceLabel}}">{{item.distanceLabel}} · </text>
-            <text>{{item.address || '附近'}}</text>
-          </view>
-        </view>
-      </scroll-view>
-    </view>
-    <view class="muted tip-inline" wx:elif="{{!editing && locReady && !pois.length}}">
-      附近没识别到餐饮店，也可以自己填写店名。
-    </view>
-
-    <view class="field">
-      <view class="label">店名 / 地点</view>
-      <input
-        class="input input-lg"
-        placeholder="例如：巷口螺蛳粉（可改）"
-        value="{{name}}"
-        bindinput="onName"
-        maxlength="40"
-        adjust-position="{{true}}"
-        hold-keyboard="{{true}}"
-      />
-    </view>
-
-    <view class="field">
-      <view class="label">拍照（可选）</view>
-      <view class="photos">
+    <view class="photos">
+      <view wx:for="{{photos}}" wx:key="*this" class="photo-wrap">
         <image
-          wx:if="{{photoPath}}"
           class="photo"
-          src="{{photoPath}}"
+          src="{{item}}"
           mode="aspectFill"
+          data-src="{{item}}"
           bindtap="previewPhoto"
         />
-        <view class="add-photo" bindtap="pickPhoto" wx:if="{{!photoPath}}">+</view>
-        <view class="remove muted" wx:if="{{photoPath}}" bindtap="clearPhoto">清除</view>
+        <view class="photo-x" data-index="{{index}}" bindtap="removePhoto">×</view>
       </view>
+      <view class="add-photo" bindtap="addPhoto" wx:if="{{photos.length < maxPhotos}}">+</view>
     </view>
 
-    <view class="field">
-      <view class="label">{{editing ? '再写一句（可选）' : '备注（可选）'}}</view>
-      <textarea
-        class="textarea"
-        placeholder="口味、推荐菜、避雷…"
-        maxlength="500"
-        value="{{note}}"
-        bindinput="onNote"
-        auto-height
-        adjust-position="{{true}}"
-        show-confirm-bar="{{false}}"
-      />
+    <view class="place-row" bindtap="goPickPlace" hover-class="place-row--press">
+      <text class="place-ico">📍</text>
+      <view class="place-main">
+        <view class="place-label">美食地点</view>
+        <view class="place-value {{placeName ? '' : 'placeholder'}}">
+          {{placeName || '去选一下'}}
+        </view>
+        <view class="place-sub muted" wx:if="{{placeSub}}">{{placeSub}}</view>
+      </view>
+      <text class="chev muted">›</text>
     </view>
+  </view>
 
+  <view class="dock">
     <button
       class="btn-primary btn-block"
       loading="{{saving}}"
-      disabled="{{!editing && !locReady}}"
       bindtap="onSave"
     >
-      {{editing ? '保存修改' : '记下来'}}
+      {{editing ? '保存修改' : '记下'}}
     </button>
   </view>
 </view>

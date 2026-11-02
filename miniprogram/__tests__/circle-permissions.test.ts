@@ -7,6 +7,7 @@ import {
   saveImportSelection,
 } from '../server/services/import.js';
 import * as circles from '../server/services/circles.js';
+import * as network from '../server/services/network.js';
 import { createApp } from '../server/app.js';
 import request from 'supertest';
 
@@ -60,16 +61,16 @@ describe('圈内权限', () => {
       'old-token',
       new Date(Date.now() - 1000).toISOString()
     );
-    expect(() =>
+    await expect(
       circles.joinCircle(guest.user.id, circle.id, 'old-token')
-    ).toThrow(expect.objectContaining({ status: 403, message: expect.stringMatching(/过期/) }));
+    ).rejects.toMatchObject({ status: 403, message: expect.stringMatching(/过期/) });
 
     const reset = circles.resetInviteToken(owner.user.id, circle.id);
-    expect(() =>
+    await expect(
       circles.joinCircle(guest.user.id, circle.id, 'old-token')
-    ).toThrow(expect.objectContaining({ status: 403 }));
+    ).rejects.toMatchObject({ status: 403 });
 
-    const joined = circles.joinCircle(
+    const joined = await circles.joinCircle(
       guest.user.id,
       circle.id,
       reset.inviteToken
@@ -77,11 +78,25 @@ describe('圈内权限', () => {
     expect(joined.alreadyMember).toBe(false);
   });
 
+  test('加入后双方互为美食好友', async () => {
+    const owner = createSessionForOpenId('owner_mutual_a');
+    const guest = createSessionForOpenId('guest_mutual_b');
+    const circle = await circles.createCircle(owner.user.id, '我的美食网');
+
+    await circles.joinCircle(guest.user.id, circle.id, circle.inviteToken);
+
+    const ownerFriends = await network.listFoodFriends(owner.user.id);
+    const guestFriends = await network.listFoodFriends(guest.user.id);
+
+    expect(ownerFriends.friends.map((f) => f.id)).toContain(guest.user.id);
+    expect(guestFriends.friends.map((f) => f.id)).toContain(owner.user.id);
+  });
+
   test('私密收藏绝不出现在圈视图（含聚合计数）', async () => {
     const owner = createSessionForOpenId('owner_e');
     const member = createSessionForOpenId('member_f');
     const circle = await circles.createCircle(owner.user.id, '隐私圈');
-    circles.joinCircle(member.user.id, circle.id, circle.inviteToken);
+    await circles.joinCircle(member.user.id, circle.id, circle.inviteToken);
 
     await seedSharedFavorite(owner.user.id, 'circles');
     await seedSharedFavorite(member.user.id, 'private');
@@ -109,7 +124,7 @@ describe('圈内权限', () => {
     const owner = createSessionForOpenId('owner_g');
     const member = createSessionForOpenId('member_h');
     const circle = await circles.createCircle(owner.user.id, '退出测试');
-    circles.joinCircle(member.user.id, circle.id, circle.inviteToken);
+    await circles.joinCircle(member.user.id, circle.id, circle.inviteToken);
 
     await seedSharedFavorite(member.user.id, 'circles');
     expect(circles.listCircleShops(owner.user.id, circle.id).items.length).toBe(
@@ -131,15 +146,15 @@ describe('圈内权限', () => {
     const owner = createSessionForOpenId('owner_i');
     const m1 = createSessionForOpenId('member_j');
     const circle = await circles.createCircle(owner.user.id, '管理圈');
-    circles.joinCircle(m1.user.id, circle.id, circle.inviteToken);
+    await circles.joinCircle(m1.user.id, circle.id, circle.inviteToken);
 
     circles.removeMember(owner.user.id, circle.id, m1.user.id);
     expect(() =>
       circles.listCircleShops(m1.user.id, circle.id)
     ).toThrow(expect.objectContaining({ status: 403 }));
 
-    expect(() =>
+    await expect(
       circles.joinCircle(m1.user.id, circle.id, 'wrong')
-    ).toThrow(expect.objectContaining({ status: 403 }));
+    ).rejects.toMatchObject({ status: 403 });
   });
 });

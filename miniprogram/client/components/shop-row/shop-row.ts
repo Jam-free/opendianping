@@ -1,11 +1,15 @@
 import { API_BASE } from '../../utils/config';
 import { splitDistance, avatarInitial } from '../../utils/format';
-import { SHOP_PLACEHOLDER, shopImageSrc } from '../../utils/media';
+import {
+  SHOP_PLACEHOLDER,
+  shopImageSrc,
+  userAvatarSrc,
+} from '../../utils/media';
 
 Component({
   properties: {
     shop: { type: Object, value: {} },
-    /** 覆盖推荐行文案，如「我导入」「来自小王」 */
+    /** 覆盖推荐行文案，如「我导入」「小王推荐」 */
     sourceTag: { type: String, value: '' },
   },
   data: {
@@ -30,7 +34,8 @@ Component({
         metaLine: parts.join(' · '),
         previewAvatars: preview.map((c) => ({
           userId: c.userId,
-          avatar: c.avatar || '',
+          // 本地上传头像要拼 API_BASE，否则吃货/推荐行空白
+          avatar: userAvatarSrc(API_BASE, c.avatar),
           initial: avatarInitial(c.nickname),
         })),
         // 无 headImgProxy 也直接用兜底，不留空灰块

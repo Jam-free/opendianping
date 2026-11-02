@@ -238,3 +238,148 @@ async function reverseByAmap(
     return null;
   }
 }
+
+/**
+ * 按店名搜餐饮点：记美食「搜店名」用。
+ * 有坐标时优先搜周边；没有坐标则全国/城市模糊搜。
+ */
+export async function searchFoodPlaces(input: {
+  keyword: string;
+  lat?: number;
+  lng?: number;
+}): Promise<NearbyPoi[]> {
+  const keyword = (input.keyword || '').trim().slice(0, 40);
+  if (!keyword) return [];
+
+  if (config.tencentMapKey) {
+    const hit = await searchByTencent(keyword, input.lat, input.lng);
+    if (hit) return hit;
+  }
+  if (config.amapKey) {
+    const hit = await searchByAmap(keyword, input.lat, input.lng);
+    if (hit) return hit;
+  }
+  return [];
+}
+
+async function searchByTencent(
+  keyword: string,
+  lat?: number,
+  lng?: number
+): Promise<NearbyPoi[] | null> {
+  const url = new URL('https://apis.map.qq.com/ws/place/v1/search');
+  url.searchParams.set('keyword', keyword);
+  url.searchParams.set('key', config.tencentMapKey);
+  url.searchParams.set('page_size', '15');
+  url.searchParams.set('page_index', '1');
+  // 有定位：附近 5km；否则全国
+  if (
+    lat != null &&
+    lng != null &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lng)
+  ) {
+    url.searchParams.set('boundary', `nearby(${lat},${lng},5000,1)`);
+  } else {
+    url.searchParams.set('boundary', 'region(全国,0)');
+  }
+  url.searchParams.set('filter', 'category=美食');
+
+  try {
+    const res = await fetch(url.toString(), {
+      signal: AbortSignal.timeout(8000),
+    });
+    const data = (await res.json()) as {
+      status?: number;
+      data?: Array<{
+        id?: string;
+        title?: string;
+        address?: string;
+        category?: string;
+        _distance?: number;
+        location?: { lat?: number; lng?: number };
+      }>;
+    };
+    if (data.status !== 0 || !data.data?.length) return null;
+    return data.data
+      .filter((p) => p.title && isFoodVenueCategory(p.category || '美食'))
+      .slice(0, 12)
+      .map((p, i) => ({
+        id: p.id || `ts_${i}`,
+        title: String(p.title),
+        address: p.address || '',
+        category: p.category,
+        distance:
+          typeof p._distance === 'number' ? Math.round(p._distance) : undefined,
+        lat: p.location?.lat,
+        lng: p.location?.lng,
+      }));
+  } catch (err) {
+    console.warn('[geo] tencent search error', err);
+    return null;
+  }
+}
+
+async function searchByAmap(
+  keyword: string,
+  lat?: number,
+  lng?: number
+): Promise<NearbyPoi[] | null> {
+  const url = new URL('https://restapi.amap.com/v3/place/text');
+  url.searchParams.set('key', config.amapKey);
+  url.searchParams.set('keywords', keyword);
+  url.searchParams.set('types', '050000');
+  url.searchParams.set('offset', '15');
+  url.searchParams.set('page', '1');
+  url.searchParams.set('extensions', 'base');
+  if (
+    lat != null &&
+    lng != null &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lng)
+  ) {
+    url.searchParams.set('location', `${lng},${lat}`);
+    url.searchParams.set('radius', '5000');
+    url.searchParams.set('sortrule', 'distance');
+  }
+
+  try {
+    const res = await fetch(url.toString(), {
+      signal: AbortSignal.timeout(8000),
+    });
+    const data = (await res.json()) as {
+      status?: string;
+      pois?: Array<{
+        id?: string;
+        name?: string;
+        address?: string | string[];
+        type?: string;
+        distance?: string;
+        location?: string;
+      }>;
+    };
+    if (data.status !== '1' || !data.pois?.length) return null;
+    return data.pois
+      .filter((p) => p.name)
+      .slice(0, 12)
+      .map((p, i) => {
+        const loc = (p.location || '').split(',');
+        const poiLng = loc[0] ? Number(loc[0]) : undefined;
+        const poiLat = loc[1] ? Number(loc[1]) : undefined;
+        const addr = Array.isArray(p.address) ? p.address[0] : p.address;
+        const dist = p.distance ? Number(p.distance) : undefined;
+        return {
+          id: p.id || `as_${i}`,
+          title: String(p.name),
+          address: addr || '',
+          category: p.type,
+          distance: Number.isFinite(dist) ? Math.round(dist!) : undefined,
+          lat: Number.isFinite(poiLat) ? poiLat : undefined,
+          lng: Number.isFinite(poiLng) ? poiLng : undefined,
+        };
+      });
+  } catch (err) {
+    console.warn('[geo] amap search error', err);
+    return null;
+  }
+}

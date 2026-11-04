@@ -249,7 +249,7 @@ export function listMyCircles(userId: string) {
   const rows = getDb()
     .prepare(
       `SELECT c.id, c.name, c.owner_id, cm.role, c.created_at, c.is_personal,
-              c.invite_token, c.token_expires_at,
+              c.invite_token, c.token_expires_at, cm.joined_at,
               (SELECT COUNT(*) FROM circle_members m WHERE m.circle_id = c.id) AS member_count
        FROM circles c
        JOIN circle_members cm ON cm.circle_id = c.id

@@ -7,6 +7,7 @@ const format_1 = require("../../utils/format");
 const config_1 = require("../../utils/config");
 const media_1 = require("../../utils/media");
 const locate_draft_1 = require("../../utils/locate-draft");
+const share_circle_1 = require("../../utils/share-circle");
 function friendAvatarSrc(avatar) {
     if (!avatar)
         return '';
@@ -139,20 +140,9 @@ Page({
             const net = await (0, api_1.request)('/api/me/network');
             (0, circle_1.setActiveCircleId)(net.networkId);
             
-            // 获取所有圈子，筛选非个人空间用于分享
+            // 获取所有圈子，选择最合适的分享圈子
             const circlesData = await (0, api_1.request)('/api/circles');
-            const shareableCircles = (circlesData.items || []).filter(
-                (c) => !c.is_personal && c.invite_token && c.token_expires_at
-            );
-            
-            let shareCircleId = '';
-            let shareToken = '';
-            
-            if (shareableCircles.length > 0) {
-                // 使用第一个可分享圈子
-                shareCircleId = shareableCircles[0].id;
-                shareToken = shareableCircles[0].invite_token;
-            }
+            const shareCircle = (0, share_circle_1.selectShareCircle)(circlesData.items || []);
             
             // 吃货排行：共享店数多的靠前
             const friends = (net.friends || [])
@@ -160,8 +150,8 @@ Page({
                 .sort((a, b) => b.sharedShopCount - a.sharedShopCount);
             this.setData({
                 friends,
-                networkId: shareCircleId || net.networkId,
-                inviteToken: shareToken,
+                networkId: (shareCircle === null || shareCircle === void 0 ? void 0 : shareCircle.id) || net.networkId,
+                inviteToken: (shareCircle === null || shareCircle === void 0 ? void 0 : shareCircle.inviteToken) || '',
                 friendsLoading: false,
                 loginError: '',
             });

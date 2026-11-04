@@ -13,6 +13,7 @@ import { avatarInitial } from '../../utils/format';
 import { API_BASE } from '../../utils/config';
 import { userAvatarSrc } from '../../utils/media';
 import { startLocateFlow } from '../../utils/locate-draft';
+import { selectShareCircle } from '../../utils/share-circle';
 
 type Friend = {
   id: string;
@@ -169,20 +170,9 @@ Page({
       }>('/api/me/network');
       setActiveCircleId(net.networkId);
       
-      // 获取所有圈子，筛选非个人空间用于分享
+      // 获取所有圈子，选择最合适的分享圈子
       const circlesData = await request<{ items: any[] }>('/api/circles');
-      const shareableCircles = (circlesData.items || []).filter(
-        (c: any) => !c.is_personal && c.invite_token && c.token_expires_at
-      );
-      
-      let shareCircleId = '';
-      let shareToken = '';
-      
-      if (shareableCircles.length > 0) {
-        // 使用第一个可分享圈子
-        shareCircleId = shareableCircles[0].id;
-        shareToken = shareableCircles[0].invite_token;
-      }
+      const shareCircle = selectShareCircle(circlesData.items || []);
       
       // 吃货排行：共享店数多的靠前
       const friends = (net.friends || [])
@@ -194,8 +184,8 @@ Page({
         .sort((a, b) => b.sharedShopCount - a.sharedShopCount);
       this.setData({
         friends,
-        networkId: shareCircleId || net.networkId,
-        inviteToken: shareToken,
+        networkId: shareCircle?.id || net.networkId,
+        inviteToken: shareCircle?.inviteToken || '',
         friendsLoading: false,
         loginError: '',
       });

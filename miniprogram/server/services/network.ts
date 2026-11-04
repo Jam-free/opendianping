@@ -17,10 +17,54 @@ function nowIso(): string {
 }
 
 /**
+ * 检测 poi_key 冲突：如果多个不同的 shop_id 共享同一个 poi_key，
+ * 说明去重键生成有问题，需要修复
+ */
+function detectPoiKeyCollisions(userId: string): Array<{
+  poi_key: string;
+  shop_ids: string[];
+  shop_names: string[];
+}> {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT COALESCE(s.source_shop_id, s.amap_poi_id, s.id) AS poi_key,
+              GROUP_CONCAT(s.id, '|') AS shop_ids,
+              GROUP_CONCAT(s.raw_name, '|') AS shop_names,
+              COUNT(DISTINCT s.id) AS shop_count
+       FROM favorites f
+       JOIN shops s ON s.id = f.shop_id
+       WHERE f.user_id = ?
+       GROUP BY poi_key
+       HAVING shop_count > 1`
+    )
+    .all(userId) as Array<{
+      poi_key: string;
+      shop_ids: string;
+      shop_names: string;
+    }>;
+
+  return rows.map((r) => ({
+    poi_key: r.poi_key,
+    shop_ids: r.shop_ids.split('|'),
+    shop_names: r.shop_names.split('|'),
+  }));
+}
+
+/**
  * 首次进入自动确保用户拥有「我的美食网」。
  * 产品层不展示「创建圈子」，只复用 circles 表做邀请与共享。
+ * 
+ * 只有在用户既没有创建也没有加入任何圈子时，才创建新的个人圈子。
+ * 如果用户已经加入了其他圈子，则不自动创建，返回 null。
  */
-export async function ensurePersonalNetwork(userId: string) {
+export async function ensurePersonalNetwork(userId: string): Promise<{
+  id: string;
+  name: string;
+  inviteToken: string;
+  tokenExpiresAt: string;
+  memberCount: number;
+} | null> {
   const db = getDb();
   const owned = db
     .prepare(
@@ -51,7 +95,19 @@ export async function ensurePersonalNetwork(userId: string) {
     };
   }
 
-  const created = await createCircle(userId, PERSONAL_NETWORK_NAME);
+  const hasJoined = db
+    .prepare(
+      `SELECT COUNT(*) AS count
+       FROM circle_members cm
+       WHERE cm.user_id = ? AND cm.role = 'member'`
+    )
+    .get(userId) as { count: number };
+
+  if (hasJoined.count > 0) {
+    return null;
+  }
+
+  const created = await createCircle(userId, PERSONAL_NETWORK_NAME, true);
   return {
     id: created.id,
     name: created.name,
@@ -88,36 +144,82 @@ function healInboundFriendships(userId: string, myNetworkId: string) {
   }
 }
 
-/** Tab1：美食好友（不含自己）；含我邀请的，以及我点开对方邀请后互加的 */
+/**
+ * 获取用户的美食网络：包括自己创建的圈子和加入的所有圈子的成员（去重）
+ * 这样同一个圈子里的所有成员都能互相看见
+ */
+function getAllNetworkMembers(userId: string): Array<{
+  id: string;
+  nickname: string | null;
+  avatar: string | null;
+  shared_shop_count: number;
+}> {
+  const db = getDb();
+  
+  return db
+    .prepare(
+      `SELECT DISTINCT u.id, u.nickname, u.avatar,
+              (SELECT COUNT(DISTINCT f.shop_id)
+               FROM favorites f
+               WHERE f.user_id = u.id
+                 AND f.visibility = 'circles'
+                 AND (
+                   NOT EXISTS (SELECT 1 FROM circle_shares cs WHERE cs.favorite_id = f.id)
+                   OR EXISTS (
+                     SELECT 1 FROM circle_shares cs2
+                     JOIN circle_members cm_owner ON cm_owner.circle_id = cs2.circle_id
+                     JOIN circle_members cm_viewer ON cm_viewer.circle_id = cs2.circle_id
+                     WHERE cs2.favorite_id = f.id
+                       AND cm_owner.user_id = u.id
+                       AND cm_viewer.user_id = ?
+                   )
+                 )) AS shared_shop_count
+       FROM users u
+       WHERE u.id != ?
+         AND u.id IN (
+           SELECT cm2.user_id
+           FROM circle_members cm1
+           JOIN circle_members cm2 ON cm1.circle_id = cm2.circle_id
+           WHERE cm1.user_id = ?
+             AND cm2.user_id != ?
+         )
+       ORDER BY u.nickname`
+    )
+    .all(userId, userId, userId, userId) as Array<{
+      id: string;
+      nickname: string | null;
+      avatar: string | null;
+      shared_shop_count: number;
+    }>;
+}
+
+/** 
+ * Tab1：美食好友（不含自己）
+ * 显示所有与当前用户在同一圈子中的成员（去重）
+ * 这样 A、B、C 在同一个圈子里时，每个人都能看到其他人
+ */
 export async function listFoodFriends(userId: string) {
   const network = await ensurePersonalNetwork(userId);
-  healInboundFriendships(userId, network.id);
+  if (network) {
+    healInboundFriendships(userId, network.id);
+  }
 
-  const members = listCircleMembers(userId, network.id) as Array<{
-    id: string;
-    nickname: string | null;
-    avatar: string | null;
-    role: string;
-    joined_at: string;
-    shared_shop_count: number;
-  }>;
+  const allMembers = getAllNetworkMembers(userId);
 
   const refreshed = await ensurePersonalNetwork(userId);
   return {
-    networkId: refreshed.id,
-    inviteToken: refreshed.inviteToken,
-    tokenExpiresAt: refreshed.tokenExpiresAt,
-    memberCount: refreshed.memberCount,
-    friends: members
-      .filter((m) => m.id !== userId)
-      .map((m) => ({
-        id: m.id,
-        nickname: m.nickname,
-        avatar: m.avatar,
-        role: m.role,
-        joinedAt: m.joined_at,
-        sharedShopCount: Number(m.shared_shop_count) || 0,
-      })),
+    networkId: refreshed?.id || '',
+    inviteToken: '',
+    tokenExpiresAt: '',
+    memberCount: allMembers.length + 1,
+    friends: allMembers.map((m) => ({
+      id: m.id,
+      nickname: m.nickname,
+      avatar: m.avatar,
+      role: 'member' as const,
+      joinedAt: '',
+      sharedShopCount: Number(m.shared_shop_count) || 0,
+    })),
   };
 }
 
@@ -149,8 +251,8 @@ type MyShopRow = {
 const MY_SHOP_ORIGIN_LABEL: Record<string, string> = {
   imported: '我导入',
   checkin: '我记下',
-  from_friend: '好友推荐',
-  agent: 'Agent 记下',
+  from_friend: '来自好友',
+  agent: 'AI 帮你记下',
 };
 
 type FriendRecommender = {
@@ -159,28 +261,46 @@ type FriendRecommender = {
   avatar: string | null;
 };
 
-/** 在我的美食网里，还有谁也共享了这家店（用来标「XX推荐」） */
+/** 
+ * 在我的美食网络里，还有谁也共享了这家店（用来标「来自XX」）
+ * 查询所有与当前用户在同一圈子中的成员
+ */
 function findFriendRecommenders(
   userId: string,
-  networkId: string,
   shopId: string,
   preferredUserId?: string | null
 ): FriendRecommender[] {
   const db = getDb();
   const rows = db
     .prepare(
-      `SELECT u.id AS userId, u.nickname, u.avatar
+      `SELECT DISTINCT u.id AS userId, u.nickname, u.avatar
        FROM favorites f
        JOIN users u ON u.id = f.user_id
-       JOIN circle_members cm
-         ON cm.user_id = f.user_id AND cm.circle_id = ?
        WHERE f.shop_id = ?
          AND f.user_id != ?
          AND f.visibility = 'circles'
+         AND f.user_id IN (
+           SELECT cm2.user_id
+           FROM circle_members cm1
+           JOIN circle_members cm2 ON cm1.circle_id = cm2.circle_id
+           WHERE cm1.user_id = ?
+             AND cm2.user_id != ?
+         )
+         AND (
+           NOT EXISTS (SELECT 1 FROM circle_shares cs WHERE cs.favorite_id = f.id)
+           OR EXISTS (
+             SELECT 1 FROM circle_shares cs2
+             JOIN circle_members cm_owner ON cm_owner.circle_id = cs2.circle_id
+             JOIN circle_members cm_viewer ON cm_viewer.circle_id = cs2.circle_id
+             WHERE cs2.favorite_id = f.id
+               AND cm_owner.user_id = f.user_id
+               AND cm_viewer.user_id = ?
+           )
+         )
        ORDER BY CASE WHEN f.user_id = ? THEN 0 ELSE 1 END, f.created_at ASC
        LIMIT 3`
     )
-    .all(networkId, shopId, userId, preferredUserId || '') as FriendRecommender[];
+    .all(shopId, userId, userId, userId, userId, preferredUserId || '') as FriendRecommender[];
   return rows;
 }
 
@@ -188,9 +308,19 @@ function friendRecommendLabel(recs: FriendRecommender[]): string {
   const names = recs
     .map((r) => (r.nickname || '').trim())
     .filter(Boolean);
-  if (names[0]) return `${names[0]}推荐`;
-  if (recs.length) return '好友推荐';
-  return MY_SHOP_ORIGIN_LABEL.from_friend;
+  const shown = names.slice(0, 2);
+  if (recs.length === 0) return MY_SHOP_ORIGIN_LABEL.from_friend;
+  if (recs.length === 1 && shown[0]) return `来自${shown[0]}`;
+  if (shown.length >= 2 && recs.length > 2) {
+    return `来自${shown[0]}、${shown[1]}等 ${recs.length} 人`;
+  }
+  if (shown.length === 1 && recs.length > 1) {
+    return `来自${shown[0]}等 ${recs.length} 人`;
+  }
+  if (shown.length >= 2) {
+    return `来自${shown[0]}、${shown[1]}`;
+  }
+  return `来自 ${recs.length} 人`;
 }
 
 /**
@@ -270,13 +400,25 @@ function toAgentMineShop(s: {
  * Tab2：我导入的 + 我记下的 + Agent 记下的 + 我从好友清单收藏的店。
  * origin: imported | checkin | from_friend | agent
  * wishlist=1 →「心心念念」（很想去），熄心不删店。
+ * 
+ * 推荐人查找范围：所有我加入的圈子（不只是我拥有的圈子）
  */
 export async function listMyShops(
   userId: string,
   opts?: { lat?: number; lng?: number; userCity?: string }
 ) {
   const network = await ensurePersonalNetwork(userId);
-  healInboundFriendships(userId, network.id);
+  if (network) {
+    healInboundFriendships(userId, network.id);
+  }
+
+  const collisions = detectPoiKeyCollisions(userId);
+  if (collisions.length > 0) {
+    console.warn(
+      `[poi_key collision] User ${userId} has ${collisions.length} poi_key collisions:`,
+      JSON.stringify(collisions, null, 2)
+    );
+  }
 
   const rows = getDb()
     .prepare(
@@ -328,20 +470,29 @@ export async function listMyShops(
         shopCity: r.city ?? undefined,
       });
     }
+    
     const head = r.photo_url || r.head_img;
     const status = deriveShopStatus(r);
 
-    let sourceTag = MY_SHOP_ORIGIN_LABEL[r.origin] || '';
-    let recommendersLine = sourceTag;
+    let sourceTag = '';
+    let recommendersLine = '';
     let collectors: FriendRecommender[] = [];
-    if (r.origin === 'from_friend') {
+    
+    if (r.origin === 'from_friend' || r.origin === 'agent') {
       collectors = findFriendRecommenders(
         userId,
-        network.id,
         r.shop_id,
         r.from_user_id
       );
-      sourceTag = friendRecommendLabel(collectors);
+      if (collectors.length > 0) {
+        sourceTag = friendRecommendLabel(collectors);
+        recommendersLine = sourceTag;
+      } else {
+        sourceTag = MY_SHOP_ORIGIN_LABEL[r.origin] || '';
+        recommendersLine = sourceTag;
+      }
+    } else {
+      sourceTag = MY_SHOP_ORIGIN_LABEL[r.origin] || '';
       recommendersLine = sourceTag;
     }
 
@@ -435,27 +586,61 @@ export async function createCheckin(
   const wishlist = input.wishlist ? 1 : 0;
 
   const db = getDb();
-  const shopId = uuidv4();
+  
+  let shopId: string;
+  if (poiId) {
+    const existing = db
+      .prepare(`SELECT id FROM shops WHERE amap_poi_id = ? LIMIT 1`)
+      .get(poiId) as { id: string } | undefined;
+    shopId = existing?.id || uuidv4();
+  } else {
+    shopId = uuidv4();
+  }
+  
   const favId = uuidv4();
   const createdAt = nowIso();
 
   const tx = db.transaction(() => {
-    db.prepare(
-      `INSERT INTO shops (
-         id, source_type, source_shop_id, amap_poi_id, raw_name, adcode,
-         category, district, city, address, avg_price, lat, lng,
-         source_url, head_img, phone, display_cache_policy
-       ) VALUES (?, 'locate', NULL, ?, ?, NULL, NULL, NULL, NULL, ?, NULL, ?, ?, NULL, ?, ?, 'minimal')`
-    ).run(
-      shopId,
-      poiId,
-      name,
-      input.address || null,
-      input.lat,
-      input.lng,
-      photoUrl,
-      phone
-    );
+    if (poiId) {
+      const existing = db
+        .prepare(`SELECT id FROM shops WHERE amap_poi_id = ? LIMIT 1`)
+        .get(poiId) as { id: string } | undefined;
+      
+      if (!existing) {
+        db.prepare(
+          `INSERT INTO shops (
+             id, source_type, source_shop_id, amap_poi_id, raw_name, adcode,
+             category, district, city, address, avg_price, lat, lng,
+             source_url, head_img, phone, display_cache_policy
+           ) VALUES (?, 'locate', NULL, ?, ?, NULL, NULL, NULL, NULL, ?, NULL, ?, ?, NULL, ?, ?, 'minimal')`
+        ).run(
+          shopId,
+          poiId,
+          name,
+          input.address || null,
+          input.lat,
+          input.lng,
+          photoUrl,
+          phone
+        );
+      }
+    } else {
+      db.prepare(
+        `INSERT INTO shops (
+           id, source_type, source_shop_id, amap_poi_id, raw_name, adcode,
+           category, district, city, address, avg_price, lat, lng,
+           source_url, head_img, phone, display_cache_policy
+         ) VALUES (?, 'locate', NULL, NULL, ?, NULL, NULL, NULL, NULL, ?, NULL, ?, ?, NULL, ?, ?, 'minimal')`
+      ).run(
+        shopId,
+        name,
+        input.address || null,
+        input.lat,
+        input.lng,
+        photoUrl,
+        phone
+      );
+    }
 
     db.prepare(
       `INSERT INTO favorites (
@@ -646,12 +831,11 @@ export async function setWishlistByPoi(
     return { favoriteId: null as string | null, wishlist: false };
   }
 
-  const network = await ensurePersonalNetwork(userId);
+  await ensurePersonalNetwork(userId);
   const preferred =
     fromUserId && fromUserId !== userId ? fromUserId : undefined;
   const recs = findFriendRecommenders(
     userId,
-    network.id,
     shop.id,
     preferred || null
   );
@@ -1237,29 +1421,54 @@ export async function createAgentShop(
     };
   }
 
-  const shopId = uuidv4();
+  let shopId: string | undefined;
+  
+  if (parsed.sourceShopId) {
+    const bySource = db
+      .prepare(`SELECT id FROM shops WHERE source_shop_id = ? LIMIT 1`)
+      .get(parsed.sourceShopId) as { id: string } | undefined;
+    shopId = bySource?.id;
+  }
+  
+  if (!shopId && parsed.poiKey) {
+    const byAmap = db
+      .prepare(`SELECT id FROM shops WHERE amap_poi_id = ? LIMIT 1`)
+      .get(parsed.poiKey) as { id: string } | undefined;
+    shopId = byAmap?.id;
+  }
+  
+  if (!shopId) {
+    shopId = uuidv4();
+  }
+  
   const favId = uuidv4();
   const tx = db.transaction(() => {
-    db.prepare(
-      `INSERT INTO shops (
-         id, source_type, source_shop_id, amap_poi_id, raw_name, adcode,
-         category, district, city, address, avg_price, lat, lng,
-         source_url, head_img, phone, display_cache_policy
-       ) VALUES (?, 'agent', ?, ?, ?, NULL, ?, ?, ?, ?, NULL, ?, ?, ?, NULL, ?, 'minimal')`
-    ).run(
-      shopId,
-      parsed.sourceShopId,
-      parsed.poiKey,
-      name,
-      parsed.category,
-      parsed.district,
-      parsed.city,
-      parsed.address,
-      parsed.lat,
-      parsed.lng,
-      parsed.sourceUrl,
-      parsed.phone
-    );
+    const existingShop = db
+      .prepare(`SELECT id FROM shops WHERE id = ?`)
+      .get(shopId) as { id: string } | undefined;
+    
+    if (!existingShop) {
+      db.prepare(
+        `INSERT INTO shops (
+           id, source_type, source_shop_id, amap_poi_id, raw_name, adcode,
+           category, district, city, address, avg_price, lat, lng,
+           source_url, head_img, phone, display_cache_policy
+         ) VALUES (?, 'agent', ?, ?, ?, NULL, ?, ?, ?, ?, NULL, ?, ?, ?, NULL, ?, 'minimal')`
+      ).run(
+        shopId,
+        parsed.sourceShopId,
+        parsed.poiKey,
+        name,
+        parsed.category,
+        parsed.district,
+        parsed.city,
+        parsed.address,
+        parsed.lat,
+        parsed.lng,
+        parsed.sourceUrl,
+        parsed.phone
+      );
+    }
     db.prepare(
       `INSERT INTO favorites (
          id, user_id, shop_id, note, visibility, import_batch_id,
@@ -1444,23 +1653,43 @@ export async function updateAgentShop(
   return agentShopByFavoriteId(userId, existing.favorite_id);
 }
 
-/** Agent 可读可写本人店：本人收藏 + 美食网内好友共享店（去重） */
+/** 
+ * Agent 可读可写本人店：本人收藏 + 美食网内好友共享店（去重）
+ * 查询范围：所有用户加入的圈子（不只是拥有的圈子）
+ */
 export async function listAgentShops(userId: string) {
-  const network = await ensurePersonalNetwork(userId);
+  await ensurePersonalNetwork(userId);
   const mine = await listMyShops(userId);
   const friendRows = getDb()
     .prepare(
       `SELECT DISTINCT
               COALESCE(s.source_shop_id, s.amap_poi_id, s.id) AS poi_key,
               s.raw_name AS name, s.category, s.district, s.city, s.address,
-              s.lat, s.lng, s.avg_price, u.nickname AS from_friend
-       FROM circle_members cm
-       JOIN favorites f ON f.user_id = cm.user_id AND f.visibility = 'circles'
+              s.lat, s.lng, s.avg_price, u.nickname AS from_friend,
+              f.note
+       FROM favorites f
        JOIN shops s ON s.id = f.shop_id
-       JOIN users u ON u.id = cm.user_id
-       WHERE cm.circle_id = ? AND cm.user_id != ?`
+       JOIN users u ON u.id = f.user_id
+       WHERE f.visibility = 'circles'
+         AND f.user_id != ?
+         AND f.user_id IN (
+           SELECT cm2.user_id
+           FROM circle_members cm1
+           JOIN circle_members cm2 ON cm1.circle_id = cm2.circle_id
+           WHERE cm1.user_id = ?
+             AND cm2.user_id != ?
+         )
+         AND (
+           NOT EXISTS (SELECT 1 FROM circle_shares cs WHERE cs.favorite_id = f.id)
+           OR EXISTS (
+             SELECT 1 FROM circle_shares cs2
+             JOIN circle_members cm_viewer ON cm_viewer.circle_id = cs2.circle_id
+             WHERE cs2.favorite_id = f.id
+               AND cm_viewer.user_id = ?
+           )
+         )`
     )
-    .all(network.id, userId) as Array<Record<string, unknown>>;
+    .all(userId, userId, userId, userId) as Array<Record<string, unknown>>;
 
   return {
     mine: mine.items.map((s) => toAgentMineShop(s)),

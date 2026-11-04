@@ -36,7 +36,11 @@ function assertMember(circleId: string, userId: string): { role: string } {
   return row;
 }
 
-export async function createCircle(userId: string, name: string) {
+export async function createCircle(
+  userId: string,
+  name: string,
+  isPersonal: boolean = false
+) {
   const trimmed = name.trim();
   if (!trimmed || trimmed.length > 30) {
     throw Object.assign(new Error('圈名需 1–30 字'), { status: 400 });
@@ -53,9 +57,9 @@ export async function createCircle(userId: string, name: string) {
 
   const tx = db.transaction(() => {
     db.prepare(
-      `INSERT INTO circles (id, name, owner_id, invite_token, token_expires_at, opengid, member_limit, created_at)
-       VALUES (?, ?, ?, ?, ?, NULL, ?, ?)`
-    ).run(id, trimmed, userId, inviteToken, expires, config.circleMemberLimit, createdAt);
+      `INSERT INTO circles (id, name, owner_id, invite_token, token_expires_at, opengid, member_limit, is_personal, created_at)
+       VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)`
+    ).run(id, trimmed, userId, inviteToken, expires, config.circleMemberLimit, isPersonal ? 1 : null, createdAt);
     db.prepare(
       `INSERT INTO circle_members (circle_id, user_id, role, joined_at)
        VALUES (?, ?, 'owner', ?)`
@@ -69,17 +73,27 @@ export async function createCircle(userId: string, name: string) {
     inviteToken,
     tokenExpiresAt: expires,
     memberLimit: config.circleMemberLimit,
+    isPersonal,
   };
 }
 
 export function resetInviteToken(userId: string, circleId: string) {
+  const db = getDb();
+  const circle = db
+    .prepare(`SELECT is_personal FROM circles WHERE id = ?`)
+    .get(circleId) as { is_personal: number | null } | undefined;
+  
+  if (circle?.is_personal) {
+    throw Object.assign(new Error('个人空间不支持邀请链接'), { status: 403 });
+  }
+
   const member = assertMember(circleId, userId);
   if (member.role !== 'owner') {
     throw Object.assign(new Error('仅圈主可重置邀请'), { status: 403 });
   }
   const inviteToken = newInviteToken();
   const expires = tokenExpiresAt();
-  getDb()
+  db
     .prepare(
       `UPDATE circles SET invite_token = ?, token_expires_at = ? WHERE id = ?`
     )
@@ -129,11 +143,16 @@ export async function joinCircle(
         token_expires_at: string;
         opengid: string | null;
         member_limit: number;
+        is_personal: number | null;
       }
     | undefined;
 
   if (!circle) {
     throw Object.assign(new Error('收藏圈不存在'), { status: 404 });
+  }
+  
+  if (circle.is_personal) {
+    throw Object.assign(new Error('不能加入他人的个人空间'), { status: 403 });
   }
   if (circle.invite_token !== token) {
     throw Object.assign(new Error('邀请已失效（可能已重置）'), { status: 403 });
@@ -198,7 +217,7 @@ async function ensureOwnerInJoinerNetwork(
 
   let networkId = owned?.id;
   if (!networkId) {
-    const created = await createCircle(joinerId, '我的美食网');
+    const created = await createCircle(joinerId, '我的美食网', true);
     networkId = created.id;
   }
 
@@ -275,7 +294,7 @@ export function dissolveCircle(ownerId: string, circleId: string): void {
 export function listMyCircles(userId: string) {
   const rows = getDb()
     .prepare(
-      `SELECT c.id, c.name, c.owner_id, cm.role, c.created_at,
+      `SELECT c.id, c.name, c.owner_id, cm.role, c.created_at, c.is_personal,
               c.invite_token, c.token_expires_at,
               (SELECT COUNT(*) FROM circle_members m WHERE m.circle_id = c.id) AS member_count
        FROM circles c
@@ -285,9 +304,9 @@ export function listMyCircles(userId: string) {
     )
     .all(userId) as Array<Record<string, unknown>>;
 
-  // 邀请 token 仅圈主可见，避免成员复制后滥用
+  // 邀请 token 仅圈主可见（且非个人空间），避免成员复制后滥用
   return rows.map((r) => {
-    if (r.role !== 'owner') {
+    if (r.role !== 'owner' || r.is_personal) {
       const { invite_token: _t, token_expires_at: _e, ...rest } = r;
       return rest;
     }
@@ -413,14 +432,14 @@ function queryCircleShopRows(
     WHERE cm.circle_id = ?
       AND f.visibility = 'circles'
       AND (
-        NOT EXISTS (SELECT 1 FROM circle_shares cs WHERE cs.circle_id = ?)
+        NOT EXISTS (SELECT 1 FROM circle_shares cs WHERE cs.favorite_id = f.id)
         OR EXISTS (
           SELECT 1 FROM circle_shares cs2
           WHERE cs2.circle_id = ? AND cs2.favorite_id = f.id
         )
       )
   `;
-  params.push(circleId, circleId);
+  params.push(circleId);
 
   if (filters?.city) {
     sql += ` AND s.city = ?`;
@@ -468,13 +487,13 @@ function aggregateCircleShops(rows: CircleShopRow[]): AggregatedCircleShop[] {
       if (r.source_url) agg.sourceUrl = r.source_url;
       if (r.source_shop_id) agg.sourceShopId = r.source_shop_id;
       if (r.phone) agg.phone = r.phone;
-      if (r.head_img) {
+      if (r.head_img && r.shop_key === rows.find(row => row.poi_key === r.poi_key)?.shop_key) {
         agg.headImg = r.head_img;
         agg.headImgProxy = buildProxyPath(r.head_img);
       }
       map.set(r.poi_key, agg);
     } else {
-      if (!agg.headImg && r.head_img) {
+      if (!agg.headImg && r.head_img && r.shop_key === agg.shopKey) {
         agg.headImg = r.head_img;
         agg.headImgProxy = buildProxyPath(r.head_img);
       }
@@ -652,6 +671,91 @@ export function getCircleShopDetail(
   return shop;
 }
 
+/**
+ * 获取店铺详情（从共享圈子中）
+ * 用于 B 查看 C 分享的店铺详情
+ */
+export function getMemberShopDetailInSharedCircles(
+  viewerId: string,
+  targetMemberId: string,
+  poiKey: string,
+  opts?: { lat?: number; lng?: number; userCity?: string }
+): AggregatedCircleShop | null {
+  const db = getDb();
+  
+  const sharedCircles = db
+    .prepare(
+      `SELECT DISTINCT c.id
+       FROM circle_members cm1
+       JOIN circle_members cm2 ON cm1.circle_id = cm2.circle_id
+       JOIN circles c ON c.id = cm1.circle_id
+       WHERE cm1.user_id = ?
+         AND cm2.user_id = ?
+         AND cm1.user_id != cm2.user_id`
+    )
+    .all(viewerId, targetMemberId) as Array<{ id: string }>;
+
+  if (sharedCircles.length === 0) {
+    return null;
+  }
+
+  const allRows: CircleShopRow[] = [];
+  for (const circle of sharedCircles) {
+    const rows = queryCircleShopRows(circle.id);
+    allRows.push(...rows);
+  }
+
+  const shopRows = allRows.filter((r) => r.poi_key === poiKey);
+  if (shopRows.length === 0) return null;
+
+  const aggregated = aggregateCircleShops(shopRows);
+  const shop = aggregated[0];
+  if (!shop) return null;
+
+  if (
+    opts?.lat != null &&
+    opts?.lng != null &&
+    shop.lat != null &&
+    shop.lng != null
+  ) {
+    const meters = haversineMeters(opts.lat, opts.lng, shop.lat, shop.lng);
+    shop.distanceMeters = meters;
+    shop.distanceLabel = formatDistanceLabel(meters, {
+      userCity: opts.userCity,
+      shopCity: shop.city,
+    });
+  }
+
+  const mine = shop.collectors.find((c) => c.userId === viewerId);
+  if (mine) {
+    shop.myFavoriteId = mine.favoriteId;
+    shop.myNote = mine.note || '';
+  } else {
+    shop.myNote = '';
+  }
+
+  const myWish = db
+    .prepare(
+      `SELECT f.wishlist
+       FROM favorites f
+       JOIN shops s ON s.id = f.shop_id
+       WHERE f.user_id = ?
+         AND COALESCE(s.source_shop_id, s.amap_poi_id, s.id) = ?
+       LIMIT 1`
+    )
+    .get(viewerId, poiKey) as { wishlist: number } | undefined;
+  shop.wishlist = Boolean(myWish?.wishlist);
+
+  shop.collectors = shop.collectors.filter((c) => c.userId !== viewerId);
+  shop.collectorCount = shop.collectors.length;
+  shop.recommendersLine = formatRecommendersLine(
+    shop.collectors,
+    shop.collectorCount
+  );
+
+  return shop;
+}
+
 export function listCircleMembers(userId: string, circleId: string) {
   assertMember(circleId, userId);
   return getDb()
@@ -663,7 +767,7 @@ export function listCircleMembers(userId: string, circleId: string) {
                 WHERE f.user_id = u.id
                   AND f.visibility = 'circles'
                   AND (
-                    NOT EXISTS (SELECT 1 FROM circle_shares cs WHERE cs.circle_id = ?)
+                    NOT EXISTS (SELECT 1 FROM circle_shares cs WHERE cs.favorite_id = f.id)
                     OR EXISTS (
                       SELECT 1 FROM circle_shares cs2
                       WHERE cs2.circle_id = ? AND cs2.favorite_id = f.id
@@ -675,10 +779,10 @@ export function listCircleMembers(userId: string, circleId: string) {
        WHERE cm.circle_id = ?
        ORDER BY CASE cm.role WHEN 'owner' THEN 0 ELSE 1 END, cm.joined_at`
     )
-    .all(circleId, circleId, circleId);
+    .all(circleId, circleId);
 }
 
-/** 从圈友店里加进自己的私藏；记下推荐人，私藏列表可显示「XX推荐」 */
+/** 从圈友店里加进自己的私藏；记下推荐人，私藏列表可显示「来自XX」 */
 export function addFavoriteFromCircleShop(
   userId: string,
   circleId: string,
@@ -764,6 +868,82 @@ export function setCircleInviteForTest(
       `UPDATE circles SET invite_token = ?, token_expires_at = ? WHERE id = ?`
     )
     .run(token, expiresAt, circleId);
+}
+
+/**
+ * 获取两个用户共享的圈子中，目标用户的店铺
+ * 用于"吃货排行"中点击好友查看其店铺
+ * 
+ * @param viewerId 查看者（如 B）
+ * @param targetMemberId 目标成员（如 C）
+ * @returns 目标成员在共享圈子中的店铺
+ */
+export function listMemberShopsInSharedCircles(
+  viewerId: string,
+  targetMemberId: string,
+  opts?: {
+    lat?: number;
+    lng?: number;
+    userCity?: string;
+  }
+): {
+  items: AggregatedCircleShop[];
+  sharedCircleCount: number;
+} {
+  const db = getDb();
+  
+  const sharedCircles = db
+    .prepare(
+      `SELECT DISTINCT c.id
+       FROM circle_members cm1
+       JOIN circle_members cm2 ON cm1.circle_id = cm2.circle_id
+       JOIN circles c ON c.id = cm1.circle_id
+       WHERE cm1.user_id = ?
+         AND cm2.user_id = ?
+         AND cm1.user_id != cm2.user_id`
+    )
+    .all(viewerId, targetMemberId) as Array<{ id: string }>;
+
+  if (sharedCircles.length === 0) {
+    return { items: [], sharedCircleCount: 0 };
+  }
+
+  const allRows: CircleShopRow[] = [];
+  for (const circle of sharedCircles) {
+    const rows = queryCircleShopRows(circle.id, {
+      memberId: targetMemberId,
+    });
+    allRows.push(...rows);
+  }
+
+  const deduped = new Map<string, CircleShopRow>();
+  for (const row of allRows) {
+    if (!deduped.has(row.poi_key)) {
+      deduped.set(row.poi_key, row);
+    }
+  }
+
+  const aggregated = aggregateCircleShops([...deduped.values()]);
+  
+  const itemsWithNote = aggregated.map((item) => {
+    const targetCollector = item.collectors.find((c) => c.userId === targetMemberId);
+    return {
+      ...item,
+      note: targetCollector?.note || null,
+    };
+  });
+  
+  const { withCoords, withoutCoords } = sortShopsByDistance(
+    itemsWithNote,
+    opts?.lat,
+    opts?.lng,
+    opts?.userCity
+  );
+
+  return {
+    items: [...withCoords, ...withoutCoords],
+    sharedCircleCount: sharedCircles.length,
+  };
 }
 
 export { assertMember };

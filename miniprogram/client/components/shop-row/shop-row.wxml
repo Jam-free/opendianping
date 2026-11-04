@@ -15,6 +15,7 @@
       <view class="dist" wx:if="{{!dist.na}}">{{dist.main}}{{dist.unit}}</view>
     </view>
     <view class="meta muted" wx:if="{{metaLine}}">{{metaLine}}</view>
+    <view class="note" wx:if="{{shop.note}}">{{shop.note}}</view>
     <view class="avs" wx:if="{{previewAvatars.length || shop.recommendersLine || sourceTag}}">
       <block wx:for="{{previewAvatars}}" wx:key="userId">
         <image wx:if="{{item.avatar}}" class="av" src="{{item.avatar}}" />

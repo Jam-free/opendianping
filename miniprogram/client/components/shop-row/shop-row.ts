@@ -9,7 +9,7 @@ import {
 Component({
   properties: {
     shop: { type: Object, value: {} },
-    /** 覆盖推荐行文案，如「我导入」「小王推荐」 */
+    /** 覆盖推荐行文案，如「我导入」「来自小王」 */
     sourceTag: { type: String, value: '' },
   },
   data: {

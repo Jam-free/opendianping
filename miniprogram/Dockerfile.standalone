@@ -13,6 +13,7 @@ COPY . .
 
 ENV NODE_ENV=production
 ENV PORT=80
+# 禁止无盘发布：服务必须挂载持久盘到 /data，且跨版本保持这条路径。
 ENV DB_PATH=/data/miniprogram.db
 ENV DEV_AUTH_BYPASS=false
 # 无仓库根 lib 时用文本+高德兜底；有父级 OpenDianping 时改为 opendianping

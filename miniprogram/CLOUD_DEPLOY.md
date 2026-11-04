@@ -2,6 +2,16 @@
 
 AppID：`wx219e6044fdb7a6cd`
 
+> ## 禁止无盘发布（必读）
+>
+> `feimaocat-api` **每一次**发布都必须同时满足：
+> 1. 服务挂载**持久盘**到 **`/data`**
+> 2. 环境变量 **`DB_PATH=/data/miniprogram.db`**（换版本也不许改这条路径）
+>
+> Agent Token（`agent_tokens`）和收藏（`favorites`）在**同一个 SQLite 文件、同一块盘**上。镜像本身是空的：没挂盘时进程会在容器临时层 `mkdir /data` 并建一个空库，接口看起来正常，但旧 Token 会全部变成 401「无效的 Agent Token」，「我的店」也会空。
+>
+> 发版 / 启动 **不得**清 Token 表或收藏表。用户只能在小程序里点「连接 AI」走 `POST /api/agent-tokens` 或 `/api/agent-tokens/reset` 主动重置。
+
 ## A. 开通云开发（你正在看的页）
 
 按下面填，然后点 **¥19.9 开通**：
@@ -34,7 +44,7 @@ AppID：`wx219e6044fdb7a6cd`
 | 变量 | 值 |
 |------|-----|
 | `PORT` | `80` |
-| `DB_PATH` | `/data/miniprogram.db` |
+| `DB_PATH` | `/data/miniprogram.db`（**跨版本保持不变**） |
 | `DEV_AUTH_BYPASS` | `false` |
 | `WECHAT_APPID` | `wx219e6044fdb7a6cd` |
 | `WECHAT_APP_SECRET` | 公众平台 → 开发管理 → 开发设置里的 AppSecret |
@@ -44,7 +54,11 @@ AppID：`wx219e6044fdb7a6cd`
 | `AGENT_SHOP_WRITE_PER_MIN` | 可选，默认 `30`（Agent 写店每用户每分钟） |
 | `AGENT_SHOP_WRITE_PER_DAY` | 可选，默认 `200`（Agent 写店每用户每天） |
 
-7. **持久盘**：挂载路径 `/data`，容量 1GB 即可（存 SQLite）
+7. **持久盘（禁止无盘发布）**：
+   - 必须挂载，挂载路径 **`/data`**，容量 1GB 即可（存 SQLite）
+   - 没有这块盘就不要点发布。新版本不会把旧 Token「迁移」到空库里
+   - Token 表与 favorites **同库同盘**；发版不得清表
+
 8. 监听端口：`80`
 9. 发布版本，等变绿
 
@@ -52,7 +66,16 @@ AppID：`wx219e6044fdb7a6cd`
 
 `https://feimaocat-api-xxxxx.ap-shanghai.wxcloudrun.com`
 
-先浏览器打开：`https://你的域名/health`，应返回含 `"albumImport":true` 的 JSON（说明新镜像已生效）。
+### 发版变绿后立刻检查（不要跳过）
+
+浏览器或 curl 打开：`https://你的域名/health`
+
+1. 应有 `"ok":true` 和 `"albumImport":true`（说明新镜像已生效）
+2. 看 `persistence`：
+   - `dbPath` 必须是 `/data/miniprogram.db`
+   - 若生产里**本来就有**用户 / 收藏 / Agent Token：`agentTokenCount` 和 `favoriteCount` **必须不是 0**
+   - 若计数是 0，或日志出现 `[PERSISTENCE]`：先查挂盘和 `DB_PATH`，**不要**让用户重新点「连接 AI」——除非已经确认旧盘数据没了，只能重发 Token
+3. 容器日志搜 `[PERSISTENCE]`。生产路径下空库会打大字警告，不是「第一次开机很健康」
 
 ### 登录依赖（必读）
 
@@ -77,7 +100,7 @@ AppID：`wx219e6044fdb7a6cd`
 
 **Jam / 云托管发布后（1–2 步）：**
 
-1. 用本分支重新发布 `feimaocat-api`，等版本变绿；浏览器打开 `/health` 仍应是 `{"ok":true,"albumImport":true}`。
+1. 用本分支重新发布 `feimaocat-api`，等版本变绿；浏览器打开 `/health` 应含 `"ok":true,"albumImport":true`，并核对上面的 `persistence` 计数。
 2. 手机打开小程序体验版：选头像 + 选昵称后应进入「我的店」，**不应**再出现红字「登录请求失败，请检查网络后重试」。
 
 说明：公网 `curl -X POST …/api/auth/login` **没有**微信注入头，会走 code 换票；容器若仍不能出网，这条公网调试路径可能继续失败——**不代表小程序登录失败**。要测正式路径，必须从微信里 `callContainer`。
@@ -98,9 +121,10 @@ AppID：`wx219e6044fdb7a6cd`
 
 ## D. 今日验收
 
-- [ ] `/health` 公网可访问
+- [ ] `/health` 公网可访问，且 `persistence.dbPath` 为 `/data/miniprogram.db`
+- [ ] 生产已有数据时：`persistence.agentTokenCount` / `favoriteCount` 非空（不是 0）
 - [ ] 体验版能登录，朋友圈 / 我的店能开
-- [ ] 邀请分享、导入或记美食、连接 AI 出 Token
+- [ ] 邀请分享、导入或记美食、连接 AI 出 Token（Token **只**在用户主动点「连接 AI」时重置，发版不会清）
 
 ## 本地对照
 
@@ -108,3 +132,5 @@ AppID：`wx219e6044fdb7a6cd`
 cd miniprogram && npm run dev   # http://127.0.0.1:8787
 cd miniprogram && npm test      # 含登录：网关头 / mock 微信 / 出网失败中文
 ```
+
+本地 `DB_PATH=./data/miniprogram.db` 首次创建空库是正常的，不会打生产那种 `[PERSISTENCE]` 警告。

@@ -20,6 +20,7 @@ WORKDIR /app/miniprogram
 
 ENV NODE_ENV=production
 ENV PORT=80
+# 禁止无盘发布：服务必须挂载持久盘到 /data，且跨版本保持这条路径。
 ENV DB_PATH=/data/miniprogram.db
 ENV DEV_AUTH_BYPASS=true
 ENV SOURCE_ADAPTER=opendianping

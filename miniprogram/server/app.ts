@@ -9,6 +9,7 @@ import {
   resolveSession,
 } from './auth.js';
 import { config } from './config.js';
+import { getPersistenceHealth } from './db.js';
 import {
   parseImport,
   saveImportSelection,
@@ -78,7 +79,10 @@ export function createApp() {
 
   app.get('/health', (_req, res) => {
     // albumImport=true 表示本镜像可解析点评公开专辑（不依赖根目录 lib）
-    res.json({ ok: true, albumImport: true });
+    // persistence 是只读计数：发版后用来确认 Token/收藏还在同一块盘上。
+    // ok 保持 true = 进程活着；盘空了看 persistence.warning / 计数，不要把探活打死。
+    const persistence = getPersistenceHealth();
+    res.json({ ok: true, albumImport: true, persistence });
   });
 
   app.get(

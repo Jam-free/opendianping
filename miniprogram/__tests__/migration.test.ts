@@ -42,6 +42,30 @@ describe('is_personal migration and backfill', () => {
         FOREIGN KEY (circle_id) REFERENCES circles(id) ON DELETE CASCADE,
         FOREIGN KEY (user_id) REFERENCES users(id)
       );
+      
+      CREATE TABLE shops (
+        id TEXT PRIMARY KEY,
+        source_type TEXT NOT NULL,
+        raw_name TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      
+      CREATE TABLE favorites (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        shop_id TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (shop_id) REFERENCES shops(id)
+      );
+      
+      CREATE TABLE circle_shares (
+        circle_id TEXT NOT NULL,
+        favorite_id TEXT NOT NULL,
+        PRIMARY KEY (circle_id, favorite_id),
+        FOREIGN KEY (circle_id) REFERENCES circles(id) ON DELETE CASCADE,
+        FOREIGN KEY (favorite_id) REFERENCES favorites(id) ON DELETE CASCADE
+      );
     `);
   });
 
@@ -267,10 +291,113 @@ describe('is_personal migration and backfill', () => {
     const circle = db.prepare('SELECT is_personal FROM circles WHERE id = ?').get('circle-f-second') as { is_personal: number | null };
     expect(circle.is_personal).not.toBe(1);
   });
+
+  it('不应该标记有 circle_shares 记录的「我的美食网」为个人空间', () => {
+    const now = new Date().toISOString();
+    
+    // 创建用户 G
+    db.prepare(`INSERT INTO users (id, openid, nickname, created_at) VALUES (?, ?, ?, ?)`)
+      .run('user-g', 'openid-g', 'Grace', now);
+    
+    // 创建 G 的「我的美食网」（第一个圈子）
+    db.prepare(`INSERT INTO circles (id, name, owner_id, invite_token, token_expires_at, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?)`)
+      .run('circle-g', '我的美食网', 'user-g', 'token-g', '2099-01-01', now);
+    
+    db.prepare(`INSERT INTO circle_members (circle_id, user_id, role, joined_at) 
+                VALUES (?, ?, ?, ?)`)
+      .run('circle-g', 'user-g', 'owner', now);
+    
+    // 创建一个店铺和收藏，并分享到圈子
+    db.prepare(`INSERT INTO shops (id, source_type, raw_name, created_at) 
+                VALUES (?, ?, ?, ?)`)
+      .run('shop-g-1', 'locate', 'Grace Restaurant', now);
+    
+    db.prepare(`INSERT INTO favorites (id, user_id, shop_id, created_at) 
+                VALUES (?, ?, ?, ?)`)
+      .run('fav-g-1', 'user-g', 'shop-g-1', now);
+    
+    // 分享到圈子（存在 circle_shares 记录）
+    db.prepare(`INSERT INTO circle_shares (circle_id, favorite_id) 
+                VALUES (?, ?)`)
+      .run('circle-g', 'fav-g-1');
+
+    // 运行迁移
+    runMigration(db);
+
+    // 验证：有 circle_shares 记录的圈子不应该被标记为个人空间
+    const circle = db.prepare('SELECT is_personal FROM circles WHERE id = ?').get('circle-g') as { is_personal: number | null };
+    expect(circle.is_personal).not.toBe(1);
+  });
+  
+  it('不应该标记成员过多（>2）的「我的美食网」为个人空间', () => {
+    const now = new Date().toISOString();
+    
+    // 创建用户 H 和 3 个 heal 成员
+    db.prepare(`INSERT INTO users (id, openid, nickname, created_at) VALUES (?, ?, ?, ?)`)
+      .run('user-h', 'openid-h', 'Helen', now);
+    db.prepare(`INSERT INTO users (id, openid, nickname, created_at) VALUES (?, ?, ?, ?)`)
+      .run('user-m1', 'openid-m1', 'M1', now);
+    db.prepare(`INSERT INTO users (id, openid, nickname, created_at) VALUES (?, ?, ?, ?)`)
+      .run('user-m2', 'openid-m2', 'M2', now);
+    db.prepare(`INSERT INTO users (id, openid, nickname, created_at) VALUES (?, ?, ?, ?)`)
+      .run('user-m3', 'openid-m3', 'M3', now);
+    
+    // M1, M2, M3 各自创建圈子
+    db.prepare(`INSERT INTO circles (id, name, owner_id, invite_token, token_expires_at, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?)`)
+      .run('circle-m1', 'Circle M1', 'user-m1', 'token-m1', '2099-01-01', now);
+    db.prepare(`INSERT INTO circles (id, name, owner_id, invite_token, token_expires_at, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?)`)
+      .run('circle-m2', 'Circle M2', 'user-m2', 'token-m2', '2099-01-01', now);
+    db.prepare(`INSERT INTO circles (id, name, owner_id, invite_token, token_expires_at, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?)`)
+      .run('circle-m3', 'Circle M3', 'user-m3', 'token-m3', '2099-01-01', now);
+    
+    db.prepare(`INSERT INTO circle_members (circle_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)`)
+      .run('circle-m1', 'user-m1', 'owner', now);
+    db.prepare(`INSERT INTO circle_members (circle_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)`)
+      .run('circle-m2', 'user-m2', 'owner', now);
+    db.prepare(`INSERT INTO circle_members (circle_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)`)
+      .run('circle-m3', 'user-m3', 'owner', now);
+    
+    // H 加入这些圈子
+    const hJoined = new Date(Date.now() + 1000).toISOString();
+    db.prepare(`INSERT INTO circle_members (circle_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)`)
+      .run('circle-m1', 'user-h', 'member', hJoined);
+    db.prepare(`INSERT INTO circle_members (circle_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)`)
+      .run('circle-m2', 'user-h', 'member', hJoined);
+    db.prepare(`INSERT INTO circle_members (circle_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)`)
+      .run('circle-m3', 'user-h', 'member', hJoined);
+    
+    // H 创建个人空间
+    db.prepare(`INSERT INTO circles (id, name, owner_id, invite_token, token_expires_at, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?)`)
+      .run('circle-h', '我的美食网', 'user-h', 'token-h', '2099-01-01', hJoined);
+    db.prepare(`INSERT INTO circle_members (circle_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)`)
+      .run('circle-h', 'user-h', 'owner', hJoined);
+    
+    // M1, M2, M3 被 heal 添加到 H 的个人空间
+    const healTime = new Date(Date.now() + 1001).toISOString();
+    db.prepare(`INSERT INTO circle_members (circle_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)`)
+      .run('circle-h', 'user-m1', 'member', healTime);
+    db.prepare(`INSERT INTO circle_members (circle_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)`)
+      .run('circle-h', 'user-m2', 'member', healTime);
+    db.prepare(`INSERT INTO circle_members (circle_id, user_id, role, joined_at) VALUES (?, ?, ?, ?)`)
+      .run('circle-h', 'user-m3', 'member', healTime);
+
+    // 运行迁移
+    runMigration(db);
+
+    // 验证：成员过多（>2）的圈子不应该被标记为个人空间
+    const circle = db.prepare('SELECT is_personal FROM circles WHERE id = ?').get('circle-h') as { is_personal: number | null };
+    expect(circle.is_personal).not.toBe(1);
+  });
 });
 
 // 简化的迁移逻辑（从 db.ts 复制）
 function runMigration(database: Database.Database): void {
+  // 添加 is_personal 列
   database.exec(`ALTER TABLE circles ADD COLUMN is_personal INTEGER;`);
   
   const candidates = database
@@ -293,6 +420,15 @@ function runMigration(database: Database.Database): void {
   for (const circle of candidates) {
     const isLikelyPersonal = circle.earlier_circles_count === 0;
     
+    // 检查 1：是否有 circle_shares 记录（优先检查，因为这是明确的分享痕迹）
+    const hasCircleShares = database
+      .prepare(`SELECT 1 FROM circle_shares WHERE circle_id = ? LIMIT 1`)
+      .get(circle.id);
+    
+    if (hasCircleShares) {
+      continue;
+    }
+    
     const members = database
       .prepare(
         `SELECT user_id, joined_at
@@ -305,7 +441,6 @@ function runMigration(database: Database.Database): void {
     }>;
 
     if (members.length === 0) {
-      // 没有其他成员：只有是第一个圈子时才标记为个人空间
       if (isLikelyPersonal) {
         database
           .prepare(`UPDATE circles SET is_personal = 1 WHERE id = ?`)
@@ -313,44 +448,40 @@ function runMigration(database: Database.Database): void {
       }
       continue;
     }
-
-    let allMembersAreHeal = true;
+    
+    // 检查 2：是否有成员明确不是 heal 添加的
+    let hasNonHealMember = false;
     for (const member of members) {
       const reverseCircle = database
         .prepare(
-          `SELECT c.id, cm_joiner.joined_at as joiner_joined
+          `SELECT 1
            FROM circles c
            JOIN circle_members cm_joiner ON cm_joiner.circle_id = c.id
            WHERE c.owner_id = ?
              AND cm_joiner.user_id = ?
-             AND cm_joiner.role = 'member'`
+             AND cm_joiner.role = 'member'
+           LIMIT 1`
         )
-        .get(member.user_id, circle.owner_id) as
-        | {
-            id: string;
-            joiner_joined: string;
-          }
-        | undefined;
+        .get(member.user_id, circle.owner_id);
 
       if (!reverseCircle) {
-        allMembersAreHeal = false;
-        break;
-      }
-
-      const memberJoinedPersonalMs = new Date(member.joined_at).getTime();
-      const ownerJoinedReverseMs = new Date(reverseCircle.joiner_joined).getTime();
-      const timeDiffSec = Math.abs(memberJoinedPersonalMs - ownerJoinedReverseMs) / 1000;
-
-      if (timeDiffSec > 5) {
-        allMembersAreHeal = false;
+        hasNonHealMember = true;
         break;
       }
     }
-
-    if (allMembersAreHeal && isLikelyPersonal) {
-      database
-        .prepare(`UPDATE circles SET is_personal = 1 WHERE id = ?`)
-        .run(circle.id);
+    
+    if (hasNonHealMember) {
+      continue;
     }
+    
+    // 检查 3：其他保守条件
+    if (!isLikelyPersonal || members.length > 2) {
+      continue;
+    }
+    
+    // 满足所有条件才标记为个人空间
+    database
+      .prepare(`UPDATE circles SET is_personal = 1 WHERE id = ?`)
+      .run(circle.id);
   }
 }

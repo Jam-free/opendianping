@@ -637,6 +637,79 @@ export function getMemberShopDetailInSharedCircles(
 ): AggregatedCircleShop | null {
   const db = getDb();
   
+  // 特殊情况：查看自己的店铺，返回自己的完整收藏（包括私藏）
+  if (viewerId === targetMemberId) {
+    const myShop = db
+      .prepare(
+        `SELECT 
+          s.id as shop_id,
+          COALESCE(s.source_shop_id, s.amap_poi_id, s.id) AS poi_key,
+          s.raw_name AS name,
+          s.avg_price,
+          s.category,
+          s.district,
+          s.city,
+          s.address,
+          s.lat,
+          s.lng,
+          s.source_type,
+          s.head_img,
+          f.id AS favorite_id,
+          u.id AS collector_id,
+          u.nickname AS collector_nickname,
+          u.avatar AS collector_avatar,
+          f.note,
+          f.created_at AS favorited_at,
+          f.wishlist
+         FROM favorites f
+         JOIN shops s ON s.id = f.shop_id
+         JOIN users u ON u.id = f.user_id
+         WHERE f.user_id = ?
+           AND COALESCE(s.source_shop_id, s.amap_poi_id, s.id) = ?
+         LIMIT 1`
+      )
+      .get(viewerId, poiKey) as CircleShopRow & { wishlist: number } | undefined;
+    
+    if (!myShop) return null;
+    
+    const shop: AggregatedCircleShop = {
+      shopId: myShop.shop_id,
+      poiKey: myShop.poi_key,
+      name: myShop.name,
+      avgPrice: myShop.avg_price,
+      category: myShop.category,
+      district: myShop.district,
+      city: myShop.city,
+      address: myShop.address,
+      lat: myShop.lat,
+      lng: myShop.lng,
+      sourceType: myShop.source_type,
+      headImgProxy: myShop.head_img,
+      collectors: [],
+      collectorCount: 0,
+      recommendersLine: '',
+      myFavoriteId: myShop.favorite_id,
+      myNote: myShop.note || '',
+      wishlist: Boolean(myShop.wishlist),
+    };
+    
+    if (
+      opts?.lat != null &&
+      opts?.lng != null &&
+      shop.lat != null &&
+      shop.lng != null
+    ) {
+      const meters = haversineMeters(opts.lat, opts.lng, shop.lat, shop.lng);
+      shop.distanceMeters = meters;
+      shop.distanceLabel = formatDistanceLabel(meters, {
+        userCity: opts.userCity,
+        shopCity: shop.city,
+      });
+    }
+    
+    return shop;
+  }
+  
   const sharedCircles = db
     .prepare(
       `SELECT DISTINCT c.id

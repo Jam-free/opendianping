@@ -193,6 +193,20 @@ function initSchema(database: Database.Database): void {
       // 额外检查：如果不是用户的第一个圈子，很可能是用户手动创建的共享圈
       const isLikelyPersonal = circle.earlier_circles_count === 0;
       
+      // 检查 1：是否有 circle_shares 记录（优先检查，表明有人分享过收藏到这个圈子）
+      const hasCircleShares = database
+        .prepare(
+          `SELECT 1 FROM circle_shares WHERE circle_id = ? LIMIT 1`
+        )
+        .get(circle.id);
+      
+      if (hasCircleShares) {
+        console.log(
+          `[migration] ⚠️ 保持共享圈（保守）: ${circle.id} (owner=${circle.owner_id}，原因: 存在 circle_shares 记录，表明有分享活动)`
+        );
+        continue;
+      }
+      
       const members = database
         .prepare(
           `SELECT user_id, joined_at
@@ -221,66 +235,63 @@ function initSchema(database: Database.Database): void {
         }
         continue;
       }
-
-      // 有成员：需要非常保守
-      // 检查是否所有成员都明确是 heal 添加的（反向圈子 + 时间极接近）
-      let allClearlyHeal = true;
-      let ambiguousCount = 0;
       
+      // 有成员：检查是否有真实邀请活动的痕迹
+      // 检查 2：是否有成员明确不是 heal 添加的（没有反向圈子）
+      let hasNonHealMember = false;
       for (const member of members) {
         const reverseCircle = database
           .prepare(
-            `SELECT c.id, cm_joiner.joined_at as joiner_joined
+            `SELECT 1
              FROM circles c
              JOIN circle_members cm_joiner ON cm_joiner.circle_id = c.id
              WHERE c.owner_id = ?
                AND cm_joiner.user_id = ?
-               AND cm_joiner.role = 'member'`
+               AND cm_joiner.role = 'member'
+             LIMIT 1`
           )
-          .get(member.user_id, circle.owner_id) as
-          | {
-              id: string;
-              joiner_joined: string;
-            }
-          | undefined;
+          .get(member.user_id, circle.owner_id);
 
         if (!reverseCircle) {
-          // 没有反向圈子 → 明确不是 heal，是邀请加入
-          allClearlyHeal = false;
+          // 没有反向圈子 → 明确是通过邀请加入，不是 heal
+          hasNonHealMember = true;
           break;
         }
-
-        const memberJoinedPersonalMs = new Date(member.joined_at).getTime();
-        const ownerJoinedReverseMs = new Date(reverseCircle.joiner_joined).getTime();
-        const timeDiffSec = Math.abs(memberJoinedPersonalMs - ownerJoinedReverseMs) / 1000;
-
-        // 保守时间窗口：只有 1 秒内才算明确的 heal（同步操作）
-        if (timeDiffSec > 1) {
-          // 时间差 > 1 秒：可能是巧合，标记为模糊
-          ambiguousCount++;
-          allClearlyHeal = false;
-        }
       }
-
-      if (allClearlyHeal && isLikelyPersonal && members.length <= 2) {
-        // 所有成员都明确是 heal + 是第一个圈子 + 成员数少 → 标记为个人空间
-        database
-          .prepare(`UPDATE circles SET is_personal = 1 WHERE id = ?`)
-          .run(circle.id);
+      
+      if (hasNonHealMember) {
         console.log(
-          `[migration] ✓ 标记为个人空间: ${circle.id} (owner=${circle.owner_id}，${members.length} 个明确 heal 成员, first_circle=true)`
+          `[migration] ⚠️ 保持共享圈（保守）: ${circle.id} (owner=${circle.owner_id}，${members.length} 个成员，原因: 有成员无反向圈子，是邀请加入)`
         );
-      } else {
-        // 任何模糊情况：保持为共享圈（安全优先，不锁人）
-        const reason = !allClearlyHeal
-          ? `有非 heal 成员或时间模糊 (模糊=${ambiguousCount})`
-          : !isLikelyPersonal
-          ? '不是第一个圈子'
-          : `成员过多 (${members.length} 人)`;
-        console.log(
-          `[migration] ⚠️ 保持共享圈（保守）: ${circle.id} (owner=${circle.owner_id}，${members.length} 个成员，原因: ${reason})`
-        );
+        continue;
       }
+      
+      // 检查 3：如果所有成员都有反向圈子，但不是第一个圈子或成员过多，也保守处理
+      if (!isLikelyPersonal) {
+        console.log(
+          `[migration] ⚠️ 保持共享圈（保守）: ${circle.id} (owner=${circle.owner_id}，${members.length} 个成员，原因: 不是第一个圈子)`
+        );
+        continue;
+      }
+      
+      if (members.length > 2) {
+        console.log(
+          `[migration] ⚠️ 保持共享圈（保守）: ${circle.id} (owner=${circle.owner_id}，${members.length} 个成员，原因: 成员过多)`
+        );
+        continue;
+      }
+      
+      // 只有满足所有条件才标记为个人空间：
+      // - 无 circle_shares 记录
+      // - 所有成员都有反向圈子（都是 heal）
+      // - 是第一个圈子
+      // - 成员数 <= 2
+      database
+        .prepare(`UPDATE circles SET is_personal = 1 WHERE id = ?`)
+        .run(circle.id);
+      console.log(
+        `[migration] ✓ 标记为个人空间: ${circle.id} (owner=${circle.owner_id}，${members.length} 个 heal 成员, first_circle=true, 无分享痕迹)`
+      );
     }
 
     console.log(`[migration] is_personal 回填完成`);

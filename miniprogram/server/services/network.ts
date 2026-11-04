@@ -118,33 +118,6 @@ export async function ensurePersonalNetwork(userId: string): Promise<{
 }
 
 /**
- * 补历史单向好友：我加入过别人的美食网，但对方还没进我的网。
- * 读列表时顺手修好，老用户不用重新点邀请。
- */
-function healInboundFriendships(userId: string, myNetworkId: string) {
-  const db = getDb();
-  const owners = db
-    .prepare(
-      `SELECT DISTINCT c.owner_id AS owner_id
-       FROM circle_members cm
-       JOIN circles c ON c.id = cm.circle_id
-       WHERE cm.user_id = ?
-         AND cm.role = 'member'
-         AND c.owner_id != ?`
-    )
-    .all(userId, userId) as Array<{ owner_id: string }>;
-
-  const insert = db.prepare(
-    `INSERT OR IGNORE INTO circle_members (circle_id, user_id, role, joined_at)
-     VALUES (?, ?, 'member', ?)`
-  );
-  const joinedAt = nowIso();
-  for (const row of owners) {
-    insert.run(myNetworkId, row.owner_id, joinedAt);
-  }
-}
-
-/**
  * 获取用户的美食网络：包括自己创建的圈子和加入的所有圈子的成员（去重）
  * 这样同一个圈子里的所有成员都能互相看见
  */
@@ -199,11 +172,7 @@ function getAllNetworkMembers(userId: string): Array<{
  * 这样 A、B、C 在同一个圈子里时，每个人都能看到其他人
  */
 export async function listFoodFriends(userId: string) {
-  const network = await ensurePersonalNetwork(userId);
-  if (network) {
-    healInboundFriendships(userId, network.id);
-  }
-
+  await ensurePersonalNetwork(userId);
   const allMembers = getAllNetworkMembers(userId);
 
   const refreshed = await ensurePersonalNetwork(userId);
@@ -407,10 +376,7 @@ export async function listMyShops(
   userId: string,
   opts?: { lat?: number; lng?: number; userCity?: string }
 ) {
-  const network = await ensurePersonalNetwork(userId);
-  if (network) {
-    healInboundFriendships(userId, network.id);
-  }
+  await ensurePersonalNetwork(userId);
 
   const collisions = detectPoiKeyCollisions(userId);
   if (collisions.length > 0) {

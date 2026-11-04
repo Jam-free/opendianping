@@ -191,57 +191,11 @@ export async function joinCircle(
     ).run(circleId, userId, nowIso());
   }
 
-  // 互加：邀请方也出现在加入者的吃货排行里，双方都能看到对方共享店
-  if (circle.owner_id && circle.owner_id !== userId) {
-    await ensureOwnerInJoinerNetwork(userId, circle.owner_id);
-  }
-
   return {
     circleId,
     name: circle.name,
     alreadyMember: Boolean(existing),
   };
-}
-
-/** 把邀请人写进加入者自己的美食网，形成双向好友 */
-async function ensureOwnerInJoinerNetwork(
-  joinerId: string,
-  ownerId: string
-): Promise<void> {
-  const db = getDb();
-  const owned = db
-    .prepare(
-      `SELECT id FROM circles WHERE owner_id = ? ORDER BY created_at ASC LIMIT 1`
-    )
-    .get(joinerId) as { id: string } | undefined;
-
-  let networkId = owned?.id;
-  if (!networkId) {
-    const created = await createCircle(joinerId, '我的美食网', true);
-    networkId = created.id;
-  }
-
-  const already = db
-    .prepare(
-      `SELECT 1 AS ok FROM circle_members WHERE circle_id = ? AND user_id = ?`
-    )
-    .get(networkId, ownerId) as { ok: number } | undefined;
-  if (already) return;
-
-  const circle = db
-    .prepare(`SELECT member_limit FROM circles WHERE id = ?`)
-    .get(networkId) as { member_limit: number } | undefined;
-  const count = (
-    db
-      .prepare(`SELECT COUNT(*) AS c FROM circle_members WHERE circle_id = ?`)
-      .get(networkId) as { c: number }
-  ).c;
-  if (circle && count >= circle.member_limit) return;
-
-  db.prepare(
-    `INSERT INTO circle_members (circle_id, user_id, role, joined_at)
-     VALUES (?, ?, 'member', ?)`
-  ).run(networkId, ownerId, nowIso());
 }
 
 export function leaveCircle(userId: string, circleId: string): void {

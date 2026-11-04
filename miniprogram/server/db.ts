@@ -160,16 +160,127 @@ function initSchema(database: Database.Database): void {
   
   if (!hasIsPersonal) {
     database.exec(`ALTER TABLE circles ADD COLUMN is_personal INTEGER;`);
-    // 回填：只标记真正的个人空间（没有其他成员加入的「我的美食网」）
-    // 如果已经有其他成员加入（不含圈主），说明被用作共享圈，不标记为个人空间
-    database.exec(`
-      UPDATE circles SET is_personal = 1 
-      WHERE name = '我的美食网'
-        AND owner_id IS NOT NULL
-        AND (SELECT COUNT(*) FROM circle_members cm 
-             WHERE cm.circle_id = circles.id 
-               AND cm.user_id != circles.owner_id) = 0;
-    `);
+    
+    // 回填逻辑：区分真正的个人空间和已被用作共享圈的「我的美食网」
+    // 策略：
+    // 1. 检查圈子名是否为「我的美食网」（风险：用户可能改名）
+    // 2. 检查是否为该用户拥有的第一个圈子（ensurePersonalNetwork 创建的）
+    // 3. 检查成员是被 heal 机制添加的，还是通过邀请链接加入的
+    //
+    // 风险说明：
+    // - 用户可能将个人空间改名，导致漏标记（但新代码在创建时已设置 is_personal）
+    // - 用户可能将其他圈子改名为「我的美食网」，导致误标记（概率很低）
+    const candidates = database
+      .prepare(
+        `SELECT c.id, c.name, c.owner_id, c.created_at as circle_created,
+                (SELECT COUNT(*) FROM circles c2 
+                 WHERE c2.owner_id = c.owner_id 
+                   AND c2.created_at < c.created_at) as earlier_circles_count
+         FROM circles c
+         WHERE c.name = '我的美食网' AND c.owner_id IS NOT NULL`
+      )
+      .all() as Array<{
+        id: string;
+        name: string;
+        owner_id: string;
+        circle_created: string;
+        earlier_circles_count: number;
+      }>;
+
+    console.log(`[migration] 检查 ${candidates.length} 个「我的美食网」圈子的 is_personal 标记`);
+
+    for (const circle of candidates) {
+      // 额外检查：如果不是用户的第一个圈子，很可能是用户手动创建的共享圈
+      const isLikelyPersonal = circle.earlier_circles_count === 0;
+      
+      const members = database
+        .prepare(
+          `SELECT user_id, joined_at
+           FROM circle_members
+           WHERE circle_id = ? AND user_id != ?`
+        )
+        .all(circle.id, circle.owner_id) as Array<{
+        user_id: string;
+        joined_at: string;
+      }>;
+
+      if (members.length === 0) {
+        // 没有其他成员：只有是第一个圈子时才标记为个人空间
+        if (isLikelyPersonal) {
+          database
+            .prepare(`UPDATE circles SET is_personal = 1 WHERE id = ?`)
+            .run(circle.id);
+          console.log(
+            `[migration] ✓ 标记为个人空间: ${circle.id} (owner=${circle.owner_id}，无其他成员, first_circle=true)`
+          );
+        } else {
+          console.log(
+            `[migration] ✗ 保持共享圈: ${circle.id} (owner=${circle.owner_id}，无其他成员, 但不是第一个圈子)`
+          );
+        }
+        continue;
+      }
+
+      // 检查是否所有成员都是被 heal 机制添加的
+      let allMembersAreHeal = true;
+      for (const member of members) {
+        // heal 的特征：
+        // 1. 圈主 (owner) 是 member.user_id 拥有的某个圈子的成员
+        // 2. 双方加入时间接近（heal 是在 joinCircle 时同步执行的）
+        const reverseCircle = database
+          .prepare(
+            `SELECT c.id, cm_joiner.joined_at as joiner_joined
+             FROM circles c
+             JOIN circle_members cm_joiner ON cm_joiner.circle_id = c.id
+             WHERE c.owner_id = ?
+               AND cm_joiner.user_id = ?
+               AND cm_joiner.role = 'member'`
+          )
+          .get(member.user_id, circle.owner_id) as
+          | {
+              id: string;
+              joiner_joined: string;
+            }
+          | undefined;
+
+        if (!reverseCircle) {
+          // 没有找到反向圈子：不是 heal 添加的
+          allMembersAreHeal = false;
+          break;
+        }
+
+        // 检查时间差（heal 应该在几秒内完成）
+        const memberJoinedPersonalMs = new Date(member.joined_at).getTime();
+        const ownerJoinedReverseMs = new Date(reverseCircle.joiner_joined).getTime();
+        const timeDiffSec = Math.abs(memberJoinedPersonalMs - ownerJoinedReverseMs) / 1000;
+
+        if (timeDiffSec > 5) {
+          // 时间差太大：不是 heal 添加的
+          allMembersAreHeal = false;
+          break;
+        }
+      }
+
+      if (allMembersAreHeal && isLikelyPersonal) {
+        // 所有成员都是 heal 添加的，且是用户的第一个圈子：标记为个人空间
+        database
+          .prepare(`UPDATE circles SET is_personal = 1 WHERE id = ?`)
+          .run(circle.id);
+        console.log(
+          `[migration] ✓ 标记为个人空间: ${circle.id} (owner=${circle.owner_id}，${members.length} 个 heal 成员, first_circle=true)`
+        );
+      } else {
+        // 至少有一个成员是通过邀请加入的，或不是第一个圈子：保持为共享圈
+        const reason = !allMembersAreHeal
+          ? '有真实邀请成员'
+          : '不是第一个圈子(可能手动创建)';
+        console.log(
+          `[migration] ✗ 保持共享圈: ${circle.id} (owner=${circle.owner_id}，${members.length} 个成员，原因: ${reason})`
+        );
+      }
+    }
+
+    console.log(`[migration] is_personal 回填完成`);
   }
 
   migrateSchema(database);

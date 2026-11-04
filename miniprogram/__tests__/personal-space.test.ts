@@ -119,11 +119,17 @@ describe('个人空间「我的美食网」安全', () => {
        VALUES (?, ?, 'owner', datetime('now'))`
     ).run(circleId, userA.user.id);
 
-    // 触发迁移逻辑（模拟）
+    // 触发迁移逻辑（模拟新的回填规则）
     db.exec(`
       UPDATE circles SET is_personal = 1 
       WHERE name = '我的美食网'
-        AND (SELECT COUNT(*) FROM circle_members WHERE circle_id = circles.id) = 1;
+        AND owner_id IS NOT NULL
+        AND (SELECT COUNT(*) FROM circle_members cm 
+             WHERE cm.circle_id = circles.id 
+               AND cm.user_id != circles.owner_id) = 0
+        AND (SELECT COUNT(*) FROM circles c2 
+             WHERE c2.owner_id = circles.owner_id 
+               AND c2.created_at < circles.created_at) = 0;
     `);
 
     const circle = db
@@ -163,18 +169,24 @@ describe('个人空间「我的美食网」安全', () => {
        VALUES (?, ?, 'member', datetime('now'))`
     ).run(circleId, userC.user.id);
 
-    // 触发迁移逻辑（模拟）
+    // 触发迁移逻辑（模拟新的回填规则）
     db.exec(`
       UPDATE circles SET is_personal = 1 
       WHERE name = '我的美食网'
-        AND (SELECT COUNT(*) FROM circle_members WHERE circle_id = circles.id) = 1;
+        AND owner_id IS NOT NULL
+        AND (SELECT COUNT(*) FROM circle_members cm 
+             WHERE cm.circle_id = circles.id 
+               AND cm.user_id != circles.owner_id) = 0
+        AND (SELECT COUNT(*) FROM circles c2 
+             WHERE c2.owner_id = circles.owner_id 
+               AND c2.created_at < circles.created_at) = 0;
     `);
 
     const circle = db
       .prepare('SELECT is_personal FROM circles WHERE id = ?')
       .get(circleId) as { is_personal: number | null };
 
-    // 不应该被标记为个人空间
+    // 不应该被标记为个人空间（有其他成员）
     expect(circle.is_personal).toBeNull();
 
     // 验证 B 和 C 仍然可以访问

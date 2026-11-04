@@ -156,6 +156,7 @@ export function createApp() {
       const gateway = readWxGatewayIdentity((name) => req.header(name));
       const { token, user } = await loginWithWxCode(code, { gateway });
       // 登录后静默确保个人美食网，前端不再出现「创建圈子」
+      // 如果用户已在其他圈子中，则不创建个人空间（返回 null）
       const net = await network.ensurePersonalNetwork(user.id);
       res.json({
         token,
@@ -164,7 +165,7 @@ export function createApp() {
           nickname: user.nickname,
           avatar: user.avatar,
         },
-        networkId: net.id,
+        networkId: net?.id || null,
       });
     })
   );
@@ -188,7 +189,7 @@ export function createApp() {
     asyncHandler(async (req, res) => {
       const profile = network.getUserProfile(req.userId!);
       const net = await network.ensurePersonalNetwork(req.userId!);
-      res.json({ user: profile, networkId: net.id });
+      res.json({ user: profile, networkId: net?.id || null });
     })
   );
 

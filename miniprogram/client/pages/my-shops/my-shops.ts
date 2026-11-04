@@ -139,7 +139,7 @@ Page({
   async loadShops() {
     this.setData({ shopsLoading: true });
     try {
-      await this.ensureCircleId();
+      // 加载个人店铺列表不需要 circleId（用户总是可以看到自己的收藏）
       const loc = await getUserLocation();
       const qs = buildQuery({
         lat: loc ? loc.lat : undefined,
@@ -168,11 +168,16 @@ Page({
           sharedShopCount: number;
         }>;
       }>('/api/me/network');
-      setActiveCircleId(net.networkId);
       
       // 获取所有圈子，选择最合适的分享圈子
       const circlesData = await request<{ items: any[] }>('/api/circles');
       const shareCircle = selectShareCircle(circlesData.items || []);
+      
+      // 设置活跃圈子ID（优先使用分享圈子，否则使用个人空间）
+      const activeCircleId = shareCircle?.id || net.networkId;
+      if (activeCircleId) {
+        setActiveCircleId(activeCircleId);
+      }
       
       // 吃货排行：共享店数多的靠前
       const friends = (net.friends || [])
@@ -184,7 +189,7 @@ Page({
         .sort((a, b) => b.sharedShopCount - a.sharedShopCount);
       this.setData({
         friends,
-        networkId: shareCircle?.id || net.networkId,
+        networkId: shareCircle?.id || net.networkId || '',
         inviteToken: shareCircle?.inviteToken || '',
         friendsLoading: false,
         loginError: '',
@@ -266,6 +271,7 @@ Page({
   async onShareAppMessage() {
     const { networkId, inviteToken } = this.data;
     if (!networkId || !inviteToken) {
+      // 用户没有任何可分享的圈子（既没有个人空间也没有共享圈子）
       wx.showModal({
         title: '还没有可分享的圈子',
         content: '请先创建一个圈子，邀请朋友一起共享收藏',
@@ -290,8 +296,9 @@ Page({
     const avatar = encodeURIComponent(
       String(e.currentTarget.dataset.avatar || '')
     );
+    // friend-shops 页面只需要 memberId，circleId 参数留空即可（friend-shops 会查询共享圈子）
     wx.navigateTo({
-      url: `/pages/friend-shops/friend-shops?c=${this.data.networkId}&m=${id}&n=${name}&a=${avatar}`,
+      url: `/pages/friend-shops/friend-shops?c=&m=${id}&n=${name}&a=${avatar}`,
     });
   },
 
@@ -301,13 +308,14 @@ Page({
       wx.showToast({ title: '店铺信息还没准备好', icon: 'none' });
       return;
     }
-    const circleId = await this.ensureCircleId();
-    if (!circleId) {
-      wx.showToast({ title: '美食网还没就绪，稍后再试', icon: 'none' });
+    // 从私藏列表打开：总是使用当前用户的 memberId 模式（不需要 circleId 或 networkId）
+    const cached = peekCachedUser();
+    if (!cached?.id) {
+      wx.showToast({ title: '无法打开详情，请重新登录', icon: 'none' });
       return;
     }
     wx.navigateTo({
-      url: `/pages/shop-detail/shop-detail?c=${circleId}&p=${encodeURIComponent(shop.poiKey)}`,
+      url: `/pages/shop-detail/shop-detail?m=${cached.id}&p=${encodeURIComponent(shop.poiKey)}`,
     });
   },
 });

@@ -204,8 +204,9 @@ function initSchema(database: Database.Database): void {
         joined_at: string;
       }>;
 
+      // 保守规则：只有在完全确定的情况下才标记为个人空间
       if (members.length === 0) {
-        // 没有其他成员：只有是第一个圈子时才标记为个人空间
+        // 没有其他成员 + 是第一个圈子 → 确定是个人空间
         if (isLikelyPersonal) {
           database
             .prepare(`UPDATE circles SET is_personal = 1 WHERE id = ?`)
@@ -215,18 +216,18 @@ function initSchema(database: Database.Database): void {
           );
         } else {
           console.log(
-            `[migration] ✗ 保持共享圈: ${circle.id} (owner=${circle.owner_id}，无其他成员, 但不是第一个圈子)`
+            `[migration] ⚠️ 需人工审核: ${circle.id} (owner=${circle.owner_id}，无其他成员但不是第一个圈子)`
           );
         }
         continue;
       }
 
-      // 检查是否所有成员都是被 heal 机制添加的
-      let allMembersAreHeal = true;
+      // 有成员：需要非常保守
+      // 检查是否所有成员都明确是 heal 添加的（反向圈子 + 时间极接近）
+      let allClearlyHeal = true;
+      let ambiguousCount = 0;
+      
       for (const member of members) {
-        // heal 的特征：
-        // 1. 圈主 (owner) 是 member.user_id 拥有的某个圈子的成员
-        // 2. 双方加入时间接近（heal 是在 joinCircle 时同步执行的）
         const reverseCircle = database
           .prepare(
             `SELECT c.id, cm_joiner.joined_at as joiner_joined
@@ -244,38 +245,40 @@ function initSchema(database: Database.Database): void {
           | undefined;
 
         if (!reverseCircle) {
-          // 没有找到反向圈子：不是 heal 添加的
-          allMembersAreHeal = false;
+          // 没有反向圈子 → 明确不是 heal，是邀请加入
+          allClearlyHeal = false;
           break;
         }
 
-        // 检查时间差（heal 应该在几秒内完成）
         const memberJoinedPersonalMs = new Date(member.joined_at).getTime();
         const ownerJoinedReverseMs = new Date(reverseCircle.joiner_joined).getTime();
         const timeDiffSec = Math.abs(memberJoinedPersonalMs - ownerJoinedReverseMs) / 1000;
 
-        if (timeDiffSec > 5) {
-          // 时间差太大：不是 heal 添加的
-          allMembersAreHeal = false;
-          break;
+        // 保守时间窗口：只有 1 秒内才算明确的 heal（同步操作）
+        if (timeDiffSec > 1) {
+          // 时间差 > 1 秒：可能是巧合，标记为模糊
+          ambiguousCount++;
+          allClearlyHeal = false;
         }
       }
 
-      if (allMembersAreHeal && isLikelyPersonal) {
-        // 所有成员都是 heal 添加的，且是用户的第一个圈子：标记为个人空间
+      if (allClearlyHeal && isLikelyPersonal && members.length <= 2) {
+        // 所有成员都明确是 heal + 是第一个圈子 + 成员数少 → 标记为个人空间
         database
           .prepare(`UPDATE circles SET is_personal = 1 WHERE id = ?`)
           .run(circle.id);
         console.log(
-          `[migration] ✓ 标记为个人空间: ${circle.id} (owner=${circle.owner_id}，${members.length} 个 heal 成员, first_circle=true)`
+          `[migration] ✓ 标记为个人空间: ${circle.id} (owner=${circle.owner_id}，${members.length} 个明确 heal 成员, first_circle=true)`
         );
       } else {
-        // 至少有一个成员是通过邀请加入的，或不是第一个圈子：保持为共享圈
-        const reason = !allMembersAreHeal
-          ? '有真实邀请成员'
-          : '不是第一个圈子(可能手动创建)';
+        // 任何模糊情况：保持为共享圈（安全优先，不锁人）
+        const reason = !allClearlyHeal
+          ? `有非 heal 成员或时间模糊 (模糊=${ambiguousCount})`
+          : !isLikelyPersonal
+          ? '不是第一个圈子'
+          : `成员过多 (${members.length} 人)`;
         console.log(
-          `[migration] ✗ 保持共享圈: ${circle.id} (owner=${circle.owner_id}，${members.length} 个成员，原因: ${reason})`
+          `[migration] ⚠️ 保持共享圈（保守）: ${circle.id} (owner=${circle.owner_id}，${members.length} 个成员，原因: ${reason})`
         );
       }
     }

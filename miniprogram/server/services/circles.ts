@@ -258,9 +258,9 @@ export function listMyCircles(userId: string) {
     )
     .all(userId) as Array<Record<string, unknown>>;
 
-  // 邀请 token 仅圈主可见（且非个人空间），避免成员复制后滥用
+  // 邀请 token：所有成员可见（用于分享），但个人空间永不返回
   return rows.map((r) => {
-    if (r.role !== 'owner' || r.is_personal) {
+    if (r.is_personal) {
       const { invite_token: _t, token_expires_at: _e, ...rest } = r;
       return rest;
     }

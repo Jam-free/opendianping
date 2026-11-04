@@ -114,6 +114,7 @@ function initSchema(database: Database.Database): void {
       token_expires_at TEXT NOT NULL,
       opengid TEXT,
       member_limit INTEGER NOT NULL DEFAULT 200,
+      is_personal INTEGER,
       created_at TEXT NOT NULL,
       FOREIGN KEY (owner_id) REFERENCES users(id)
     );
@@ -152,6 +153,17 @@ function initSchema(database: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_shops_amap ON shops(amap_poi_id);
     CREATE INDEX IF NOT EXISTS idx_circle_members_user ON circle_members(user_id);
   `);
+
+  // 迁移：添加 is_personal 列（如果不存在）
+  const columns = database.pragma('table_info(circles)') as Array<{ name: string }>;
+  const hasIsPersonal = columns.some((col) => col.name === 'is_personal');
+  
+  if (!hasIsPersonal) {
+    database.exec(`ALTER TABLE circles ADD COLUMN is_personal INTEGER;`);
+    // 回填：将「我的美食网」标记为个人空间
+    database.exec(`UPDATE circles SET is_personal = 1 WHERE name = '我的美食网';`);
+  }
+
   migrateSchema(database);
 }
 
@@ -183,7 +195,7 @@ function migrateSchema(database: Database.Database): void {
       `UPDATE favorites SET wishlist = 1 WHERE import_batch_id IS NOT NULL`
     );
   }
-  // 从哪位好友那里加进私藏（用于「XX推荐」）
+  // 从哪位好友那里加进私藏（用于「来自XX」）
   if (!favCols.some((c) => c.name === 'from_user_id')) {
     database.exec(`ALTER TABLE favorites ADD COLUMN from_user_id TEXT`);
   }

@@ -36,7 +36,11 @@ function assertMember(circleId: string, userId: string): { role: string } {
   return row;
 }
 
-export async function createCircle(userId: string, name: string) {
+export async function createCircle(
+  userId: string,
+  name: string,
+  isPersonal: boolean = false
+) {
   const trimmed = name.trim();
   if (!trimmed || trimmed.length > 30) {
     throw Object.assign(new Error('圈名需 1–30 字'), { status: 400 });
@@ -53,9 +57,9 @@ export async function createCircle(userId: string, name: string) {
 
   const tx = db.transaction(() => {
     db.prepare(
-      `INSERT INTO circles (id, name, owner_id, invite_token, token_expires_at, opengid, member_limit, created_at)
-       VALUES (?, ?, ?, ?, ?, NULL, ?, ?)`
-    ).run(id, trimmed, userId, inviteToken, expires, config.circleMemberLimit, createdAt);
+      `INSERT INTO circles (id, name, owner_id, invite_token, token_expires_at, opengid, member_limit, is_personal, created_at)
+       VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?)`
+    ).run(id, trimmed, userId, inviteToken, expires, config.circleMemberLimit, isPersonal ? 1 : null, createdAt);
     db.prepare(
       `INSERT INTO circle_members (circle_id, user_id, role, joined_at)
        VALUES (?, ?, 'owner', ?)`
@@ -69,17 +73,27 @@ export async function createCircle(userId: string, name: string) {
     inviteToken,
     tokenExpiresAt: expires,
     memberLimit: config.circleMemberLimit,
+    isPersonal,
   };
 }
 
 export function resetInviteToken(userId: string, circleId: string) {
+  const db = getDb();
+  const circle = db
+    .prepare(`SELECT is_personal FROM circles WHERE id = ?`)
+    .get(circleId) as { is_personal: number | null } | undefined;
+  
+  if (circle?.is_personal) {
+    throw Object.assign(new Error('个人空间不支持邀请链接'), { status: 403 });
+  }
+
   const member = assertMember(circleId, userId);
   if (member.role !== 'owner') {
     throw Object.assign(new Error('仅圈主可重置邀请'), { status: 403 });
   }
   const inviteToken = newInviteToken();
   const expires = tokenExpiresAt();
-  getDb()
+  db
     .prepare(
       `UPDATE circles SET invite_token = ?, token_expires_at = ? WHERE id = ?`
     )
@@ -129,11 +143,16 @@ export async function joinCircle(
         token_expires_at: string;
         opengid: string | null;
         member_limit: number;
+        is_personal: number | null;
       }
     | undefined;
 
   if (!circle) {
     throw Object.assign(new Error('收藏圈不存在'), { status: 404 });
+  }
+  
+  if (circle.is_personal) {
+    throw Object.assign(new Error('不能加入他人的个人空间'), { status: 403 });
   }
   if (circle.invite_token !== token) {
     throw Object.assign(new Error('邀请已失效（可能已重置）'), { status: 403 });
@@ -198,7 +217,7 @@ async function ensureOwnerInJoinerNetwork(
 
   let networkId = owned?.id;
   if (!networkId) {
-    const created = await createCircle(joinerId, '我的美食网');
+    const created = await createCircle(joinerId, '我的美食网', true);
     networkId = created.id;
   }
 
@@ -275,7 +294,7 @@ export function dissolveCircle(ownerId: string, circleId: string): void {
 export function listMyCircles(userId: string) {
   const rows = getDb()
     .prepare(
-      `SELECT c.id, c.name, c.owner_id, cm.role, c.created_at,
+      `SELECT c.id, c.name, c.owner_id, cm.role, c.created_at, c.is_personal,
               c.invite_token, c.token_expires_at,
               (SELECT COUNT(*) FROM circle_members m WHERE m.circle_id = c.id) AS member_count
        FROM circles c
@@ -285,9 +304,9 @@ export function listMyCircles(userId: string) {
     )
     .all(userId) as Array<Record<string, unknown>>;
 
-  // 邀请 token 仅圈主可见，避免成员复制后滥用
+  // 邀请 token 仅圈主可见（且非个人空间），避免成员复制后滥用
   return rows.map((r) => {
-    if (r.role !== 'owner') {
+    if (r.role !== 'owner' || r.is_personal) {
       const { invite_token: _t, token_expires_at: _e, ...rest } = r;
       return rest;
     }
@@ -763,7 +782,7 @@ export function listCircleMembers(userId: string, circleId: string) {
     .all(circleId, circleId);
 }
 
-/** 从圈友店里加进自己的私藏；记下推荐人，私藏列表可显示「XX推荐」 */
+/** 从圈友店里加进自己的私藏；记下推荐人，私藏列表可显示「来自XX」 */
 export function addFavoriteFromCircleShop(
   userId: string,
   circleId: string,

@@ -107,7 +107,7 @@ export async function ensurePersonalNetwork(userId: string): Promise<{
     return null;
   }
 
-  const created = await createCircle(userId, PERSONAL_NETWORK_NAME);
+  const created = await createCircle(userId, PERSONAL_NETWORK_NAME, true);
   return {
     id: created.id,
     name: created.name,
@@ -209,8 +209,8 @@ export async function listFoodFriends(userId: string) {
   const refreshed = await ensurePersonalNetwork(userId);
   return {
     networkId: refreshed?.id || '',
-    inviteToken: refreshed?.inviteToken || '',
-    tokenExpiresAt: refreshed?.tokenExpiresAt || '',
+    inviteToken: '',
+    tokenExpiresAt: '',
     memberCount: allMembers.length + 1,
     friends: allMembers.map((m) => ({
       id: m.id,
@@ -262,7 +262,7 @@ type FriendRecommender = {
 };
 
 /** 
- * 在我的美食网络里，还有谁也共享了这家店（用来标「XX推荐」）
+ * 在我的美食网络里，还有谁也共享了这家店（用来标「来自XX」）
  * 查询所有与当前用户在同一圈子中的成员
  */
 function findFriendRecommenders(

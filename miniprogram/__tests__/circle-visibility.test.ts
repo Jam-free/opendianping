@@ -382,6 +382,78 @@ describe('圈子成员互相可见', () => {
     expect(cInAgent).toBeDefined();
     expect(cInAgent!.sharedShopCount).toBe(2);
   });
+
+  test('私藏列表推荐人不泄露非共享圈子的昵称', async () => {
+    const userA = createSessionForOpenId('user_a_rec_leak');
+    const userB = createSessionForOpenId('user_b_rec_leak');
+    const userD = createSessionForOpenId('user_d_rec_leak');
+    const userE = createSessionForOpenId('user_e_rec_leak');
+
+    getDb()
+      .prepare(`UPDATE users SET nickname = ? WHERE id = ?`)
+      .run('小A', userA.user.id);
+    
+    getDb()
+      .prepare(`UPDATE users SET nickname = ? WHERE id = ?`)
+      .run('小D', userD.user.id);
+
+    const circleAB = await circles.createCircle(userE.user.id, 'AB圈');
+    const circleCD = await circles.createCircle(userE.user.id, 'CD圈');
+
+    await circles.joinCircle(userA.user.id, circleAB.id, circleAB.inviteToken);
+    await circles.joinCircle(userB.user.id, circleAB.id, circleAB.inviteToken);
+    await circles.joinCircle(userD.user.id, circleCD.id, circleCD.inviteToken);
+
+    const db = getDb();
+    const shop1 = uuidv4();
+
+    db.prepare(
+      `INSERT INTO shops (id, source_type, source_shop_id, amap_poi_id, raw_name,
+       adcode, category, district, city, address, avg_price, lat, lng,
+       source_url, head_img, phone, display_cache_policy)
+       VALUES (?, 'dianping_album', 'test123', NULL, ?, NULL, '火锅', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'minimal')`
+    ).run(shop1, '共享店铺');
+
+    const favA = uuidv4();
+    const favD = uuidv4();
+
+    db.prepare(
+      `INSERT INTO favorites (id, user_id, shop_id, note, visibility, created_at)
+       VALUES (?, ?, ?, NULL, 'circles', datetime('now'))`
+    ).run(favA, userA.user.id, shop1);
+
+    db.prepare(
+      `INSERT INTO circle_shares (circle_id, favorite_id)
+       VALUES (?, ?)`
+    ).run(circleAB.id, favA);
+
+    db.prepare(
+      `INSERT INTO favorites (id, user_id, shop_id, note, visibility, created_at)
+       VALUES (?, ?, ?, NULL, 'circles', datetime('now'))`
+    ).run(favD, userD.user.id, shop1);
+
+    db.prepare(
+      `INSERT INTO circle_shares (circle_id, favorite_id)
+       VALUES (?, ?)`
+    ).run(circleCD.id, favD);
+
+    const bResult = await circles.addFavoriteFromCircleShop(
+      userB.user.id,
+      circleAB.id,
+      'test123',
+      '',
+      userA.user.id
+    );
+    expect(bResult.favoriteId).toBeDefined();
+
+    const myShops = await network.listMyShops(userB.user.id);
+    const shopInList = myShops.items.find((s) => s.shopId === shop1);
+
+    expect(shopInList).toBeDefined();
+    expect(shopInList!.origin).toBe('from_friend');
+    expect(shopInList!.sourceTag).toContain('小A');
+    expect(shopInList!.sourceTag).not.toContain('小D');
+  });
 });
 
 /**

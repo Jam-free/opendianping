@@ -286,10 +286,21 @@ function findFriendRecommenders(
            WHERE cm1.user_id = ?
              AND cm2.user_id != ?
          )
+         AND (
+           NOT EXISTS (SELECT 1 FROM circle_shares cs WHERE cs.favorite_id = f.id)
+           OR EXISTS (
+             SELECT 1 FROM circle_shares cs2
+             JOIN circle_members cm_owner ON cm_owner.circle_id = cs2.circle_id
+             JOIN circle_members cm_viewer ON cm_viewer.circle_id = cs2.circle_id
+             WHERE cs2.favorite_id = f.id
+               AND cm_owner.user_id = f.user_id
+               AND cm_viewer.user_id = ?
+           )
+         )
        ORDER BY CASE WHEN f.user_id = ? THEN 0 ELSE 1 END, f.created_at ASC
        LIMIT 3`
     )
-    .all(shopId, userId, userId, userId, preferredUserId || '') as FriendRecommender[];
+    .all(shopId, userId, userId, userId, userId, preferredUserId || '') as FriendRecommender[];
   return rows;
 }
 

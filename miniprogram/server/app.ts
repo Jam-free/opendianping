@@ -649,6 +649,25 @@ export function createApp() {
     })
   );
 
+  app.get(
+    '/api/members/:memberId/shops',
+    requireAuth,
+    asyncHandler(async (req, res) => {
+      const lat = req.query.lat ? Number(req.query.lat) : undefined;
+      const lng = req.query.lng ? Number(req.query.lng) : undefined;
+      const result = circles.listMemberShopsInSharedCircles(
+        req.userId!,
+        req.params.memberId,
+        {
+          lat: Number.isFinite(lat) ? lat : undefined,
+          lng: Number.isFinite(lng) ? lng : undefined,
+          userCity: req.query.userCity ? String(req.query.userCity) : undefined,
+        }
+      );
+      res.json(result);
+    })
+  );
+
   app.post(
     '/api/circles/:id/favorites',
     requireAuth,

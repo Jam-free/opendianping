@@ -39,12 +39,12 @@ export function formatRecommendersLine(
     .filter(Boolean) as string[];
   const shown = names.slice(0, 2);
   if (total <= 0) return '';
-  if (total === 1 && shown[0]) return `${shown[0]} 推荐`;
+  if (total === 1 && shown[0]) return `来自${shown[0]}`;
   if (shown.length >= 2 && total > 2) {
-    return `${shown[0]}、${shown[1]}等 ${total} 人推荐`;
+    return `来自${shown[0]}、${shown[1]}等 ${total} 人`;
   }
   if (shown.length === 1 && total > 1) {
-    return `${shown[0]}等 ${total} 人推荐`;
+    return `来自${shown[0]}等 ${total} 人`;
   }
   if (shown.length >= 2) {
     return `${shown[0]}、${shown[1]} 推荐`;

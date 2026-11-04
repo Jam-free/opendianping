@@ -169,6 +169,61 @@ describe('圈子成员互相可见', () => {
     expect(cShopInB).toBeDefined();
     expect(cShopInB.from_friend).toBe(null);
   });
+
+  test('B 点击 C 查看 C 的店铺列表（共享圈子中的店铺）', async () => {
+    const userA = createSessionForOpenId('user_a_member_list');
+    const userB = createSessionForOpenId('user_b_member_list');
+    const userC = createSessionForOpenId('user_c_member_list');
+
+    getDb()
+      .prepare(`UPDATE users SET nickname = ? WHERE id = ?`)
+      .run('小C', userC.user.id);
+
+    const circleA = await circles.createCircle(userA.user.id, 'A的美食网');
+    await circles.joinCircle(userB.user.id, circleA.id, circleA.inviteToken);
+    await circles.joinCircle(userC.user.id, circleA.id, circleA.inviteToken);
+
+    const shopId1 = uuidv4();
+    const shopId2 = uuidv4();
+    const db = getDb();
+
+    db.prepare(
+      `INSERT INTO shops (id, source_type, source_shop_id, amap_poi_id, raw_name,
+       adcode, category, district, city, address, avg_price, lat, lng,
+       source_url, head_img, phone, display_cache_policy)
+       VALUES (?, 'locate', NULL, NULL, ?, NULL, '火锅', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'minimal')`
+    ).run(shopId1, 'C的火锅店');
+
+    db.prepare(
+      `INSERT INTO shops (id, source_type, source_shop_id, amap_poi_id, raw_name,
+       adcode, category, district, city, address, avg_price, lat, lng,
+       source_url, head_img, phone, display_cache_policy)
+       VALUES (?, 'locate', NULL, NULL, ?, NULL, '日料', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'minimal')`
+    ).run(shopId2, 'C的日料店');
+
+    db.prepare(
+      `INSERT INTO favorites (id, user_id, shop_id, note, visibility, created_at)
+       VALUES (?, ?, ?, 'C的火锅备注', 'circles', datetime('now'))`
+    ).run(uuidv4(), userC.user.id, shopId1);
+
+    db.prepare(
+      `INSERT INTO favorites (id, user_id, shop_id, note, visibility, created_at)
+       VALUES (?, ?, ?, 'C的日料备注', 'circles', datetime('now'))`
+    ).run(uuidv4(), userC.user.id, shopId2);
+
+    const result = circles.listMemberShopsInSharedCircles(userB.user.id, userC.user.id);
+
+    expect(result.items.length).toBe(2);
+    expect(result.sharedCircleCount).toBe(1);
+
+    const shopNames = result.items.map((s) => s.name).sort();
+    expect(shopNames).toEqual(['C的日料店', 'C的火锅店']);
+
+    const fireHotpot = result.items.find((s) => s.name === 'C的火锅店');
+    expect(fireHotpot).toBeDefined();
+    expect(fireHotpot!.note).toBe('C的火锅备注');
+    expect(fireHotpot!.recommendersLine).toContain('来自小C');
+  });
 });
 
 /**

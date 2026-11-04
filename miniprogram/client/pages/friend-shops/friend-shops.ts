@@ -40,17 +40,14 @@ Page({
     try {
       const loc = await getUserLocation();
       const qs = buildQuery({
-        pageSize: '200',
-        memberId: this.data.memberId,
         lat: loc ? loc.lat : undefined,
         lng: loc ? loc.lng : undefined,
       });
       const res = await request<{ items: any[] }>(
-        `/api/circles/${this.data.circleId}/shops?${qs}`
+        `/api/members/${this.data.memberId}/shops?${qs}`
       );
       const shops = (res.items || []).map((s) => ({
         ...s,
-        // 店铺行里的圈友头像也补全可访问地址
         collectors: (s.collectors || []).map(
           (c: { avatar?: string | null; [k: string]: unknown }) => ({
             ...c,

@@ -766,4 +766,80 @@ export function setCircleInviteForTest(
     .run(token, expiresAt, circleId);
 }
 
+/**
+ * 获取两个用户共享的圈子中，目标用户的店铺
+ * 用于"吃货排行"中点击好友查看其店铺
+ * 
+ * @param viewerId 查看者（如 B）
+ * @param targetMemberId 目标成员（如 C）
+ * @returns 目标成员在共享圈子中的店铺
+ */
+export function listMemberShopsInSharedCircles(
+  viewerId: string,
+  targetMemberId: string,
+  opts?: {
+    lat?: number;
+    lng?: number;
+    userCity?: string;
+  }
+): {
+  items: AggregatedCircleShop[];
+  sharedCircleCount: number;
+} {
+  const db = getDb();
+  
+  const sharedCircles = db
+    .prepare(
+      `SELECT DISTINCT c.id
+       FROM circle_members cm1
+       JOIN circle_members cm2 ON cm1.circle_id = cm2.circle_id
+       JOIN circles c ON c.id = cm1.circle_id
+       WHERE cm1.user_id = ?
+         AND cm2.user_id = ?
+         AND cm1.user_id != cm2.user_id`
+    )
+    .all(viewerId, targetMemberId) as Array<{ id: string }>;
+
+  if (sharedCircles.length === 0) {
+    return { items: [], sharedCircleCount: 0 };
+  }
+
+  const allRows: CircleShopRow[] = [];
+  for (const circle of sharedCircles) {
+    const rows = queryCircleShopRows(circle.id, {
+      memberId: targetMemberId,
+    });
+    allRows.push(...rows);
+  }
+
+  const deduped = new Map<string, CircleShopRow>();
+  for (const row of allRows) {
+    if (!deduped.has(row.poi_key)) {
+      deduped.set(row.poi_key, row);
+    }
+  }
+
+  const aggregated = aggregateCircleShops([...deduped.values()]);
+  
+  const itemsWithNote = aggregated.map((item) => {
+    const targetCollector = item.collectors.find((c) => c.userId === targetMemberId);
+    return {
+      ...item,
+      note: targetCollector?.note || null,
+    };
+  });
+  
+  const { withCoords, withoutCoords } = sortShopsByDistance(
+    itemsWithNote,
+    opts?.lat,
+    opts?.lng,
+    opts?.userCity
+  );
+
+  return {
+    items: [...withCoords, ...withoutCoords],
+    sharedCircleCount: sharedCircles.length,
+  };
+}
+
 export { assertMember };

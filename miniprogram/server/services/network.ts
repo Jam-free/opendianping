@@ -162,7 +162,18 @@ function getAllNetworkMembers(userId: string): Array<{
               (SELECT COUNT(DISTINCT f.shop_id)
                FROM favorites f
                WHERE f.user_id = u.id
-                 AND f.visibility = 'circles') AS shared_shop_count
+                 AND f.visibility = 'circles'
+                 AND (
+                   NOT EXISTS (SELECT 1 FROM circle_shares cs WHERE cs.favorite_id = f.id)
+                   OR EXISTS (
+                     SELECT 1 FROM circle_shares cs2
+                     JOIN circle_members cm_owner ON cm_owner.circle_id = cs2.circle_id
+                     JOIN circle_members cm_viewer ON cm_viewer.circle_id = cs2.circle_id
+                     WHERE cs2.favorite_id = f.id
+                       AND cm_owner.user_id = u.id
+                       AND cm_viewer.user_id = ?
+                   )
+                 )) AS shared_shop_count
        FROM users u
        WHERE u.id != ?
          AND u.id IN (
@@ -174,7 +185,7 @@ function getAllNetworkMembers(userId: string): Array<{
          )
        ORDER BY u.nickname`
     )
-    .all(userId, userId, userId) as Array<{
+    .all(userId, userId, userId, userId) as Array<{
       id: string;
       nickname: string | null;
       avatar: string | null;
@@ -240,7 +251,7 @@ type MyShopRow = {
 const MY_SHOP_ORIGIN_LABEL: Record<string, string> = {
   imported: '我导入',
   checkin: '我记下',
-  from_friend: '好友推荐',
+  from_friend: '来自好友',
   agent: 'AI 帮你记下',
 };
 
@@ -286,9 +297,19 @@ function friendRecommendLabel(recs: FriendRecommender[]): string {
   const names = recs
     .map((r) => (r.nickname || '').trim())
     .filter(Boolean);
-  if (names[0]) return `${names[0]}推荐`;
-  if (recs.length) return '好友推荐';
-  return MY_SHOP_ORIGIN_LABEL.from_friend;
+  const shown = names.slice(0, 2);
+  if (recs.length === 0) return MY_SHOP_ORIGIN_LABEL.from_friend;
+  if (recs.length === 1 && shown[0]) return `来自${shown[0]}`;
+  if (shown.length >= 2 && recs.length > 2) {
+    return `来自${shown[0]}、${shown[1]}等 ${recs.length} 人`;
+  }
+  if (shown.length === 1 && recs.length > 1) {
+    return `来自${shown[0]}等 ${recs.length} 人`;
+  }
+  if (shown.length >= 2) {
+    return `来自${shown[0]}、${shown[1]}`;
+  }
+  return `来自 ${recs.length} 人`;
 }
 
 /**

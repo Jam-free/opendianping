@@ -296,6 +296,92 @@ describe('圈子成员互相可见', () => {
     const friendShopNames = agentShops.friendsShared.map((s: any) => s.name);
     expect(friendShopNames).not.toContain('C只给D圈的店');
   });
+
+  test('sharedShopCount 只计算查看者能看到的店铺', async () => {
+    const userB = createSessionForOpenId('user_b_count_check');
+    const userC = createSessionForOpenId('user_c_count_check');
+    const userD = createSessionForOpenId('user_d_count_check');
+    const userE = createSessionForOpenId('user_e_count_check');
+
+    const circleCD = await circles.createCircle(userD.user.id, 'C和D的圈');
+    const circleBCE = await circles.createCircle(userE.user.id, 'B和C的圈');
+
+    await circles.joinCircle(userC.user.id, circleCD.id, circleCD.inviteToken);
+    await circles.joinCircle(userB.user.id, circleBCE.id, circleBCE.inviteToken);
+    await circles.joinCircle(userC.user.id, circleBCE.id, circleBCE.inviteToken);
+
+    const db = getDb();
+    const shop1 = uuidv4();
+    const shop2 = uuidv4();
+    const shop3 = uuidv4();
+
+    db.prepare(
+      `INSERT INTO shops (id, source_type, source_shop_id, amap_poi_id, raw_name,
+       adcode, category, district, city, address, avg_price, lat, lng,
+       source_url, head_img, phone, display_cache_policy)
+       VALUES (?, 'locate', NULL, NULL, ?, NULL, '火锅', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'minimal')`
+    ).run(shop1, 'C的店1（BCE圈）');
+
+    db.prepare(
+      `INSERT INTO shops (id, source_type, source_shop_id, amap_poi_id, raw_name,
+       adcode, category, district, city, address, avg_price, lat, lng,
+       source_url, head_img, phone, display_cache_policy)
+       VALUES (?, 'locate', NULL, NULL, ?, NULL, '川菜', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'minimal')`
+    ).run(shop2, 'C的店2（BCE圈）');
+
+    db.prepare(
+      `INSERT INTO shops (id, source_type, source_shop_id, amap_poi_id, raw_name,
+       adcode, category, district, city, address, avg_price, lat, lng,
+       source_url, head_img, phone, display_cache_policy)
+       VALUES (?, 'locate', NULL, NULL, ?, NULL, '日料', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'minimal')`
+    ).run(shop3, 'C的店3（仅CD圈）');
+
+    const fav1 = uuidv4();
+    const fav2 = uuidv4();
+    const fav3 = uuidv4();
+
+    db.prepare(
+      `INSERT INTO favorites (id, user_id, shop_id, note, visibility, created_at)
+       VALUES (?, ?, ?, NULL, 'circles', datetime('now'))`
+    ).run(fav1, userC.user.id, shop1);
+
+    db.prepare(
+      `INSERT INTO circle_shares (circle_id, favorite_id)
+       VALUES (?, ?)`
+    ).run(circleBCE.id, fav1);
+
+    db.prepare(
+      `INSERT INTO favorites (id, user_id, shop_id, note, visibility, created_at)
+       VALUES (?, ?, ?, NULL, 'circles', datetime('now'))`
+    ).run(fav2, userC.user.id, shop2);
+
+    db.prepare(
+      `INSERT INTO circle_shares (circle_id, favorite_id)
+       VALUES (?, ?)`
+    ).run(circleBCE.id, fav2);
+
+    db.prepare(
+      `INSERT INTO favorites (id, user_id, shop_id, note, visibility, created_at)
+       VALUES (?, ?, ?, NULL, 'circles', datetime('now'))`
+    ).run(fav3, userC.user.id, shop3);
+
+    db.prepare(
+      `INSERT INTO circle_shares (circle_id, favorite_id)
+       VALUES (?, ?)`
+    ).run(circleCD.id, fav3);
+
+    const foodFriends = await network.listFoodFriends(userB.user.id);
+    const cInList = foodFriends.friends.find((f) => f.id === userC.user.id);
+
+    expect(cInList).toBeDefined();
+    expect(cInList!.sharedShopCount).toBe(2);
+
+    const agentFriends = await network.listAgentFriends(userB.user.id);
+    const cInAgent = agentFriends.friends.find((f: any) => f.id === userC.user.id);
+
+    expect(cInAgent).toBeDefined();
+    expect(cInAgent!.sharedShopCount).toBe(2);
+  });
 });
 
 /**

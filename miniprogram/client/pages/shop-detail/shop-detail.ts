@@ -103,16 +103,8 @@ Page({
     };
     
     let sourceLabel = labels[shop.sourceType] || '未知';
-    if (shop.sourceType === 'agent' && shop.collectors && shop.collectors.length > 0) {
-      const recommender = shop.collectors[0];
-      if (recommender && recommender.nickname) {
-        sourceLabel = `来自${recommender.nickname}`;
-      }
-    } else if (shop.collectors && shop.collectors.length > 0) {
-      const recommender = shop.collectors[0];
-      if (recommender && recommender.nickname) {
-        sourceLabel = `来自${recommender.nickname}`;
-      }
+    if (shop.recommendersLine) {
+      sourceLabel = shop.recommendersLine;
     }
     
     wx.setNavigationBarTitle({ title: shop.name || '店铺详情' });

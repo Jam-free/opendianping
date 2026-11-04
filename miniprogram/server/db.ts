@@ -281,6 +281,73 @@ function initSchema(database: Database.Database): void {
     }
 
     console.log(`[migration] is_personal 回填完成`);
+    
+    // 清理个人空间中的 heal 成员
+    // 默认 dry-run：只打印，不删除
+    const shouldCleanup = process.env.CLEANUP_PERSONAL_SPACE_MEMBERS === 'true';
+    
+    const personalSpaces = database
+      .prepare(
+        `SELECT c.id, c.name, c.owner_id
+         FROM circles c
+         WHERE c.is_personal = 1`
+      )
+      .all() as Array<{ id: string; name: string; owner_id: string }>;
+    
+    console.log(`[migration] 检查 ${personalSpaces.length} 个个人空间的成员清理`);
+    
+    for (const space of personalSpaces) {
+      const healMembers = database
+        .prepare(
+          `SELECT cm.user_id, u.nickname
+           FROM circle_members cm
+           JOIN users u ON u.id = cm.user_id
+           WHERE cm.circle_id = ?
+             AND cm.user_id != ?
+             AND cm.role = 'member'`
+        )
+        .all(space.id, space.owner_id) as Array<{
+        user_id: string;
+        nickname: string | null;
+      }>;
+      
+      if (healMembers.length === 0) {
+        continue;
+      }
+      
+      if (shouldCleanup) {
+        // 实际删除
+        const deleted = database
+          .prepare(
+            `DELETE FROM circle_members 
+             WHERE circle_id = ? 
+               AND user_id != ? 
+               AND role = 'member'`
+          )
+          .run(space.id, space.owner_id);
+        
+        console.log(
+          `[migration] ✓ 清理个人空间成员: ${space.id} (owner=${space.owner_id}，删除 ${deleted.changes} 个 heal 成员: ${healMembers.map((m) => m.nickname || m.user_id).join(', ')})`
+        );
+      } else {
+        // Dry-run：只打印
+        console.log(
+          `[migration] [DRY-RUN] 个人空间有 heal 成员: ${space.id} (owner=${space.owner_id}，将删除 ${healMembers.length} 个成员: ${healMembers.map((m) => m.nickname || m.user_id).join(', ')})`
+        );
+      }
+    }
+    
+    if (!shouldCleanup && personalSpaces.some(s => {
+      const members = database.prepare(
+        `SELECT COUNT(*) as count FROM circle_members 
+         WHERE circle_id = ? AND user_id != ? AND role = 'member'`
+      ).get(s.id, s.owner_id) as { count: number };
+      return members.count > 0;
+    })) {
+      console.log(`[migration] 要执行清理，请设置环境变量: CLEANUP_PERSONAL_SPACE_MEMBERS=true`);
+    }
+    
+    console.log(`[migration] 个人空间成员清理${shouldCleanup ? '完成' : '检查完成（dry-run）'}`);
   }
 
   migrateSchema(database);

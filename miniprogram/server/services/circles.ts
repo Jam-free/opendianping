@@ -846,6 +846,7 @@ export function listMemberShopsInSharedCircles(
 } {
   const db = getDb();
   
+  // 排除个人空间：只有圈主能看到个人空间的内容
   const sharedCircles = db
     .prepare(
       `SELECT DISTINCT c.id
@@ -854,9 +855,10 @@ export function listMemberShopsInSharedCircles(
        JOIN circles c ON c.id = cm1.circle_id
        WHERE cm1.user_id = ?
          AND cm2.user_id = ?
-         AND cm1.user_id != cm2.user_id`
+         AND cm1.user_id != cm2.user_id
+         AND (c.is_personal IS NULL OR c.is_personal = 0 OR c.owner_id = ?)`
     )
-    .all(viewerId, targetMemberId) as Array<{ id: string }>;
+    .all(viewerId, targetMemberId, viewerId) as Array<{ id: string }>;
 
   if (sharedCircles.length === 0) {
     return { items: [], sharedCircleCount: 0 };

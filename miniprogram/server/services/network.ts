@@ -120,6 +120,7 @@ export async function ensurePersonalNetwork(userId: string): Promise<{
 /**
  * 获取用户的美食网络：包括自己创建的圈子和加入的所有圈子的成员（去重）
  * 这样同一个圈子里的所有成员都能互相看见
+ * 排除个人空间：只有圈主能看到个人空间的内容
  */
 function getAllNetworkMembers(userId: string): Array<{
   id: string;
@@ -137,14 +138,24 @@ function getAllNetworkMembers(userId: string): Array<{
                WHERE f.user_id = u.id
                  AND f.visibility = 'circles'
                  AND (
-                   NOT EXISTS (SELECT 1 FROM circle_shares cs WHERE cs.favorite_id = f.id)
+                   (NOT EXISTS (SELECT 1 FROM circle_shares cs WHERE cs.favorite_id = f.id)
+                    AND EXISTS (
+                      SELECT 1 FROM circle_members cm1
+                      JOIN circle_members cm2 ON cm1.circle_id = cm2.circle_id
+                      JOIN circles c_check ON c_check.id = cm1.circle_id
+                      WHERE cm1.user_id = u.id
+                        AND cm2.user_id = ?
+                        AND (c_check.is_personal IS NULL OR c_check.is_personal = 0 OR c_check.owner_id = ?)
+                    ))
                    OR EXISTS (
                      SELECT 1 FROM circle_shares cs2
                      JOIN circle_members cm_owner ON cm_owner.circle_id = cs2.circle_id
                      JOIN circle_members cm_viewer ON cm_viewer.circle_id = cs2.circle_id
+                     JOIN circles c_vis ON c_vis.id = cs2.circle_id
                      WHERE cs2.favorite_id = f.id
                        AND cm_owner.user_id = u.id
                        AND cm_viewer.user_id = ?
+                       AND (c_vis.is_personal IS NULL OR c_vis.is_personal = 0 OR c_vis.owner_id = ?)
                    )
                  )) AS shared_shop_count
        FROM users u
@@ -153,12 +164,14 @@ function getAllNetworkMembers(userId: string): Array<{
            SELECT cm2.user_id
            FROM circle_members cm1
            JOIN circle_members cm2 ON cm1.circle_id = cm2.circle_id
+           JOIN circles c ON c.id = cm1.circle_id
            WHERE cm1.user_id = ?
              AND cm2.user_id != ?
+             AND (c.is_personal IS NULL OR c.is_personal = 0 OR c.owner_id = ?)
          )
        ORDER BY u.nickname`
     )
-    .all(userId, userId, userId, userId) as Array<{
+    .all(userId, userId, userId, userId, userId, userId, userId, userId) as Array<{
       id: string;
       nickname: string | null;
       avatar: string | null;
@@ -233,6 +246,7 @@ type FriendRecommender = {
 /** 
  * 在我的美食网络里，还有谁也共享了这家店（用来标「来自XX」）
  * 查询所有与当前用户在同一圈子中的成员
+ * 排除个人空间：只有圈主能看到个人空间的内容
  */
 function findFriendRecommenders(
   userId: string,
@@ -252,24 +266,36 @@ function findFriendRecommenders(
            SELECT cm2.user_id
            FROM circle_members cm1
            JOIN circle_members cm2 ON cm1.circle_id = cm2.circle_id
+           JOIN circles c ON c.id = cm1.circle_id
            WHERE cm1.user_id = ?
              AND cm2.user_id != ?
+             AND (c.is_personal IS NULL OR c.is_personal = 0 OR c.owner_id = ?)
          )
          AND (
-           NOT EXISTS (SELECT 1 FROM circle_shares cs WHERE cs.favorite_id = f.id)
+           (NOT EXISTS (SELECT 1 FROM circle_shares cs WHERE cs.favorite_id = f.id)
+            AND EXISTS (
+              SELECT 1 FROM circle_members cm1
+              JOIN circle_members cm2 ON cm1.circle_id = cm2.circle_id
+              JOIN circles c_check ON c_check.id = cm1.circle_id
+              WHERE cm1.user_id = f.user_id
+                AND cm2.user_id = ?
+                AND (c_check.is_personal IS NULL OR c_check.is_personal = 0 OR c_check.owner_id = ?)
+            ))
            OR EXISTS (
              SELECT 1 FROM circle_shares cs2
              JOIN circle_members cm_owner ON cm_owner.circle_id = cs2.circle_id
              JOIN circle_members cm_viewer ON cm_viewer.circle_id = cs2.circle_id
+             JOIN circles c_vis ON c_vis.id = cs2.circle_id
              WHERE cs2.favorite_id = f.id
                AND cm_owner.user_id = f.user_id
                AND cm_viewer.user_id = ?
+               AND (c_vis.is_personal IS NULL OR c_vis.is_personal = 0 OR c_vis.owner_id = ?)
            )
          )
        ORDER BY CASE WHEN f.user_id = ? THEN 0 ELSE 1 END, f.created_at ASC
        LIMIT 3`
     )
-    .all(shopId, userId, userId, userId, userId, preferredUserId || '') as FriendRecommender[];
+    .all(shopId, userId, userId, userId, userId, userId, userId, userId, userId, preferredUserId || '') as FriendRecommender[];
   return rows;
 }
 
@@ -1626,6 +1652,7 @@ export async function updateAgentShop(
 export async function listAgentShops(userId: string) {
   await ensurePersonalNetwork(userId);
   const mine = await listMyShops(userId);
+  // 排除个人空间：只有圈主能看到个人空间的内容
   const friendRows = getDb()
     .prepare(
       `SELECT DISTINCT
@@ -1642,20 +1669,32 @@ export async function listAgentShops(userId: string) {
            SELECT cm2.user_id
            FROM circle_members cm1
            JOIN circle_members cm2 ON cm1.circle_id = cm2.circle_id
+           JOIN circles c ON c.id = cm1.circle_id
            WHERE cm1.user_id = ?
              AND cm2.user_id != ?
+             AND (c.is_personal IS NULL OR c.is_personal = 0 OR c.owner_id = ?)
          )
          AND (
-           NOT EXISTS (SELECT 1 FROM circle_shares cs WHERE cs.favorite_id = f.id)
+           (NOT EXISTS (SELECT 1 FROM circle_shares cs WHERE cs.favorite_id = f.id)
+            AND EXISTS (
+              SELECT 1 FROM circle_members cm1
+              JOIN circle_members cm2 ON cm1.circle_id = cm2.circle_id
+              JOIN circles c_check ON c_check.id = cm1.circle_id
+              WHERE cm1.user_id = f.user_id
+                AND cm2.user_id = ?
+                AND (c_check.is_personal IS NULL OR c_check.is_personal = 0 OR c_check.owner_id = ?)
+            ))
            OR EXISTS (
              SELECT 1 FROM circle_shares cs2
              JOIN circle_members cm_viewer ON cm_viewer.circle_id = cs2.circle_id
+             JOIN circles c_vis ON c_vis.id = cs2.circle_id
              WHERE cs2.favorite_id = f.id
                AND cm_viewer.user_id = ?
+               AND (c_vis.is_personal IS NULL OR c_vis.is_personal = 0 OR c_vis.owner_id = ?)
            )
          )`
     )
-    .all(userId, userId, userId, userId) as Array<Record<string, unknown>>;
+    .all(userId, userId, userId, userId, userId, userId, userId, userId) as Array<Record<string, unknown>>;
 
   return {
     mine: mine.items.map((s) => toAgentMineShop(s)),

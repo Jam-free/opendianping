@@ -138,6 +138,37 @@ describe('圈子成员互相可见', () => {
       [userB.user.id, userC.user.id].sort()
     );
   });
+
+  test('B 和 C 加入 A 的圈子后，B 可以看到 C 的店铺', async () => {
+    const userA = createSessionForOpenId('user_a_see_shops');
+    const userB = createSessionForOpenId('user_b_see_shops');
+    const userC = createSessionForOpenId('user_c_see_shops');
+
+    const circleA = await circles.createCircle(userA.user.id, 'A的美食网');
+    await circles.joinCircle(userB.user.id, circleA.id, circleA.inviteToken);
+    await circles.joinCircle(userC.user.id, circleA.id, circleA.inviteToken);
+
+    const shopIdC = uuidv4();
+    const db = getDb();
+
+    db.prepare(
+      `INSERT INTO shops (id, source_type, source_shop_id, amap_poi_id, raw_name,
+       adcode, category, district, city, address, avg_price, lat, lng,
+       source_url, head_img, phone, display_cache_policy)
+       VALUES (?, 'locate', NULL, NULL, ?, NULL, '咖啡', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'minimal')`
+    ).run(shopIdC, 'C的咖啡店');
+
+    db.prepare(
+      `INSERT INTO favorites (id, user_id, shop_id, note, visibility, created_at)
+       VALUES (?, ?, ?, 'C的推荐', 'circles', datetime('now'))`
+    ).run(uuidv4(), userC.user.id, shopIdC);
+
+    const bShops = await network.listAgentShops(userB.user.id);
+
+    const cShopInB = bShops.friendsShared.find((s: any) => s.name === 'C的咖啡店');
+    expect(cShopInB).toBeDefined();
+    expect(cShopInB.from_friend).toBe(null);
+  });
 });
 
 /**
@@ -154,7 +185,7 @@ describe('店铺图片显示规则', () => {
     closeDb();
   });
 
-  test('列表和详情页只使用店铺自己的 head_img，不使用其他记录的图片', async () => {
+  test('优先显示用户自己上传的照片，不显示其他用户的照片', async () => {
     const userA = createSessionForOpenId('user_img_a');
     const userB = createSessionForOpenId('user_img_b');
 
@@ -170,26 +201,53 @@ describe('店铺图片显示规则', () => {
        source_url, head_img, phone, display_cache_policy)
        VALUES (?, 'dianping_album', '12345', 'amap_123', '测试餐厅',
        NULL, '火锅', '朝阳区', '北京', '测试地址', '100', 39.9, 116.4,
-       NULL, '/images/shop_correct.jpg', NULL, 'minimal')`
+       NULL, '/images/shop_storefront.jpg', NULL, 'minimal')`
     ).run(shopId);
 
     db.prepare(
       `INSERT INTO favorites (id, user_id, shop_id, note, visibility, created_at, photo_url)
-       VALUES (?, ?, ?, '很好吃', 'circles', datetime('now'), '/images/user_wrong.jpg')`
+       VALUES (?, ?, ?, '很好吃', 'circles', datetime('now'), '/images/user_a_dish.jpg')`
     ).run(uuidv4(), userA.user.id, shopId);
 
     db.prepare(
       `INSERT INTO favorites (id, user_id, shop_id, note, visibility, created_at, photo_url)
-       VALUES (?, ?, ?, '推荐', 'circles', datetime('now'), '/images/another_wrong.jpg')`
+       VALUES (?, ?, ?, '推荐', 'circles', datetime('now'), '/images/user_b_dish.jpg')`
     ).run(uuidv4(), userB.user.id, shopId);
 
     const myShops = await network.listMyShops(userA.user.id);
     const shopItem = myShops.items.find((s) => s.shopId === shopId);
 
     expect(shopItem).toBeDefined();
-    expect(shopItem!.headImg).toBe('/images/shop_correct.jpg');
-    expect(shopItem!.headImg).not.toContain('user_wrong');
-    expect(shopItem!.headImg).not.toContain('another_wrong');
+    expect(shopItem!.headImg).toBe('/images/user_a_dish.jpg');
+    expect(shopItem!.headImg).not.toContain('user_b');
+    expect(shopItem!.headImg).not.toContain('storefront');
+  });
+
+  test('没有自己的照片时使用店铺的门脸图', async () => {
+    const userA = createSessionForOpenId('user_img_fallback');
+
+    const shopId = uuidv4();
+    const db = getDb();
+
+    db.prepare(
+      `INSERT INTO shops (id, source_type, source_shop_id, amap_poi_id, raw_name,
+       adcode, category, district, city, address, avg_price, lat, lng,
+       source_url, head_img, phone, display_cache_policy)
+       VALUES (?, 'dianping_album', '12346', 'amap_124', '测试餐厅2',
+       NULL, '日料', '海淀区', '北京', '测试地址2', '150', 39.95, 116.35,
+       NULL, '/images/shop_storefront2.jpg', NULL, 'minimal')`
+    ).run(shopId);
+
+    db.prepare(
+      `INSERT INTO favorites (id, user_id, shop_id, note, visibility, created_at)
+       VALUES (?, ?, ?, '不错', 'circles', datetime('now'))`
+    ).run(uuidv4(), userA.user.id, shopId);
+
+    const myShops = await network.listMyShops(userA.user.id);
+    const shopItem = myShops.items.find((s) => s.shopId === shopId);
+
+    expect(shopItem).toBeDefined();
+    expect(shopItem!.headImg).toBe('/images/shop_storefront2.jpg');
   });
 
   test('没有店铺图片时使用品类占位图', async () => {

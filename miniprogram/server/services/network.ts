@@ -55,10 +55,16 @@ function detectPoiKeyCollisions(userId: string): Array<{
  * 首次进入自动确保用户拥有「我的美食网」。
  * 产品层不展示「创建圈子」，只复用 circles 表做邀请与共享。
  * 
- * 优先返回用户自己创建的圈子。如果用户没有创建过圈子但已加入其他圈子，
- * 则自动创建一个新圈子。只有在用户既没有创建也没有加入任何圈子时，才创建新圈子。
+ * 只有在用户既没有创建也没有加入任何圈子时，才创建新的个人圈子。
+ * 如果用户已经加入了其他圈子，则不自动创建，返回 null。
  */
-export async function ensurePersonalNetwork(userId: string) {
+export async function ensurePersonalNetwork(userId: string): Promise<{
+  id: string;
+  name: string;
+  inviteToken: string;
+  tokenExpiresAt: string;
+  memberCount: number;
+} | null> {
   const db = getDb();
   const owned = db
     .prepare(
@@ -98,14 +104,7 @@ export async function ensurePersonalNetwork(userId: string) {
     .get(userId) as { count: number };
 
   if (hasJoined.count > 0) {
-    const created = await createCircle(userId, PERSONAL_NETWORK_NAME);
-    return {
-      id: created.id,
-      name: created.name,
-      inviteToken: created.inviteToken,
-      tokenExpiresAt: created.tokenExpiresAt,
-      memberCount: 1,
-    };
+    return null;
   }
 
   const created = await createCircle(userId, PERSONAL_NETWORK_NAME);
@@ -190,15 +189,17 @@ function getAllNetworkMembers(userId: string): Array<{
  */
 export async function listFoodFriends(userId: string) {
   const network = await ensurePersonalNetwork(userId);
-  healInboundFriendships(userId, network.id);
+  if (network) {
+    healInboundFriendships(userId, network.id);
+  }
 
   const allMembers = getAllNetworkMembers(userId);
 
   const refreshed = await ensurePersonalNetwork(userId);
   return {
-    networkId: refreshed.id,
-    inviteToken: refreshed.inviteToken,
-    tokenExpiresAt: refreshed.tokenExpiresAt,
+    networkId: refreshed?.id || '',
+    inviteToken: refreshed?.inviteToken || '',
+    tokenExpiresAt: refreshed?.tokenExpiresAt || '',
     memberCount: allMembers.length + 1,
     friends: allMembers.map((m) => ({
       id: m.id,
@@ -255,7 +256,6 @@ type FriendRecommender = {
  */
 function findFriendRecommenders(
   userId: string,
-  networkId: string,
   shopId: string,
   preferredUserId?: string | null
 ): FriendRecommender[] {
@@ -368,13 +368,17 @@ function toAgentMineShop(s: {
  * Tab2：我导入的 + 我记下的 + Agent 记下的 + 我从好友清单收藏的店。
  * origin: imported | checkin | from_friend | agent
  * wishlist=1 →「心心念念」（很想去），熄心不删店。
+ * 
+ * 推荐人查找范围：所有我加入的圈子（不只是我拥有的圈子）
  */
 export async function listMyShops(
   userId: string,
   opts?: { lat?: number; lng?: number; userCity?: string }
 ) {
   const network = await ensurePersonalNetwork(userId);
-  healInboundFriendships(userId, network.id);
+  if (network) {
+    healInboundFriendships(userId, network.id);
+  }
 
   const collisions = detectPoiKeyCollisions(userId);
   if (collisions.length > 0) {
@@ -435,7 +439,7 @@ export async function listMyShops(
       });
     }
     
-    const head = r.head_img;
+    const head = r.photo_url || r.head_img;
     const status = deriveShopStatus(r);
 
     let sourceTag = '';
@@ -445,7 +449,6 @@ export async function listMyShops(
     if (r.origin === 'from_friend' || r.origin === 'agent') {
       collectors = findFriendRecommenders(
         userId,
-        network.id,
         r.shop_id,
         r.from_user_id
       );
@@ -551,27 +554,61 @@ export async function createCheckin(
   const wishlist = input.wishlist ? 1 : 0;
 
   const db = getDb();
-  const shopId = uuidv4();
+  
+  let shopId: string;
+  if (poiId) {
+    const existing = db
+      .prepare(`SELECT id FROM shops WHERE amap_poi_id = ? LIMIT 1`)
+      .get(poiId) as { id: string } | undefined;
+    shopId = existing?.id || uuidv4();
+  } else {
+    shopId = uuidv4();
+  }
+  
   const favId = uuidv4();
   const createdAt = nowIso();
 
   const tx = db.transaction(() => {
-    db.prepare(
-      `INSERT INTO shops (
-         id, source_type, source_shop_id, amap_poi_id, raw_name, adcode,
-         category, district, city, address, avg_price, lat, lng,
-         source_url, head_img, phone, display_cache_policy
-       ) VALUES (?, 'locate', NULL, ?, ?, NULL, NULL, NULL, NULL, ?, NULL, ?, ?, NULL, ?, ?, 'minimal')`
-    ).run(
-      shopId,
-      poiId,
-      name,
-      input.address || null,
-      input.lat,
-      input.lng,
-      photoUrl,
-      phone
-    );
+    if (poiId) {
+      const existing = db
+        .prepare(`SELECT id FROM shops WHERE amap_poi_id = ? LIMIT 1`)
+        .get(poiId) as { id: string } | undefined;
+      
+      if (!existing) {
+        db.prepare(
+          `INSERT INTO shops (
+             id, source_type, source_shop_id, amap_poi_id, raw_name, adcode,
+             category, district, city, address, avg_price, lat, lng,
+             source_url, head_img, phone, display_cache_policy
+           ) VALUES (?, 'locate', NULL, ?, ?, NULL, NULL, NULL, NULL, ?, NULL, ?, ?, NULL, ?, ?, 'minimal')`
+        ).run(
+          shopId,
+          poiId,
+          name,
+          input.address || null,
+          input.lat,
+          input.lng,
+          photoUrl,
+          phone
+        );
+      }
+    } else {
+      db.prepare(
+        `INSERT INTO shops (
+           id, source_type, source_shop_id, amap_poi_id, raw_name, adcode,
+           category, district, city, address, avg_price, lat, lng,
+           source_url, head_img, phone, display_cache_policy
+         ) VALUES (?, 'locate', NULL, NULL, ?, NULL, NULL, NULL, NULL, ?, NULL, ?, ?, NULL, ?, ?, 'minimal')`
+      ).run(
+        shopId,
+        name,
+        input.address || null,
+        input.lat,
+        input.lng,
+        photoUrl,
+        phone
+      );
+    }
 
     db.prepare(
       `INSERT INTO favorites (
@@ -762,12 +799,11 @@ export async function setWishlistByPoi(
     return { favoriteId: null as string | null, wishlist: false };
   }
 
-  const network = await ensurePersonalNetwork(userId);
+  await ensurePersonalNetwork(userId);
   const preferred =
     fromUserId && fromUserId !== userId ? fromUserId : undefined;
   const recs = findFriendRecommenders(
     userId,
-    network.id,
     shop.id,
     preferred || null
   );
@@ -1353,29 +1389,54 @@ export async function createAgentShop(
     };
   }
 
-  const shopId = uuidv4();
+  let shopId: string | undefined;
+  
+  if (parsed.sourceShopId) {
+    const bySource = db
+      .prepare(`SELECT id FROM shops WHERE source_shop_id = ? LIMIT 1`)
+      .get(parsed.sourceShopId) as { id: string } | undefined;
+    shopId = bySource?.id;
+  }
+  
+  if (!shopId && parsed.poiKey) {
+    const byAmap = db
+      .prepare(`SELECT id FROM shops WHERE amap_poi_id = ? LIMIT 1`)
+      .get(parsed.poiKey) as { id: string } | undefined;
+    shopId = byAmap?.id;
+  }
+  
+  if (!shopId) {
+    shopId = uuidv4();
+  }
+  
   const favId = uuidv4();
   const tx = db.transaction(() => {
-    db.prepare(
-      `INSERT INTO shops (
-         id, source_type, source_shop_id, amap_poi_id, raw_name, adcode,
-         category, district, city, address, avg_price, lat, lng,
-         source_url, head_img, phone, display_cache_policy
-       ) VALUES (?, 'agent', ?, ?, ?, NULL, ?, ?, ?, ?, NULL, ?, ?, ?, NULL, ?, 'minimal')`
-    ).run(
-      shopId,
-      parsed.sourceShopId,
-      parsed.poiKey,
-      name,
-      parsed.category,
-      parsed.district,
-      parsed.city,
-      parsed.address,
-      parsed.lat,
-      parsed.lng,
-      parsed.sourceUrl,
-      parsed.phone
-    );
+    const existingShop = db
+      .prepare(`SELECT id FROM shops WHERE id = ?`)
+      .get(shopId) as { id: string } | undefined;
+    
+    if (!existingShop) {
+      db.prepare(
+        `INSERT INTO shops (
+           id, source_type, source_shop_id, amap_poi_id, raw_name, adcode,
+           category, district, city, address, avg_price, lat, lng,
+           source_url, head_img, phone, display_cache_policy
+         ) VALUES (?, 'agent', ?, ?, ?, NULL, ?, ?, ?, ?, NULL, ?, ?, ?, NULL, ?, 'minimal')`
+      ).run(
+        shopId,
+        parsed.sourceShopId,
+        parsed.poiKey,
+        name,
+        parsed.category,
+        parsed.district,
+        parsed.city,
+        parsed.address,
+        parsed.lat,
+        parsed.lng,
+        parsed.sourceUrl,
+        parsed.phone
+      );
+    }
     db.prepare(
       `INSERT INTO favorites (
          id, user_id, shop_id, note, visibility, import_batch_id,
@@ -1560,9 +1621,12 @@ export async function updateAgentShop(
   return agentShopByFavoriteId(userId, existing.favorite_id);
 }
 
-/** Agent 可读可写本人店：本人收藏 + 美食网内好友共享店（去重） */
+/** 
+ * Agent 可读可写本人店：本人收藏 + 美食网内好友共享店（去重）
+ * 查询范围：所有用户加入的圈子（不只是拥有的圈子）
+ */
 export async function listAgentShops(userId: string) {
-  const network = await ensurePersonalNetwork(userId);
+  await ensurePersonalNetwork(userId);
   const mine = await listMyShops(userId);
   const friendRows = getDb()
     .prepare(
@@ -1570,13 +1634,20 @@ export async function listAgentShops(userId: string) {
               COALESCE(s.source_shop_id, s.amap_poi_id, s.id) AS poi_key,
               s.raw_name AS name, s.category, s.district, s.city, s.address,
               s.lat, s.lng, s.avg_price, u.nickname AS from_friend
-       FROM circle_members cm
-       JOIN favorites f ON f.user_id = cm.user_id AND f.visibility = 'circles'
+       FROM favorites f
        JOIN shops s ON s.id = f.shop_id
-       JOIN users u ON u.id = cm.user_id
-       WHERE cm.circle_id = ? AND cm.user_id != ?`
+       JOIN users u ON u.id = f.user_id
+       WHERE f.visibility = 'circles'
+         AND f.user_id != ?
+         AND f.user_id IN (
+           SELECT cm2.user_id
+           FROM circle_members cm1
+           JOIN circle_members cm2 ON cm1.circle_id = cm2.circle_id
+           WHERE cm1.user_id = ?
+             AND cm2.user_id != ?
+         )`
     )
-    .all(network.id, userId) as Array<Record<string, unknown>>;
+    .all(userId, userId, userId) as Array<Record<string, unknown>>;
 
   return {
     mine: mine.items.map((s) => toAgentMineShop(s)),

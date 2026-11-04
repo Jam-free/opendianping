@@ -24,7 +24,8 @@ Page({
     async bootstrap() {
         try {
             const list = await (0, api_1.request)('/api/circles');
-            const mine = (list.items || []).find((c) => c.id === this.data.circleId);
+            const circles = (list.items || []).filter((c) => !c.is_personal);
+            const mine = circles.find((c) => c.id === this.data.circleId);
             if (!mine) {
                 wx.showToast({ title: '你不在该圈内', icon: 'none' });
                 return;

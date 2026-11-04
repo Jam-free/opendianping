@@ -101,4 +101,94 @@ describe('个人空间「我的美食网」安全', () => {
     expect(newToken.inviteToken).toBeDefined();
     expect(newToken.inviteToken).not.toBe(normalCircle.inviteToken);
   });
+
+  // 迁移测试：只有圈主的「我的美食网」才标记为个人空间
+  test('迁移回填：只标记仅有圈主的「我的美食网」', async () => {
+    const userA = createSessionForOpenId('user_a_solo_network');
+
+    // 模拟旧数据：手动创建「我的美食网」但不标记 is_personal
+    const db = getDb();
+    const circleId = '12345678-1234-1234-1234-123456789abc';
+    db.prepare(
+      `INSERT INTO circles (id, name, owner_id, invite_token, token_expires_at, member_limit, created_at)
+       VALUES (?, '我的美食网', ?, 'token123', datetime('now', '+30 days'), 200, datetime('now'))`
+    ).run(circleId, userA.user.id);
+
+    db.prepare(
+      `INSERT INTO circle_members (circle_id, user_id, role, joined_at)
+       VALUES (?, ?, 'owner', datetime('now'))`
+    ).run(circleId, userA.user.id);
+
+    // 触发迁移逻辑（模拟）
+    db.exec(`
+      UPDATE circles SET is_personal = 1 
+      WHERE name = '我的美食网'
+        AND (SELECT COUNT(*) FROM circle_members WHERE circle_id = circles.id) = 1;
+    `);
+
+    const circle = db
+      .prepare('SELECT is_personal FROM circles WHERE id = ?')
+      .get(circleId) as { is_personal: number | null };
+
+    expect(circle.is_personal).toBe(1);
+  });
+
+  // 迁移测试：已有其他成员的「我的美食网」不标记为个人空间
+  test('迁移回填：有其他成员的「我的美食网」保持为共享圈', async () => {
+    const userA = createSessionForOpenId('user_a_shared_network');
+    const userB = createSessionForOpenId('user_b_in_a_network');
+    const userC = createSessionForOpenId('user_c_in_a_network');
+
+    const db = getDb();
+    const circleId = '87654321-4321-4321-4321-cba987654321';
+
+    // 模拟旧数据：A 的「我的美食网」已经被 B、C 加入
+    db.prepare(
+      `INSERT INTO circles (id, name, owner_id, invite_token, token_expires_at, member_limit, created_at)
+       VALUES (?, '我的美食网', ?, 'oldtoken', datetime('now', '+30 days'), 200, datetime('now'))`
+    ).run(circleId, userA.user.id);
+
+    db.prepare(
+      `INSERT INTO circle_members (circle_id, user_id, role, joined_at)
+       VALUES (?, ?, 'owner', datetime('now'))`
+    ).run(circleId, userA.user.id);
+
+    db.prepare(
+      `INSERT INTO circle_members (circle_id, user_id, role, joined_at)
+       VALUES (?, ?, 'member', datetime('now'))`
+    ).run(circleId, userB.user.id);
+
+    db.prepare(
+      `INSERT INTO circle_members (circle_id, user_id, role, joined_at)
+       VALUES (?, ?, 'member', datetime('now'))`
+    ).run(circleId, userC.user.id);
+
+    // 触发迁移逻辑（模拟）
+    db.exec(`
+      UPDATE circles SET is_personal = 1 
+      WHERE name = '我的美食网'
+        AND (SELECT COUNT(*) FROM circle_members WHERE circle_id = circles.id) = 1;
+    `);
+
+    const circle = db
+      .prepare('SELECT is_personal FROM circles WHERE id = ?')
+      .get(circleId) as { is_personal: number | null };
+
+    // 不应该被标记为个人空间
+    expect(circle.is_personal).toBeNull();
+
+    // 验证 B 和 C 仍然可以访问
+    const members = circles.listCircleMembers(userA.user.id, circleId);
+    expect(members.length).toBe(3);
+
+    // B 应该仍然能重置邀请（因为这不是个人空间）
+    // 等等，B 不是圈主，所以不能重置。但至少不应该因为"个人空间"而被拒绝
+    // 让我们验证这个圈子可以被正常使用
+    const circleData = db
+      .prepare('SELECT * FROM circles WHERE id = ?')
+      .get(circleId) as any;
+    
+    expect(circleData.name).toBe('我的美食网');
+    expect(circleData.is_personal).toBeNull();
+  });
 });

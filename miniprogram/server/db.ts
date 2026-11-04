@@ -160,8 +160,16 @@ function initSchema(database: Database.Database): void {
   
   if (!hasIsPersonal) {
     database.exec(`ALTER TABLE circles ADD COLUMN is_personal INTEGER;`);
-    // 回填：将「我的美食网」标记为个人空间
-    database.exec(`UPDATE circles SET is_personal = 1 WHERE name = '我的美食网';`);
+    // 回填：只标记真正的个人空间（没有其他成员加入的「我的美食网」）
+    // 如果已经有其他成员加入（不含圈主），说明被用作共享圈，不标记为个人空间
+    database.exec(`
+      UPDATE circles SET is_personal = 1 
+      WHERE name = '我的美食网'
+        AND owner_id IS NOT NULL
+        AND (SELECT COUNT(*) FROM circle_members cm 
+             WHERE cm.circle_id = circles.id 
+               AND cm.user_id != circles.owner_id) = 0;
+    `);
   }
 
   migrateSchema(database);

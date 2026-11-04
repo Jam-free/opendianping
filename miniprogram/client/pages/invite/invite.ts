@@ -15,7 +15,7 @@ Page({
   async load() {
     try {
       const res = await request<{ items: any[] }>('/api/circles');
-      const items = res.items || [];
+      const items = (res.items || []).filter((c) => !c.is_personal);
       let activeId = getActiveCircleId();
       let circle = items.find((c) => c.id === activeId) || items[0];
       if (circle && !activeId) {

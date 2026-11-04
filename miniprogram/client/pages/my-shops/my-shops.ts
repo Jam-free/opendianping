@@ -168,6 +168,22 @@ Page({
         }>;
       }>('/api/me/network');
       setActiveCircleId(net.networkId);
+      
+      // 获取所有圈子，筛选非个人空间用于分享
+      const circlesData = await request<{ items: any[] }>('/api/circles');
+      const shareableCircles = (circlesData.items || []).filter(
+        (c: any) => !c.is_personal && c.invite_token && c.token_expires_at
+      );
+      
+      let shareCircleId = '';
+      let shareToken = '';
+      
+      if (shareableCircles.length > 0) {
+        // 使用第一个可分享圈子
+        shareCircleId = shareableCircles[0].id;
+        shareToken = shareableCircles[0].invite_token;
+      }
+      
       // 吃货排行：共享店数多的靠前
       const friends = (net.friends || [])
         .map((f) => ({
@@ -178,8 +194,8 @@ Page({
         .sort((a, b) => b.sharedShopCount - a.sharedShopCount);
       this.setData({
         friends,
-        networkId: net.networkId,
-        inviteToken: net.inviteToken,
+        networkId: shareCircleId || net.networkId,
+        inviteToken: shareToken,
         friendsLoading: false,
         loginError: '',
       });
@@ -257,9 +273,14 @@ Page({
     });
   },
 
-  onShareAppMessage() {
+  async onShareAppMessage() {
     const { networkId, inviteToken } = this.data;
     if (!networkId || !inviteToken) {
+      wx.showModal({
+        title: '还没有可分享的圈子',
+        content: '请先创建一个圈子，邀请朋友一起共享收藏',
+        showCancel: false,
+      });
       return {
         title: '我和我爱吃的朋友们 · 一起收藏好店',
         path: '/pages/my-shops/my-shops',

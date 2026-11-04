@@ -67,6 +67,12 @@
         <text class="k muted">我的备注</text>
         <text class="v">{{shop.myNote}}</text>
       </view>
+      <block wx:for="{{shop.collectors}}" wx:key="userId" wx:if="{{item.note}}">
+        <view class="kv hairline">
+          <text class="k muted">{{item.nickname}}的备注</text>
+          <text class="v">{{item.note}}</text>
+        </view>
+      </block>
       <view class="kv hairline" wx:if="{{shop.avgPrice}}">
         <text class="k muted">人均</text>
         <text>{{shop.avgPrice}}</text>

@@ -224,6 +224,78 @@ describe('圈子成员互相可见', () => {
     expect(fireHotpot!.note).toBe('C的火锅备注');
     expect(fireHotpot!.recommendersLine).toContain('来自小C');
   });
+
+  test('B 不能看到 C 只分享给 D 圈子的店铺', async () => {
+    const userB = createSessionForOpenId('user_b_multi_circle');
+    const userC = createSessionForOpenId('user_c_multi_circle');
+    const userD = createSessionForOpenId('user_d_multi_circle');
+    const userE = createSessionForOpenId('user_e_multi_circle');
+
+    getDb()
+      .prepare(`UPDATE users SET nickname = ? WHERE id = ?`)
+      .run('小C', userC.user.id);
+
+    const circleBD = await circles.createCircle(userB.user.id, 'B和D的圈');
+    const circleCD = await circles.createCircle(userC.user.id, 'C和D的圈');
+    const circleBCE = await circles.createCircle(userE.user.id, 'B、C和E的圈');
+
+    await circles.joinCircle(userD.user.id, circleBD.id, circleBD.inviteToken);
+    await circles.joinCircle(userD.user.id, circleCD.id, circleCD.inviteToken);
+    await circles.joinCircle(userB.user.id, circleBCE.id, circleBCE.inviteToken);
+    await circles.joinCircle(userC.user.id, circleBCE.id, circleBCE.inviteToken);
+
+    const db = getDb();
+    const shopOnlyCD = uuidv4();
+    const shopBCE = uuidv4();
+
+    db.prepare(
+      `INSERT INTO shops (id, source_type, source_shop_id, amap_poi_id, raw_name,
+       adcode, category, district, city, address, avg_price, lat, lng,
+       source_url, head_img, phone, display_cache_policy)
+       VALUES (?, 'locate', NULL, NULL, ?, NULL, '川菜', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'minimal')`
+    ).run(shopOnlyCD, 'C只给D圈的店');
+
+    db.prepare(
+      `INSERT INTO shops (id, source_type, source_shop_id, amap_poi_id, raw_name,
+       adcode, category, district, city, address, avg_price, lat, lng,
+       source_url, head_img, phone, display_cache_policy)
+       VALUES (?, 'locate', NULL, NULL, ?, NULL, '粤菜', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'minimal')`
+    ).run(shopBCE, 'C分享到BCE圈的店');
+
+    const favOnlyCD = uuidv4();
+    const favBCE = uuidv4();
+
+    db.prepare(
+      `INSERT INTO favorites (id, user_id, shop_id, note, visibility, created_at)
+       VALUES (?, ?, ?, 'C只给CD圈的备注', 'circles', datetime('now'))`
+    ).run(favOnlyCD, userC.user.id, shopOnlyCD);
+
+    db.prepare(
+      `INSERT INTO circle_shares (circle_id, favorite_id)
+       VALUES (?, ?)`
+    ).run(circleCD.id, favOnlyCD);
+
+    db.prepare(
+      `INSERT INTO favorites (id, user_id, shop_id, note, visibility, created_at)
+       VALUES (?, ?, ?, 'C分享到BCE圈的备注', 'circles', datetime('now'))`
+    ).run(favBCE, userC.user.id, shopBCE);
+
+    db.prepare(
+      `INSERT INTO circle_shares (circle_id, favorite_id)
+       VALUES (?, ?)`
+    ).run(circleBCE.id, favBCE);
+
+    const result = circles.listMemberShopsInSharedCircles(userB.user.id, userC.user.id);
+    const agentShops = await network.listAgentShops(userB.user.id);
+
+    expect(result.items.length).toBe(1);
+    const shopNames = result.items.map((s) => s.name);
+    expect(shopNames).toContain('C分享到BCE圈的店');
+    expect(shopNames).not.toContain('C只给D圈的店');
+
+    const friendShopNames = agentShops.friendsShared.map((s: any) => s.name);
+    expect(friendShopNames).not.toContain('C只给D圈的店');
+  });
 });
 
 /**

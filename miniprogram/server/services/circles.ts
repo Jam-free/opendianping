@@ -413,14 +413,14 @@ function queryCircleShopRows(
     WHERE cm.circle_id = ?
       AND f.visibility = 'circles'
       AND (
-        NOT EXISTS (SELECT 1 FROM circle_shares cs WHERE cs.circle_id = ?)
+        NOT EXISTS (SELECT 1 FROM circle_shares cs WHERE cs.favorite_id = f.id)
         OR EXISTS (
           SELECT 1 FROM circle_shares cs2
           WHERE cs2.circle_id = ? AND cs2.favorite_id = f.id
         )
       )
   `;
-  params.push(circleId, circleId);
+  params.push(circleId);
 
   if (filters?.city) {
     sql += ` AND s.city = ?`;
@@ -652,6 +652,91 @@ export function getCircleShopDetail(
   return shop;
 }
 
+/**
+ * 获取店铺详情（从共享圈子中）
+ * 用于 B 查看 C 分享的店铺详情
+ */
+export function getMemberShopDetailInSharedCircles(
+  viewerId: string,
+  targetMemberId: string,
+  poiKey: string,
+  opts?: { lat?: number; lng?: number; userCity?: string }
+): AggregatedCircleShop | null {
+  const db = getDb();
+  
+  const sharedCircles = db
+    .prepare(
+      `SELECT DISTINCT c.id
+       FROM circle_members cm1
+       JOIN circle_members cm2 ON cm1.circle_id = cm2.circle_id
+       JOIN circles c ON c.id = cm1.circle_id
+       WHERE cm1.user_id = ?
+         AND cm2.user_id = ?
+         AND cm1.user_id != cm2.user_id`
+    )
+    .all(viewerId, targetMemberId) as Array<{ id: string }>;
+
+  if (sharedCircles.length === 0) {
+    return null;
+  }
+
+  const allRows: CircleShopRow[] = [];
+  for (const circle of sharedCircles) {
+    const rows = queryCircleShopRows(circle.id);
+    allRows.push(...rows);
+  }
+
+  const shopRows = allRows.filter((r) => r.poi_key === poiKey);
+  if (shopRows.length === 0) return null;
+
+  const aggregated = aggregateCircleShops(shopRows);
+  const shop = aggregated[0];
+  if (!shop) return null;
+
+  if (
+    opts?.lat != null &&
+    opts?.lng != null &&
+    shop.lat != null &&
+    shop.lng != null
+  ) {
+    const meters = haversineMeters(opts.lat, opts.lng, shop.lat, shop.lng);
+    shop.distanceMeters = meters;
+    shop.distanceLabel = formatDistanceLabel(meters, {
+      userCity: opts.userCity,
+      shopCity: shop.city,
+    });
+  }
+
+  const mine = shop.collectors.find((c) => c.userId === viewerId);
+  if (mine) {
+    shop.myFavoriteId = mine.favoriteId;
+    shop.myNote = mine.note || '';
+  } else {
+    shop.myNote = '';
+  }
+
+  const myWish = db
+    .prepare(
+      `SELECT f.wishlist
+       FROM favorites f
+       JOIN shops s ON s.id = f.shop_id
+       WHERE f.user_id = ?
+         AND COALESCE(s.source_shop_id, s.amap_poi_id, s.id) = ?
+       LIMIT 1`
+    )
+    .get(viewerId, poiKey) as { wishlist: number } | undefined;
+  shop.wishlist = Boolean(myWish?.wishlist);
+
+  shop.collectors = shop.collectors.filter((c) => c.userId !== viewerId);
+  shop.collectorCount = shop.collectors.length;
+  shop.recommendersLine = formatRecommendersLine(
+    shop.collectors,
+    shop.collectorCount
+  );
+
+  return shop;
+}
+
 export function listCircleMembers(userId: string, circleId: string) {
   assertMember(circleId, userId);
   return getDb()
@@ -663,7 +748,7 @@ export function listCircleMembers(userId: string, circleId: string) {
                 WHERE f.user_id = u.id
                   AND f.visibility = 'circles'
                   AND (
-                    NOT EXISTS (SELECT 1 FROM circle_shares cs WHERE cs.circle_id = ?)
+                    NOT EXISTS (SELECT 1 FROM circle_shares cs WHERE cs.favorite_id = f.id)
                     OR EXISTS (
                       SELECT 1 FROM circle_shares cs2
                       WHERE cs2.circle_id = ? AND cs2.favorite_id = f.id
@@ -675,7 +760,7 @@ export function listCircleMembers(userId: string, circleId: string) {
        WHERE cm.circle_id = ?
        ORDER BY CASE cm.role WHEN 'owner' THEN 0 ELSE 1 END, cm.joined_at`
     )
-    .all(circleId, circleId, circleId);
+    .all(circleId, circleId);
 }
 
 /** 从圈友店里加进自己的私藏；记下推荐人，私藏列表可显示「XX推荐」 */

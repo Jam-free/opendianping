@@ -41,6 +41,7 @@ function timeLabel(iso: string): string {
 Page({
   data: {
     circleId: '',
+    memberId: '',
     poiKey: '',
     shop: null as any,
     dist: { main: '—', unit: '', na: true },
@@ -62,6 +63,7 @@ Page({
   onLoad(query: Record<string, string | undefined>) {
     this.setData({
       circleId: query.c || '',
+      memberId: query.m || '',
       poiKey: decodeURIComponent(query.p || ''),
       fromUserId: query.from ? decodeURIComponent(query.from) : '',
     });
@@ -80,9 +82,15 @@ Page({
       lng: loc ? loc.lng : undefined,
     });
     const qs = query ? `?${query}` : '';
-    const res = await request<{ shop: any }>(
-      `/api/circles/${this.data.circleId}/shops/${encodeURIComponent(this.data.poiKey)}${qs}`
-    );
+    
+    let url: string;
+    if (this.data.memberId) {
+      url = `/api/members/${encodeURIComponent(this.data.memberId)}/shops/${encodeURIComponent(this.data.poiKey)}${qs}`;
+    } else {
+      url = `/api/circles/${this.data.circleId}/shops/${encodeURIComponent(this.data.poiKey)}${qs}`;
+    }
+    
+    const res = await request<{ shop: any }>(url);
     const shop = res.shop;
     const parts = [shop.category, shop.district].filter(Boolean);
     const labels: Record<string, string> = {

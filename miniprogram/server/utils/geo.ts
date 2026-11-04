@@ -47,7 +47,7 @@ export function formatRecommendersLine(
     return `来自${shown[0]}等 ${total} 人`;
   }
   if (shown.length >= 2) {
-    return `${shown[0]}、${shown[1]} 推荐`;
+    return `来自${shown[0]}、${shown[1]}`;
   }
-  return `${total} 人推荐`;
+  return `来自 ${total} 人`;
 }

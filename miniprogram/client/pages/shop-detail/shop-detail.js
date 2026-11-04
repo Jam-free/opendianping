@@ -38,6 +38,7 @@ function timeLabel(iso) {
 Page({
     data: {
         circleId: '',
+        memberId: '',
         poiKey: '',
         shop: null,
         dist: { main: '—', unit: '', na: true },
@@ -58,6 +59,7 @@ Page({
     onLoad(query) {
         this.setData({
             circleId: query.c || '',
+            memberId: query.m || '',
             poiKey: decodeURIComponent(query.p || ''),
             fromUserId: query.from ? decodeURIComponent(query.from) : '',
         });
@@ -75,7 +77,14 @@ Page({
             lng: loc ? loc.lng : undefined,
         });
         const qs = query ? `?${query}` : '';
-        const res = await (0, api_1.request)(`/api/circles/${this.data.circleId}/shops/${encodeURIComponent(this.data.poiKey)}${qs}`);
+        let url;
+        if (this.data.memberId) {
+            url = `/api/members/${encodeURIComponent(this.data.memberId)}/shops/${encodeURIComponent(this.data.poiKey)}${qs}`;
+        }
+        else {
+            url = `/api/circles/${this.data.circleId}/shops/${encodeURIComponent(this.data.poiKey)}${qs}`;
+        }
+        const res = await (0, api_1.request)(url);
         const shop = res.shop;
         const parts = [shop.category, shop.district].filter(Boolean);
         const labels = {
@@ -84,14 +93,28 @@ Page({
             text: '文本识别',
             locate: '记美食',
             photo: '拍照记下',
+            agent: 'AI 帮你记下',
         };
+        let sourceLabel = labels[shop.sourceType] || '未知';
+        if (shop.sourceType === 'agent' && shop.collectors && shop.collectors.length > 0) {
+            const recommender = shop.collectors[0];
+            if (recommender && recommender.nickname) {
+                sourceLabel = `来自${recommender.nickname}`;
+            }
+        }
+        else if (shop.collectors && shop.collectors.length > 0) {
+            const recommender = shop.collectors[0];
+            if (recommender && recommender.nickname) {
+                sourceLabel = `来自${recommender.nickname}`;
+            }
+        }
         wx.setNavigationBarTitle({ title: shop.name || '店铺详情' });
         this.setData({
             shop,
             dist: (0, format_1.splitDistance)(shop.distanceLabel),
             metaLine: parts.join(' · '),
             displaySrc: (0, media_1.shopImageSrc)(config_1.API_BASE, shop.headImgProxy),
-            sourceLabel: labels[shop.sourceType] || shop.sourceType || '未知',
+            sourceLabel,
             dianpingUrl: buildDianpingUrl(shop),
             wishlist: Boolean(shop.wishlist),
             canEditCheckin: (shop.sourceType === 'locate' || shop.sourceType === 'photo') &&

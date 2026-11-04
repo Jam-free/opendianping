@@ -1633,7 +1633,8 @@ export async function listAgentShops(userId: string) {
       `SELECT DISTINCT
               COALESCE(s.source_shop_id, s.amap_poi_id, s.id) AS poi_key,
               s.raw_name AS name, s.category, s.district, s.city, s.address,
-              s.lat, s.lng, s.avg_price, u.nickname AS from_friend
+              s.lat, s.lng, s.avg_price, u.nickname AS from_friend,
+              f.note
        FROM favorites f
        JOIN shops s ON s.id = f.shop_id
        JOIN users u ON u.id = f.user_id
@@ -1645,9 +1646,18 @@ export async function listAgentShops(userId: string) {
            JOIN circle_members cm2 ON cm1.circle_id = cm2.circle_id
            WHERE cm1.user_id = ?
              AND cm2.user_id != ?
+         )
+         AND (
+           NOT EXISTS (SELECT 1 FROM circle_shares cs WHERE cs.favorite_id = f.id)
+           OR EXISTS (
+             SELECT 1 FROM circle_shares cs2
+             JOIN circle_members cm_viewer ON cm_viewer.circle_id = cs2.circle_id
+             WHERE cs2.favorite_id = f.id
+               AND cm_viewer.user_id = ?
+           )
          )`
     )
-    .all(userId, userId, userId) as Array<Record<string, unknown>>;
+    .all(userId, userId, userId, userId) as Array<Record<string, unknown>>;
 
   return {
     mine: mine.items.map((s) => toAgentMineShop(s)),

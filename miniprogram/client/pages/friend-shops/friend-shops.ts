@@ -67,15 +67,12 @@ Page({
 
   openShop(e: WechatMiniprogram.CustomEvent) {
     const shop = e?.detail?.shop;
-    if (!shop?.poiKey || !this.data.circleId) {
+    if (!shop?.poiKey || !this.data.memberId) {
       wx.showToast({ title: '店铺信息还没准备好', icon: 'none' });
       return;
     }
-    const from = this.data.memberId
-      ? `&from=${encodeURIComponent(this.data.memberId)}`
-      : '';
     wx.navigateTo({
-      url: `/pages/shop-detail/shop-detail?c=${this.data.circleId}&p=${encodeURIComponent(shop.poiKey)}${from}`,
+      url: `/pages/shop-detail/shop-detail?m=${encodeURIComponent(this.data.memberId)}&p=${encodeURIComponent(shop.poiKey)}`,
     });
   },
 });

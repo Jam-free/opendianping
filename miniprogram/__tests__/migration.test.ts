@@ -127,7 +127,7 @@ describe('is_personal migration and backfill', () => {
     expect(circle.is_personal).not.toBe(1);
   });
 
-  it('应该标记只有 heal 添加成员的「我的美食网」为个人空间', () => {
+  it('不应该标记有 heal 成员的「我的美食网」为个人空间（保守规则）', () => {
     const now = new Date().toISOString();
     
     // 创建用户 X 和 M
@@ -169,16 +169,16 @@ describe('is_personal migration and backfill', () => {
     // 运行迁移
     runMigration(db);
 
-    // 验证：X 的个人空间应该被标记（M 是 heal 添加的）
-    const circleX = db.prepare('SELECT is_personal FROM circles WHERE id = ?').get('circle-x-personal') as { is_personal: number };
-    expect(circleX.is_personal).toBe(1);
+    // 验证：X 的个人空间不应该被标记（有成员，保守规则）
+    const circleX = db.prepare('SELECT is_personal FROM circles WHERE id = ?').get('circle-x-personal') as { is_personal: number | null };
+    expect(circleX.is_personal).not.toBe(1);
     
     // M 的圈子不应该被标记（名字不是「我的美食网」）
     const circleM = db.prepare('SELECT is_personal FROM circles WHERE id = ?').get('circle-m') as { is_personal: number | null };
     expect(circleM.is_personal).not.toBe(1);
   });
 
-  it('应该区分真实共享圈和只有 heal 成员的个人空间', () => {
+  it('应该保持真实共享圈为共享圈，有 heal 成员的也保持共享圈', () => {
     const now = new Date().toISOString();
     
     // 创建用户 A、B、C
@@ -230,9 +230,9 @@ describe('is_personal migration and backfill', () => {
     const circleA = db.prepare('SELECT is_personal FROM circles WHERE id = ?').get('circle-a-shared') as { is_personal: number | null };
     expect(circleA.is_personal).not.toBe(1);
     
-    // B 的个人空间应该被标记
-    const circleB = db.prepare('SELECT is_personal FROM circles WHERE id = ?').get('circle-b-personal') as { is_personal: number };
-    expect(circleB.is_personal).toBe(1);
+    // B 的个人空间也不应该被标记（有成员，保守规则）
+    const circleB = db.prepare('SELECT is_personal FROM circles WHERE id = ?').get('circle-b-personal') as { is_personal: number | null };
+    expect(circleB.is_personal).not.toBe(1);
   });
 
   it('不应该标记名字不是「我的美食网」的圈子', () => {
@@ -449,39 +449,7 @@ function runMigration(database: Database.Database): void {
       continue;
     }
     
-    // 检查 2：是否有成员明确不是 heal 添加的
-    let hasNonHealMember = false;
-    for (const member of members) {
-      const reverseCircle = database
-        .prepare(
-          `SELECT 1
-           FROM circles c
-           JOIN circle_members cm_joiner ON cm_joiner.circle_id = c.id
-           WHERE c.owner_id = ?
-             AND cm_joiner.user_id = ?
-             AND cm_joiner.role = 'member'
-           LIMIT 1`
-        )
-        .get(member.user_id, circle.owner_id);
-
-      if (!reverseCircle) {
-        hasNonHealMember = true;
-        break;
-      }
-    }
-    
-    if (hasNonHealMember) {
-      continue;
-    }
-    
-    // 检查 3：其他保守条件
-    if (!isLikelyPersonal || members.length > 2) {
-      continue;
-    }
-    
-    // 满足所有条件才标记为个人空间
-    database
-      .prepare(`UPDATE circles SET is_personal = 1 WHERE id = ?`)
-      .run(circle.id);
+    // 有成员（>=1）：一律保留为共享圈，不再标记为个人空间
+    // 这是因为无法确定老数据中成员是通过邀请加入还是 heal 添加
   }
 }

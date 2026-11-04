@@ -218,7 +218,8 @@ function initSchema(database: Database.Database): void {
         joined_at: string;
       }>;
 
-      // 保守规则：只有在完全确定的情况下才标记为个人空间
+      // 最保守规则：只有「只有圈主一个成员」的圈才标记为个人空间
+      // 原因：无法确定老数据中成员是通过邀请加入还是 heal 添加
       if (members.length === 0) {
         // 没有其他成员 + 是第一个圈子 → 确定是个人空间
         if (isLikelyPersonal) {
@@ -226,19 +227,21 @@ function initSchema(database: Database.Database): void {
             .prepare(`UPDATE circles SET is_personal = 1 WHERE id = ?`)
             .run(circle.id);
           console.log(
-            `[migration] ✓ 标记为个人空间: ${circle.id} (owner=${circle.owner_id}，无其他成员, first_circle=true)`
+            `[migration] ✓ 标记为个人空间: ${circle.id} (owner=${circle.owner_id}，只有圈主一人, first_circle=true)`
           );
         } else {
           console.log(
-            `[migration] ⚠️ 需人工审核: ${circle.id} (owner=${circle.owner_id}，无其他成员但不是第一个圈子)`
+            `[migration] ⚠️ 需人工审核: ${circle.id} (owner=${circle.owner_id}，只有圈主一人但不是第一个圈子)`
           );
         }
         continue;
       }
       
-      // 有成员：检查是否有真实邀请活动的痕迹
-      // 检查 2：是否有成员明确不是 heal 添加的（没有反向圈子）
+      // 有成员（>=1）：一律保留为共享圈
+      // 检查是否有成员明确不是 heal 添加的（没有反向圈子）
       let hasNonHealMember = false;
+      let allHaveReverseCircle = true;
+      
       for (const member of members) {
         const reverseCircle = database
           .prepare(
@@ -253,12 +256,12 @@ function initSchema(database: Database.Database): void {
           .get(member.user_id, circle.owner_id);
 
         if (!reverseCircle) {
-          // 没有反向圈子 → 明确是通过邀请加入，不是 heal
           hasNonHealMember = true;
-          break;
+          allHaveReverseCircle = false;
         }
       }
       
+      // 明确有非 heal 成员
       if (hasNonHealMember) {
         console.log(
           `[migration] ⚠️ 保持共享圈（保守）: ${circle.id} (owner=${circle.owner_id}，${members.length} 个成员，原因: 有成员无反向圈子，是邀请加入)`
@@ -266,32 +269,26 @@ function initSchema(database: Database.Database): void {
         continue;
       }
       
-      // 检查 3：如果所有成员都有反向圈子，但不是第一个圈子或成员过多，也保守处理
-      if (!isLikelyPersonal) {
+      // 所有成员都有反向圈子，但仍然保守处理（可能是邀请圈被用作 heal）
+      // 符合旧 heal 特征：无 shares、所有成员有反向圈、是第一个圈、成员 <= 2
+      const isLikelyHealPattern = 
+        allHaveReverseCircle && 
+        isLikelyPersonal && 
+        members.length <= 2;
+      
+      if (isLikelyHealPattern) {
+        console.log(
+          `[migration] ⚠️ 待人工审核（可能是 heal）: ${circle.id} (owner=${circle.owner_id}，${members.length} 个成员有反向圈, first_circle=true, 无 shares)`
+        );
+      } else if (!isLikelyPersonal) {
         console.log(
           `[migration] ⚠️ 保持共享圈（保守）: ${circle.id} (owner=${circle.owner_id}，${members.length} 个成员，原因: 不是第一个圈子)`
         );
-        continue;
-      }
-      
-      if (members.length > 2) {
+      } else {
         console.log(
           `[migration] ⚠️ 保持共享圈（保守）: ${circle.id} (owner=${circle.owner_id}，${members.length} 个成员，原因: 成员过多)`
         );
-        continue;
       }
-      
-      // 只有满足所有条件才标记为个人空间：
-      // - 无 circle_shares 记录
-      // - 所有成员都有反向圈子（都是 heal）
-      // - 是第一个圈子
-      // - 成员数 <= 2
-      database
-        .prepare(`UPDATE circles SET is_personal = 1 WHERE id = ?`)
-        .run(circle.id);
-      console.log(
-        `[migration] ✓ 标记为个人空间: ${circle.id} (owner=${circle.owner_id}，${members.length} 个 heal 成员, first_circle=true, 无分享痕迹)`
-      );
     }
 
     console.log(`[migration] is_personal 回填完成`);
@@ -398,6 +395,15 @@ function migrateSchema(database: Database.Database): void {
   // 从哪位好友那里加进私藏（用于「来自XX」）
   if (!favCols.some((c) => c.name === 'from_user_id')) {
     database.exec(`ALTER TABLE favorites ADD COLUMN from_user_id TEXT`);
+  }
+
+  // 圈子成员加入来源（owner/invite/system），用于区分邀请加入和系统添加
+  const memberCols = database
+    .prepare(`PRAGMA table_info(circle_members)`)
+    .all() as Array<{ name: string }>;
+  if (!memberCols.some((c) => c.name === 'join_source')) {
+    database.exec(`ALTER TABLE circle_members ADD COLUMN join_source TEXT`);
+    console.log(`[migration] 已添加 circle_members.join_source 字段（旧数据为 NULL）`);
   }
 
   database.exec(`

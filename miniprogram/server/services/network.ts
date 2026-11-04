@@ -17,8 +17,46 @@ function nowIso(): string {
 }
 
 /**
+ * 检测 poi_key 冲突：如果多个不同的 shop_id 共享同一个 poi_key，
+ * 说明去重键生成有问题，需要修复
+ */
+function detectPoiKeyCollisions(userId: string): Array<{
+  poi_key: string;
+  shop_ids: string[];
+  shop_names: string[];
+}> {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `SELECT COALESCE(s.source_shop_id, s.amap_poi_id, s.id) AS poi_key,
+              GROUP_CONCAT(s.id, '|') AS shop_ids,
+              GROUP_CONCAT(s.raw_name, '|') AS shop_names,
+              COUNT(DISTINCT s.id) AS shop_count
+       FROM favorites f
+       JOIN shops s ON s.id = f.shop_id
+       WHERE f.user_id = ?
+       GROUP BY poi_key
+       HAVING shop_count > 1`
+    )
+    .all(userId) as Array<{
+      poi_key: string;
+      shop_ids: string;
+      shop_names: string;
+    }>;
+
+  return rows.map((r) => ({
+    poi_key: r.poi_key,
+    shop_ids: r.shop_ids.split('|'),
+    shop_names: r.shop_names.split('|'),
+  }));
+}
+
+/**
  * 首次进入自动确保用户拥有「我的美食网」。
  * 产品层不展示「创建圈子」，只复用 circles 表做邀请与共享。
+ * 
+ * 优先返回用户自己创建的圈子。如果用户没有创建过圈子但已加入其他圈子，
+ * 则自动创建一个新圈子。只有在用户既没有创建也没有加入任何圈子时，才创建新圈子。
  */
 export async function ensurePersonalNetwork(userId: string) {
   const db = getDb();
@@ -48,6 +86,25 @@ export async function ensurePersonalNetwork(userId: string) {
       inviteToken: owned.invite_token,
       tokenExpiresAt: owned.token_expires_at,
       memberCount: owned.member_count,
+    };
+  }
+
+  const hasJoined = db
+    .prepare(
+      `SELECT COUNT(*) AS count
+       FROM circle_members cm
+       WHERE cm.user_id = ? AND cm.role = 'member'`
+    )
+    .get(userId) as { count: number };
+
+  if (hasJoined.count > 0) {
+    const created = await createCircle(userId, PERSONAL_NETWORK_NAME);
+    return {
+      id: created.id,
+      name: created.name,
+      inviteToken: created.inviteToken,
+      tokenExpiresAt: created.tokenExpiresAt,
+      memberCount: 1,
     };
   }
 
@@ -88,36 +145,69 @@ function healInboundFriendships(userId: string, myNetworkId: string) {
   }
 }
 
-/** Tab1：美食好友（不含自己）；含我邀请的，以及我点开对方邀请后互加的 */
+/**
+ * 获取用户的美食网络：包括自己创建的圈子和加入的所有圈子的成员（去重）
+ * 这样同一个圈子里的所有成员都能互相看见
+ */
+function getAllNetworkMembers(userId: string): Array<{
+  id: string;
+  nickname: string | null;
+  avatar: string | null;
+  shared_shop_count: number;
+}> {
+  const db = getDb();
+  
+  return db
+    .prepare(
+      `SELECT DISTINCT u.id, u.nickname, u.avatar,
+              (SELECT COUNT(DISTINCT f.shop_id)
+               FROM favorites f
+               WHERE f.user_id = u.id
+                 AND f.visibility = 'circles') AS shared_shop_count
+       FROM users u
+       WHERE u.id != ?
+         AND u.id IN (
+           SELECT cm2.user_id
+           FROM circle_members cm1
+           JOIN circle_members cm2 ON cm1.circle_id = cm2.circle_id
+           WHERE cm1.user_id = ?
+             AND cm2.user_id != ?
+         )
+       ORDER BY u.nickname`
+    )
+    .all(userId, userId, userId) as Array<{
+      id: string;
+      nickname: string | null;
+      avatar: string | null;
+      shared_shop_count: number;
+    }>;
+}
+
+/** 
+ * Tab1：美食好友（不含自己）
+ * 显示所有与当前用户在同一圈子中的成员（去重）
+ * 这样 A、B、C 在同一个圈子里时，每个人都能看到其他人
+ */
 export async function listFoodFriends(userId: string) {
   const network = await ensurePersonalNetwork(userId);
   healInboundFriendships(userId, network.id);
 
-  const members = listCircleMembers(userId, network.id) as Array<{
-    id: string;
-    nickname: string | null;
-    avatar: string | null;
-    role: string;
-    joined_at: string;
-    shared_shop_count: number;
-  }>;
+  const allMembers = getAllNetworkMembers(userId);
 
   const refreshed = await ensurePersonalNetwork(userId);
   return {
     networkId: refreshed.id,
     inviteToken: refreshed.inviteToken,
     tokenExpiresAt: refreshed.tokenExpiresAt,
-    memberCount: refreshed.memberCount,
-    friends: members
-      .filter((m) => m.id !== userId)
-      .map((m) => ({
-        id: m.id,
-        nickname: m.nickname,
-        avatar: m.avatar,
-        role: m.role,
-        joinedAt: m.joined_at,
-        sharedShopCount: Number(m.shared_shop_count) || 0,
-      })),
+    memberCount: allMembers.length + 1,
+    friends: allMembers.map((m) => ({
+      id: m.id,
+      nickname: m.nickname,
+      avatar: m.avatar,
+      role: 'member' as const,
+      joinedAt: '',
+      sharedShopCount: Number(m.shared_shop_count) || 0,
+    })),
   };
 }
 
@@ -150,7 +240,7 @@ const MY_SHOP_ORIGIN_LABEL: Record<string, string> = {
   imported: '我导入',
   checkin: '我记下',
   from_friend: '好友推荐',
-  agent: 'Agent 记下',
+  agent: 'AI 帮你记下',
 };
 
 type FriendRecommender = {
@@ -159,7 +249,10 @@ type FriendRecommender = {
   avatar: string | null;
 };
 
-/** 在我的美食网里，还有谁也共享了这家店（用来标「XX推荐」） */
+/** 
+ * 在我的美食网络里，还有谁也共享了这家店（用来标「XX推荐」）
+ * 查询所有与当前用户在同一圈子中的成员
+ */
 function findFriendRecommenders(
   userId: string,
   networkId: string,
@@ -169,18 +262,23 @@ function findFriendRecommenders(
   const db = getDb();
   const rows = db
     .prepare(
-      `SELECT u.id AS userId, u.nickname, u.avatar
+      `SELECT DISTINCT u.id AS userId, u.nickname, u.avatar
        FROM favorites f
        JOIN users u ON u.id = f.user_id
-       JOIN circle_members cm
-         ON cm.user_id = f.user_id AND cm.circle_id = ?
        WHERE f.shop_id = ?
          AND f.user_id != ?
          AND f.visibility = 'circles'
+         AND f.user_id IN (
+           SELECT cm2.user_id
+           FROM circle_members cm1
+           JOIN circle_members cm2 ON cm1.circle_id = cm2.circle_id
+           WHERE cm1.user_id = ?
+             AND cm2.user_id != ?
+         )
        ORDER BY CASE WHEN f.user_id = ? THEN 0 ELSE 1 END, f.created_at ASC
        LIMIT 3`
     )
-    .all(networkId, shopId, userId, preferredUserId || '') as FriendRecommender[];
+    .all(shopId, userId, userId, userId, preferredUserId || '') as FriendRecommender[];
   return rows;
 }
 
@@ -278,6 +376,14 @@ export async function listMyShops(
   const network = await ensurePersonalNetwork(userId);
   healInboundFriendships(userId, network.id);
 
+  const collisions = detectPoiKeyCollisions(userId);
+  if (collisions.length > 0) {
+    console.warn(
+      `[poi_key collision] User ${userId} has ${collisions.length} poi_key collisions:`,
+      JSON.stringify(collisions, null, 2)
+    );
+  }
+
   const rows = getDb()
     .prepare(
       `SELECT f.id AS favorite_id, s.id AS shop_id,
@@ -328,20 +434,30 @@ export async function listMyShops(
         shopCity: r.city ?? undefined,
       });
     }
-    const head = r.photo_url || r.head_img;
+    
+    const head = r.head_img;
     const status = deriveShopStatus(r);
 
-    let sourceTag = MY_SHOP_ORIGIN_LABEL[r.origin] || '';
-    let recommendersLine = sourceTag;
+    let sourceTag = '';
+    let recommendersLine = '';
     let collectors: FriendRecommender[] = [];
-    if (r.origin === 'from_friend') {
+    
+    if (r.origin === 'from_friend' || r.origin === 'agent') {
       collectors = findFriendRecommenders(
         userId,
         network.id,
         r.shop_id,
         r.from_user_id
       );
-      sourceTag = friendRecommendLabel(collectors);
+      if (collectors.length > 0) {
+        sourceTag = friendRecommendLabel(collectors);
+        recommendersLine = sourceTag;
+      } else {
+        sourceTag = MY_SHOP_ORIGIN_LABEL[r.origin] || '';
+        recommendersLine = sourceTag;
+      }
+    } else {
+      sourceTag = MY_SHOP_ORIGIN_LABEL[r.origin] || '';
       recommendersLine = sourceTag;
     }
 

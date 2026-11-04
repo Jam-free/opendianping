@@ -468,13 +468,13 @@ function aggregateCircleShops(rows: CircleShopRow[]): AggregatedCircleShop[] {
       if (r.source_url) agg.sourceUrl = r.source_url;
       if (r.source_shop_id) agg.sourceShopId = r.source_shop_id;
       if (r.phone) agg.phone = r.phone;
-      if (r.head_img) {
+      if (r.head_img && r.shop_key === rows.find(row => row.poi_key === r.poi_key)?.shop_key) {
         agg.headImg = r.head_img;
         agg.headImgProxy = buildProxyPath(r.head_img);
       }
       map.set(r.poi_key, agg);
     } else {
-      if (!agg.headImg && r.head_img) {
+      if (!agg.headImg && r.head_img && r.shop_key === agg.shopKey) {
         agg.headImg = r.head_img;
         agg.headImgProxy = buildProxyPath(r.head_img);
       }

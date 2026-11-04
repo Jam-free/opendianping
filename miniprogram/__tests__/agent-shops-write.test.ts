@@ -152,8 +152,8 @@ describe('S5 Agent 写入本人店', () => {
     expect(listed.body.semantics.origin).toMatch(/agent=/);
 
     const my = await listMyShops(user.id);
-    expect(my.items[0].sourceTag).toBe('Agent 记下');
-    expect(my.items[0].recommendersLine).toBe('Agent 记下');
+    expect(my.items[0].sourceTag).toBe('AI 帮你记下');
+    expect(my.items[0].recommendersLine).toBe('AI 帮你记下');
     expect(my.items[0].status).toBe('pending');
 
     const row = shopRowByName('泰式河粉');

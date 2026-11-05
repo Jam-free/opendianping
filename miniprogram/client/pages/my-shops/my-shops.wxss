@@ -15,10 +15,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  /* 上下内边距交给胶囊高度；头像与标题垂直居中，不再往上顶 */
-  padding: 0 40rpx;
+  /* 上下内边距交给胶囊高度；右边距由页面按胶囊位置写入，头像停在胶囊左侧 */
+  padding: 0 0 0 40rpx;
   gap: 24rpx;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .titles {
@@ -26,11 +27,14 @@
   align-items: baseline;
   min-width: 0;
   flex: 1;
+  overflow: hidden;
 }
 
 .title-hit {
   padding: 10rpx 4rpx;
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .title-hit--gap {
@@ -39,8 +43,12 @@
 }
 
 .title {
+  display: block;
   line-height: 1.15;
   letter-spacing: 0.5rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .title--on {
@@ -57,7 +65,9 @@
 
 .avatar-entry {
   flex: none;
-  margin-right: 8rpx;
+  margin-left: 12rpx;
+  position: relative;
+  z-index: 2;
 }
 
 .avatar-hover {
@@ -123,11 +133,47 @@
   border-bottom: none;
 }
 
+.rank-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 72rpx;
+}
+
 .rank-hint {
-  padding: 24rpx 0 8rpx;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  line-height: 72rpx;
   font-size: 24rpx;
   color: #b0b0b0;
   letter-spacing: 0.5rpx;
+}
+
+/* 有人上榜后，邀请和左侧说明同一行、同一高度 */
+.rank-invite {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin: 0;
+  padding: 0 0 0 24rpx !important;
+  height: 72rpx;
+  line-height: 72rpx;
+  min-height: 0;
+  background: transparent;
+  color: var(--primary);
+  font-size: 26rpx;
+  font-weight: 600;
+  border-radius: 0;
+}
+
+.rank-invite::after {
+  border: none;
+}
+
+.rank-invite--press {
+  opacity: 0.6;
 }
 
 .friend-row {

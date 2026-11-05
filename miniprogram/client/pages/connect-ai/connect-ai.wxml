@@ -2,7 +2,7 @@
   <view class="intro card">
     <view class="intro-title">把你的店交给 AI</view>
     <view class="muted intro-desc">
-      复制下面这段给 Cursor / Claude / Grok 等。它可以读你的店，确认后也能帮你记下。改不了朋友的数据。
+      复制下面这段，发给你常用的 AI。它能看你记过的店，你点头之后也能帮你记下。
     </view>
   </view>
 
@@ -19,8 +19,8 @@
   </view>
 
   <view class="block card">
-    <view class="step">Token</view>
-    <view class="muted tip">一般不用管；泄露了就重置。</view>
+    <view class="step">口令</view>
+    <view class="muted tip">一般不用管。别人看到了，就点重置。</view>
 
     <view class="token-box" wx:if="{{hasToken}}">
       <text class="token">{{showToken && plainToken ? plainToken : maskedToken}}</text>
@@ -30,7 +30,7 @@
 
     <view class="token-actions" wx:if="{{hasToken || plainToken}}">
       <button class="btn-ghost half" bindtap="copyToken" disabled="{{!plainToken}}">
-        只复制 Token
+        只复制口令
       </button>
       <button class="btn-ghost half" loading="{{busy}}" bindtap="resetToken">重置</button>
     </view>

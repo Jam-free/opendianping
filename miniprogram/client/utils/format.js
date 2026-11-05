@@ -11,6 +11,10 @@ function splitDistance(label) {
     if (m) {
         return { main: m[1], unit: m[2].toLowerCase(), na: false };
     }
+    // 「1公里内」是模糊位置的诚实文案，整段展示，不当成缺失。
+    if (/公里内$/.test(label)) {
+        return { main: label, unit: '', na: false };
+    }
     return { main: label, unit: '', na: true };
 }
 function avatarInitial(nickname) {

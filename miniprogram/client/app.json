@@ -1,7 +1,7 @@
 {
   "pages": [
-    "pages/login/login",
     "pages/my-shops/my-shops",
+    "pages/login/login",
     "pages/friends/friends",
     "pages/join/join",
     "pages/import/import",
@@ -23,9 +23,9 @@
   "sitemapLocation": "sitemap.json",
   "lazyCodeLoading": "requiredComponents",
   "permission": {
-    "scope.userLocation": {
-      "desc": "用于计算你和店铺的距离，并在记美食时记录位置"
+    "scope.userFuzzyLocation": {
+      "desc": "用于按大致远近排列店铺，并在记美食时列出附近的店"
     }
   },
-  "requiredPrivateInfos": ["getLocation"]
+  "requiredPrivateInfos": ["getFuzzyLocation"]
 }

@@ -23,6 +23,8 @@ describe('距离与推荐文案', () => {
     expect(m).toBeLessThan(1200);
     expect(formatDistanceLabel(350)).toBe('350 m');
     expect(formatDistanceLabel(1500)).toBe('1.5 km');
+    expect(formatDistanceLabel(350, { coarse: true })).toBe('1公里内');
+    expect(formatDistanceLabel(1500, { coarse: true })).toBe('2公里内');
     expect(
       formatDistanceLabel(5000, { userCity: '深圳', shopCity: '广州' })
     ).toBe('广州');
@@ -69,6 +71,6 @@ describe('距离与推荐文案', () => {
 
     expect(res.items.map((s) => s.name)).toEqual(['近店', '远店', '无坐标']);
     expect(res.withoutCoordsCount).toBe(1);
-    expect(res.items[0].distanceLabel).toMatch(/m|km/);
+    expect(res.items[0].distanceLabel).toMatch(/公里内/);
   });
 });

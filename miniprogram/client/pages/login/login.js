@@ -22,11 +22,21 @@ Page({
     /** 同步锁：setData 的 busy 有延迟，防双触发 */
     _entering: false,
     _enterTimer: 0,
+    /** 已经去下一页了，离开时不要清掉「登录后要去哪」 */
+    _entered: false,
     onShow() {
         this.bootstrap();
     },
     onUnload() {
         this.clearEnterTimer();
+        if (this._entered)
+            return;
+        try {
+            wx.removeStorageSync('pending_next');
+        }
+        catch (_a) {
+            /* ignore */
+        }
     },
     async bootstrap() {
         try {
@@ -47,6 +57,7 @@ Page({
             const nick = (me.user.nickname || '').trim();
             const av = me.user.avatar || '';
             if (nick && av) {
+                this._entered = true;
                 (0, api_1.enterAppAfterLogin)();
                 return;
             }
@@ -160,6 +171,7 @@ Page({
             });
             const me = await (0, api_1.request)('/api/me');
             (0, api_1.saveCachedUser)(me.user);
+            this._entered = true;
             (0, api_1.enterAppAfterLogin)();
         }
         catch (err) {

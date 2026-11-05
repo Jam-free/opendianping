@@ -3,6 +3,8 @@ import {
   peekCachedUser,
   saveCachedUser,
   request,
+  hasSession,
+  ensureLogin,
 } from '../../utils/api';
 import { avatarInitial } from '../../utils/format';
 import { API_BASE } from '../../utils/config';
@@ -22,6 +24,7 @@ Page({
     initial: '?',
     busy: false,
     saving: false,
+    loggedIn: false,
   },
 
   onShow() {
@@ -29,6 +32,18 @@ Page({
   },
 
   async hydrate() {
+    const loggedIn = hasSession();
+    this.setData({ loggedIn });
+    if (!loggedIn) {
+      this.setData({
+        nickname: '',
+        draftNickname: '',
+        avatar: '',
+        avatarRaw: '',
+        initial: '我',
+      });
+      return;
+    }
     const cached = peekCachedUser();
     if (cached) {
       this.setData({
@@ -78,6 +93,8 @@ Page({
     }
     this.setData({ saving: true });
     try {
+      // 点保存时才登录。选头像、填昵称本身不要求先有账号。
+      await ensureLogin({ interactive: true });
       const avatarUrl = await persistAvatarIfNeeded(this.data.avatarRaw);
       const res = await request<{
         user: { id: string; nickname?: string | null; avatar?: string | null };
@@ -93,6 +110,7 @@ Page({
         avatar: userAvatarSrc(API_BASE, res.user.avatar),
         avatarRaw: res.user.avatar || '',
         initial: avatarInitial(res.user.nickname || nickname),
+        loggedIn: true,
       });
       wx.showToast({ title: '已保存' });
     } catch (err) {
@@ -104,7 +122,7 @@ Page({
   onLogout() {
     wx.showModal({
       title: '退出登录？',
-      content: '将撤销本机授权，回到登录页。已导入的店仍保留在你的账号里。',
+      content: '将撤销本机授权，回到首页。已导入的店仍保留在你的账号里。',
       confirmText: '退出',
       confirmColor: '#e05a5a',
       success: async (r) => {

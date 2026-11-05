@@ -2,8 +2,11 @@
   <view class="card block">
     <view class="h1">{{info.name || '美食好友邀请'}}</view>
     <view class="muted" wx:if="{{info.member_count}}">当前 {{info.member_count}} 人</view>
-    <view class="desc muted">
+    <view class="desc muted" wx:if="{{circleId && token}}">
       加入后可看到对方共享的店铺，你导入或记下的店也会默认共享给美食好友。不会自动加入，请确认后点击下方按钮。
+    </view>
+    <view class="desc muted" wx:else>
+      这个链接里没有邀请。请让对方打开小程序，到「吃货排行」重新分享一次。
     </view>
     <button
       class="btn-primary btn-block"

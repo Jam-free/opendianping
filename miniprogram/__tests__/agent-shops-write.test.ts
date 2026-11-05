@@ -12,6 +12,7 @@ import {
   tryConsumeAgentShopWrite,
 } from '../server/rate-limit.js';
 import { issueAgentToken, listMyShops } from '../server/services/network.js';
+import * as circles from '../server/services/circles.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -29,7 +30,6 @@ const MINE_KEYS = [
   'wishlist',
   'phone',
   'status',
-  'sourceShopId',
 ] as const;
 
 let userSeq = 0;
@@ -53,8 +53,7 @@ function auth(agentToken: string) {
 function shopRowByName(name: string) {
   return getDb()
     .prepare(
-      `SELECT id, source_type, source_shop_id, amap_poi_id, raw_name, city,
-              district, address, category, phone, lat, lng, source_url
+      `SELECT id, source_type, source_shop_id, amap_poi_id, raw_name, city, lat, lng
        FROM shops WHERE raw_name = ? ORDER BY rowid DESC LIMIT 1`
     )
     .get(name) as
@@ -65,13 +64,8 @@ function shopRowByName(name: string) {
         amap_poi_id: string | null;
         raw_name: string;
         city: string | null;
-        district: string | null;
-        address: string | null;
-        category: string | null;
-        phone: string | null;
         lat: number | null;
         lng: number | null;
-        source_url: string | null;
       }
     | undefined;
 }
@@ -128,10 +122,6 @@ describe('S5 Agent 写入本人店', () => {
     expect(posted.body.origin).toBe('agent');
     expect(posted.body.status).toBe('pending');
     expect(posted.body.source_shop_id).toBeUndefined();
-    expect(posted.body.sourceShopId).toBeNull();
-    expect(posted.body.address).toBeNull();
-    expect(posted.body.category).toBeNull();
-    expect(posted.body.phone).toBeNull();
     for (const key of MINE_KEYS) {
       expect(posted.body).toHaveProperty(key);
     }
@@ -226,7 +216,7 @@ describe('S5 Agent 写入本人店', () => {
     expect(mine.some((s) => s.name === '重置后可写店')).toBe(true);
   });
 
-  test('E2E-A4 / S5-SEC-02：真实点评数字 id 可存；幻觉 shopId 丢掉；无核验则 pending', async () => {
+  test('E2E-A4 / S5-SEC-02：仅 name+city → pending，永不写 source_shop_id', async () => {
     const { app, agentToken } = seedUser('a4');
     const posted = await request(app)
       .post('/api/agent/shops')
@@ -244,12 +234,10 @@ describe('S5 Agent 写入本人店', () => {
     expect(posted.body.wishlist).toBe(false);
     expect(posted.body.name).toBe('街角米线');
     expect(posted.body.source_shop_id).toBeUndefined();
-    expect(posted.body.sourceShopId).toBe('1908397290');
-    expect(posted.body.poiKey).toBe('1908397290');
 
     const row = shopRowByName('街角米线');
     expect(row?.raw_name).toBe('街角米线');
-    expect(row?.source_shop_id).toBe('1908397290');
+    expect(row?.source_shop_id).toBeNull();
     expect(row?.amap_poi_id).toBeNull();
   });
 
@@ -621,201 +609,73 @@ describe('S5 Agent 写入本人店', () => {
     expect(posted.body.status).toBe(mineItem.status);
   });
 
-  test('S5-DOC-01：skill 从只读改为可写本人店', () => {
-    const skill = fs.readFileSync(
-      path.resolve(__dirname, '../../skills/feimaocat-cloud/SKILL.md'),
-      'utf8'
-    );
-    expect(skill).toMatch(/POST \$FEIMAOCAT_API_BASE\/api\/agent\/shops/);
-    expect(skill).toMatch(/PATCH \$FEIMAOCAT_API_BASE\/api\/agent\/shops\/:poiKey/);
-    expect(skill).toMatch(/写前确认/);
-    expect(skill).toMatch(/`agent` Agent 记下/);
-    expect(skill).toMatch(/wishlist 只是加分项/);
-    expect(skill).not.toMatch(/用 `wishlist === true` 做「很想去」主候选/);
-    expect(skill).not.toMatch(/^- 只读；/m);
-  });
+  test('朋友已分享的店记下来时沿用那一份，并标成朋友推荐', async () => {
+    const friend = seedUser('sharer');
+    const me = seedUser('saver');
+    getDb()
+      .prepare(`UPDATE users SET nickname = ? WHERE id = ?`)
+      .run('吴双', friend.user.id);
+    const circle = await circles.createCircle(friend.user.id, '我的美食网');
+    await circles.joinCircle(me.user.id, circle.id, circle.inviteToken);
 
-  test('新字段：address / category / phone / lat/lng 原样入库，不把 district 当成 address', async () => {
-    const { app, agentToken } = seedUser('fields');
-    const posted = await request(app)
-      .post('/api/agent/shops')
-      .set(auth(agentToken))
-      .send({
-        name: '肥猫面馆',
-        city: '深圳',
-        district: '南山区',
-        address: '科技园路 1 号',
-        category: '面馆',
-        phone: '0755-12345678',
-        note: '汤浓',
-        wishlist: true,
-        lat: 22.54,
-        lng: 113.93,
-      });
-    expect(posted.status).toBe(201);
-    expect(posted.body).toMatchObject({
-      name: '肥猫面馆',
-      city: '深圳',
-      district: '南山区',
-      address: '科技园路 1 号',
-      category: '面馆',
-      phone: '0755-12345678',
-      note: '汤浓',
-      wishlist: true,
-      status: 'pending',
-      sourceShopId: null,
-    });
-    expect(posted.body.lat).toBeCloseTo(22.54);
-    expect(posted.body.lng).toBeCloseTo(113.93);
-    expect(posted.body.address).not.toBe(posted.body.district);
-
-    const row = shopRowByName('肥猫面馆');
-    expect(row?.address).toBe('科技园路 1 号');
-    expect(row?.category).toBe('面馆');
-    expect(row?.phone).toBe('0755-12345678');
-    expect(row?.district).toBe('南山区');
-  });
-
-  test('点评链接抽出数字 id；专辑库已有同店则回填坐标并 confirmed', async () => {
-    const { app, agentToken } = seedUser('dpfill');
+    const shopId = 'shop-friend-pushu';
     getDb()
       .prepare(
         `INSERT INTO shops (
            id, source_type, source_shop_id, amap_poi_id, raw_name, adcode,
            category, district, city, address, avg_price, lat, lng,
            source_url, head_img, phone, display_cache_policy
-         ) VALUES (
-           'imported-shop', 'dianping_album', '1908397290', NULL, '专辑里的店',
-           NULL, '川菜', '福田区', '深圳', '福华路 88 号', NULL,
-           22.54, 114.06, 'https://m.dianping.com/shop/1908397290',
-           NULL, '0755-8888', 'minimal'
-         )`
+         ) VALUES (?, 'dianping_album', NULL, NULL, ?, NULL, ?, ?, ?, ?, NULL, ?, ?, NULL, ?, NULL, 'minimal')`
       )
-      .run();
+      .run(
+        shopId,
+        '朴墅（西湖青芝坞店）',
+        '杭帮菜',
+        '西湖',
+        '杭州',
+        '青芝坞',
+        30.27,
+        120.13,
+        'https://example.com/pushu.jpg'
+      );
+    getDb()
+      .prepare(
+        `INSERT INTO favorites (
+           id, user_id, shop_id, note, visibility, created_at, wishlist
+         ) VALUES (?, ?, ?, NULL, 'circles', ?, 0)`
+      )
+      .run('fav-friend-pushu', friend.user.id, shopId, new Date().toISOString());
 
-    const posted = await request(app)
+    const posted = await request(me.app)
       .post('/api/agent/shops')
-      .set(auth(agentToken))
-      .send({
-        name: '专辑里的店',
-        city: '深圳',
-        dianpingUrl: 'https://m.dianping.com/shop/1908397290?from=share',
-      });
+      .set(auth(me.agentToken))
+      .send({ name: '朴墅', city: '杭州', note: '想去' });
+
     expect(posted.status).toBe(201);
-    expect(posted.body.sourceShopId).toBe('1908397290');
-    expect(posted.body.address).toBe('福华路 88 号');
-    expect(posted.body.category).toBe('川菜');
-    expect(posted.body.phone).toBe('0755-8888');
-    expect(posted.body.status).toBe('confirmed');
-    expect(posted.body.lat).toBeCloseTo(22.54);
-    expect(posted.body.lng).toBeCloseTo(114.06);
+    expect(posted.body.origin).toBe('from_friend');
+    expect(posted.body.address).toBe('青芝坞');
+    expect(posted.body.wishlist).toBe(true);
+
+    const mine = await listMyShops(me.user.id);
+    const item = mine.items.find((s) => String(s.name).includes('朴墅'));
+    expect(item?.sourceTag).toBe('吴双推荐');
+    expect(item?.headImg).toBe('https://example.com/pushu.jpg');
+
+    const copies = getDb()
+      .prepare(`SELECT COUNT(*) AS c FROM shops WHERE raw_name LIKE '朴墅%'`)
+      .get() as { c: number };
+    expect(copies.c).toBe(1);
   });
 
-  test('去重合并：空字段用新值补上，已有值不覆盖', async () => {
-    const { app, agentToken } = seedUser('merge');
-    const first = await request(app)
-      .post('/api/agent/shops')
-      .set(auth(agentToken))
-      .send({
-        name: '合并面馆',
-        city: '成都',
-        address: '春熙路 1 号',
-        category: '面馆',
-      });
-    expect(first.status).toBe(201);
-    expect(first.body.phone).toBeNull();
-
-    const second = await request(app)
-      .post('/api/agent/shops')
-      .set(auth(agentToken))
-      .send({
-        name: '合并面馆',
-        city: '成都',
-        address: '不该覆盖的新地址',
-        category: '火锅',
-        phone: '028-111',
-        district: '锦江区',
-      });
-    expect(second.status).toBe(200);
-    expect(second.body.address).toBe('春熙路 1 号');
-    expect(second.body.category).toBe('面馆');
-    expect(second.body.phone).toBe('028-111');
-    expect(second.body.district).toBe('锦江区');
-  });
-
-  test('PATCH 只改本人店：更新字段、他人 404、无效 Token 401', async () => {
-    const owner = seedUser('patch-owner');
-    const other = seedUser('patch-other');
-
-    const created = await request(owner.app)
-      .post('/api/agent/shops')
-      .set(auth(owner.agentToken))
-      .send({ name: '可改的店', city: '杭州', district: '西湖区' });
-    expect(created.status).toBe(201);
-    const poiKey = created.body.poiKey as string;
-
-    const none = await request(owner.app)
-      .patch(`/api/agent/shops/${poiKey}`)
-      .send({ address: '不该写入' });
-    expect(none.status).toBe(401);
-
-    const sessionAsAgent = await request(owner.app)
-      .patch(`/api/agent/shops/${poiKey}`)
-      .set('Authorization', `Bearer ${owner.sessionToken}`)
-      .send({ address: '不该写入' });
-    expect(sessionAsAgent.status).toBe(401);
-
-    const stolen = await request(other.app)
-      .patch(`/api/agent/shops/${poiKey}`)
-      .set(auth(other.agentToken))
-      .send({ address: '偷改' });
-    expect(stolen.status).toBe(404);
-
-    const missing = await request(owner.app)
-      .patch('/api/agent/shops/not-a-real-shop')
-      .set(auth(owner.agentToken))
-      .send({ address: '不存在' });
-    expect(missing.status).toBe(404);
-
-    const patched = await request(owner.app)
-      .patch(`/api/agent/shops/${encodeURIComponent(poiKey)}`)
-      .set(auth(owner.agentToken))
-      .send({
-        address: '湖滨路 2 号',
-        category: '杭帮菜',
-        phone: '0571-000',
-        wishlist: true,
-        sourceShopId: '1234567',
-      });
-    expect(patched.status).toBe(200);
-    expect(patched.body).toMatchObject({
-      name: '可改的店',
-      city: '杭州',
-      district: '西湖区',
-      address: '湖滨路 2 号',
-      category: '杭帮菜',
-      phone: '0571-000',
-      wishlist: true,
-      sourceShopId: '1234567',
-      origin: 'agent',
-      status: 'pending',
-    });
-    for (const key of MINE_KEYS) {
-      expect(patched.body).toHaveProperty(key);
-    }
-
-    const listed = await request(owner.app)
-      .get('/api/agent/shops')
-      .set(auth(owner.agentToken));
-    const hit = (listed.body.mine as Array<Record<string, unknown>>).find(
-      (s) => s.name === '可改的店'
+  test('S5-DOC-01：skill 从只读改为可写本人店', () => {
+    const skill = fs.readFileSync(
+      path.resolve(__dirname, '../../skills/feimaocat-cloud/SKILL.md'),
+      'utf8'
     );
-    expect(hit).toMatchObject({
-      address: '湖滨路 2 号',
-      category: '杭帮菜',
-      phone: '0571-000',
-      wishlist: true,
-      sourceShopId: '1234567',
-    });
+    expect(skill).toMatch(/POST "地址\/api\/agent\/shops"/);
+    expect(skill).toMatch(/先把店名念给他听，等他说可以，再写入/);
+    expect(skill).toMatch(/只记用户自己的店/);
+    expect(skill).not.toMatch(/心心念念|肥猫|FEIMAOCAT/);
+    expect(skill).not.toMatch(/^- 只读；/m);
   });
 });

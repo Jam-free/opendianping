@@ -9,9 +9,14 @@ Page({
         info: {},
         joining: false,
     },
+    /** 同步副本：setData 还没写完时，登录门禁也要读得到邀请 */
+    _circleId: '',
+    _token: '',
     onLoad(query) {
         const circleId = query.c || '';
         const token = query.t || '';
+        this._circleId = circleId;
+        this._token = token;
         this.setData({ circleId, token });
         if (circleId)
             this.loadPreview();
@@ -32,6 +37,12 @@ Page({
                 method: 'POST',
                 data: { token: this.data.token },
             });
+            try {
+                wx.removeStorageSync('pending_join');
+            }
+            catch (_a) {
+                /* ignore */
+            }
             (0, circle_1.setActiveCircleId)(this.data.circleId);
             wx.showToast({ title: '已加入' });
             setTimeout(() => {

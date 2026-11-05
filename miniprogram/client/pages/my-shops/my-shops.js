@@ -33,11 +33,17 @@ Page({
         loginError: '',
         avatar: '',
         initial: '?',
+        loggedIn: false,
+        /** 右边留给微信胶囊，避免头像钻进胶囊被挡住 */
+        capsulePad: 108,
     },
+    /** 登录完成后要接着做的事：import / locate / ai */
+    _nextAction: '',
     onLoad(query) {
         var _a, _b;
         const panel = query.panel === '1' || query.panel === 'rank' ? 1 : 0;
-        // 自定义顶栏：标题行与右上角胶囊对齐，避免头像顶进状态栏被挡
+        this._nextAction = query.next || '';
+        // 自定义顶栏：标题行与胶囊同一高度，头像停在胶囊左边
         try {
             const wxAny = wx;
             const sys = ((_a = wxAny.getSystemInfoSync) === null || _a === void 0 ? void 0 : _a.call(wxAny)) || {};
@@ -45,11 +51,16 @@ Page({
             const statusBar = Number(sys.statusBarHeight) || 20;
             const menuTop = Number(menu.top) || 0;
             const menuHeight = Number(menu.height) || 32;
+            const menuLeft = Number(menu.left) || 0;
+            const winW = Number(sys.windowWidth) || 375;
             // 顶到胶囊上沿即可；再往上会被系统栏裁掉
             const statusPad = menuTop > 0 ? menuTop : statusBar + 6;
             const navRowHeight = menuHeight > 0 ? menuHeight : 32;
+            // 胶囊左缘到屏幕右边的距离，再留 8px，头像不会被盖住
+            const capsulePad = menuLeft > 0 && winW > menuLeft ? Math.ceil(winW - menuLeft + 8) : 108;
             this.setData(Object.assign({ statusPad,
-                navRowHeight }, (panel ? { panel } : {})));
+                navRowHeight,
+                capsulePad }, (panel ? { panel } : {})));
         }
         catch (_c) {
             if (panel)
@@ -57,14 +68,35 @@ Page({
         }
     },
     onShow() {
-        if (!(0, api_1.hasSession)()) {
-            (0, api_1.goLoginGate)();
+        const loggedIn = (0, api_1.hasSession)();
+        this.setData({ loggedIn });
+        if (!loggedIn) {
+            // 审核要求：先浏览首页，不要一进来就要求头像、昵称授权
+            this.setData({
+                shops: [],
+                friends: [],
+                shopsLoading: false,
+                friendsLoading: false,
+                loginError: '',
+                avatar: '',
+                initial: '',
+            });
             return;
         }
         wx.showShareMenu({ withShareTicket: true, menus: ['shareAppMessage'] });
         this.hydrateMe();
         this.loadShops();
         this.loadFriends();
+        const next = this._nextAction;
+        if (next) {
+            this._nextAction = '';
+            if (next === 'import')
+                wx.navigateTo({ url: '/pages/import/import' });
+            else if (next === 'ai')
+                wx.navigateTo({ url: '/pages/connect-ai/connect-ai' });
+            else if (next === 'locate')
+                (0, locate_draft_1.startLocateFlow)();
+        }
     },
     goPanel(e) {
         const panel = Number(e.currentTarget.dataset.panel);
@@ -75,6 +107,10 @@ Page({
         this.setData({ panel: panel });
     },
     onSwipe(e) {
+        // 只有手指滑才跟着走。从邀请链接打开排行时，swiper 会先报一次第 0 页，
+        // 若跟着改，人会被弹回「私藏好店」，看起来像吃货排行打不开。
+        if (e.detail.source !== 'touch')
+            return;
         const panel = Number(e.detail.current);
         if (panel === this.data.panel)
             return;
@@ -149,6 +185,12 @@ Page({
                 friendsLoading: false,
                 loginError: '',
             });
+            if (net.networkId && net.inviteToken) {
+                wx.setStorageSync('share_invite', {
+                    networkId: net.networkId,
+                    inviteToken: net.inviteToken,
+                });
+            }
         }
         catch (err) {
             const msg = err.message || '加载失败';
@@ -172,17 +214,34 @@ Page({
             /* 登录页会展示错误 */
         }
     },
+    /** 点头像先进账号页，在那一页里再选头像和昵称 */
     goAccount() {
         wx.navigateTo({ url: '/pages/account/account' });
     },
     goImport() {
+        if (!(0, api_1.hasSession)()) {
+            (0, api_1.askToLogin)('/pages/my-shops/my-shops?next=import');
+            return;
+        }
         wx.navigateTo({ url: '/pages/import/import' });
     },
     goConnectAi() {
+        if (!(0, api_1.hasSession)()) {
+            (0, api_1.askToLogin)('/pages/my-shops/my-shops?next=ai');
+            return;
+        }
         wx.navigateTo({ url: '/pages/connect-ai/connect-ai' });
     },
     goLocate() {
+        if (!(0, api_1.hasSession)()) {
+            (0, api_1.askToLogin)('/pages/my-shops/my-shops?next=locate');
+            return;
+        }
         (0, locate_draft_1.startLocateFlow)();
+    },
+    /** 分享要先登录，否则发出去的链接加不上好友 */
+    askLoginForShare() {
+        (0, api_1.askToLogin)('/pages/my-shops/my-shops?panel=1');
     },
     /** 长按店铺行 → 确认后从「我的店」移除 */
     onDeleteShop(e) {
@@ -217,8 +276,43 @@ Page({
             },
         });
     },
-    onShareAppMessage() {
-        const { networkId, inviteToken } = this.data;
+    /**
+     * 分享必须带上邀请。没带上时，朋友点开只是进了自己的首页，吃货排行仍是空的。
+     * 页面还没加载完就点分享时，先用上次记下的邀请，没有再现拉一次。
+     */
+    async onShareAppMessage() {
+        if (!(0, api_1.hasSession)()) {
+            return {
+                title: '我和我爱吃的朋友们 · 一起收藏好店',
+                path: '/pages/my-shops/my-shops',
+            };
+        }
+        let networkId = this.data.networkId;
+        let inviteToken = this.data.inviteToken;
+        if (!networkId || !inviteToken) {
+            try {
+                const saved = wx.getStorageSync('share_invite');
+                networkId = (saved === null || saved === void 0 ? void 0 : saved.networkId) || '';
+                inviteToken = (saved === null || saved === void 0 ? void 0 : saved.inviteToken) || '';
+            }
+            catch (_a) {
+                /* ignore */
+            }
+        }
+        if (!networkId || !inviteToken) {
+            try {
+                const net = await (0, api_1.request)('/api/me/network');
+                networkId = net.networkId;
+                inviteToken = net.inviteToken;
+                if (networkId && inviteToken) {
+                    this.setData({ networkId, inviteToken });
+                    wx.setStorageSync('share_invite', { networkId, inviteToken });
+                }
+            }
+            catch (_b) {
+                /* 拉不到就只能分享首页 */
+            }
+        }
         if (!networkId || !inviteToken) {
             return {
                 title: '我和我爱吃的朋友们 · 一起收藏好店',

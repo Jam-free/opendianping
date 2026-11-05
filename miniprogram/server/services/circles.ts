@@ -551,6 +551,7 @@ function sortShopsByDistance(
       item.distanceLabel = formatDistanceLabel(meters, {
         userCity,
         shopCity: item.city,
+        coarse: true,
       });
       withCoords.push(item);
     } else if (shopHasCoords) {
@@ -636,6 +637,7 @@ export function getCircleShopDetail(
     shop.distanceLabel = formatDistanceLabel(meters, {
       userCity: opts.userCity,
       shopCity: shop.city,
+      coarse: true,
     });
   }
 

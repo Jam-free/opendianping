@@ -4,7 +4,6 @@
     latitude="{{mapLat}}"
     longitude="{{mapLng}}"
     scale="16"
-    show-location
     markers="{{markers}}"
     enable-scroll="{{false}}"
     enable-zoom="{{false}}"
@@ -15,7 +14,7 @@
       <text class="search-ico">⌕</text>
       <input
         class="search-input"
-        placeholder="搜店名"
+        placeholder="输入店名"
         value="{{keyword}}"
         bindinput="onKeyword"
         confirm-type="search"
@@ -29,7 +28,7 @@
   <view class="list-label muted">{{listLabel}}</view>
 
   <scroll-view scroll-y class="list" enhanced show-scrollbar="{{false}}">
-    <view wx:if="{{loading}}" class="muted tip">正在找附近…</view>
+    <view wx:if="{{loading}}" class="muted tip">正在找地点…</view>
     <view wx:elif="{{locError}}" class="muted tip">{{locError}}</view>
     <block wx:else>
       <view
@@ -43,13 +42,13 @@
           <view class="item-name">{{item.title}}</view>
           <view class="item-meta muted">
             <text wx:if="{{item.distanceLabel}}">{{item.distanceLabel}} · </text>
-            <text>{{item.address || '附近'}}</text>
+            <text>{{item.address || '地点'}}</text>
           </view>
         </view>
         <text class="check" wx:if="{{selectedId === item.id}}">✓</text>
       </view>
       <view wx:if="{{!items.length}}" class="muted tip">
-        {{keyword ? '没搜到，换个词，或选「我当前位置」' : '附近暂时没有店，可选「我当前位置」'}}
+        {{keyword ? '没有这家店，可以选「我当前位置」' : '这里还没有其他地点，可以选「我当前位置」'}}
       </view>
     </block>
   </scroll-view>

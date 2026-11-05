@@ -76,13 +76,21 @@ export function goLoginGate(): void {
   try {
     const pages = getCurrentPages();
     const cur = pages[pages.length - 1] as
-      | { route?: string; options?: Record<string, string> }
+      | {
+          route?: string;
+          options?: Record<string, string>;
+          /** onLoad 里同步记下的邀请，不依赖异步 setData */
+          _circleId?: string;
+          _token?: string;
+          data?: { circleId?: string; token?: string };
+        }
       | undefined;
-    if (cur?.route === 'pages/join/join' && cur.options) {
-      wx.setStorageSync('pending_join', {
-        c: cur.options.c || '',
-        t: cur.options.t || '',
-      });
+    if (cur?.route === 'pages/join/join') {
+      // 页面参数有时是空的。用空值覆盖会把刚记下的邀请清掉，
+      // 登录完就进了首页，两边的吃货排行都还是空的。
+      const c = cur._circleId || cur.data?.circleId || cur.options?.c || '';
+      const t = cur._token || cur.data?.token || cur.options?.t || '';
+      if (c && t) wx.setStorageSync('pending_join', { c, t });
     }
   } catch {
     /* ignore */
@@ -91,17 +99,36 @@ export function goLoginGate(): void {
   wx.reLaunch({ url: '/pages/login/login' });
 }
 
-/** 登录成功后的去向：有未完成的邀请则回加入页，否则进「我的店」 */
+/**
+ * 用户自己点了导入、分享等操作，才去登录。
+ * 不踢回登录墙：没登完可以返回，继续看首页。
+ */
+export function askToLogin(nextUrl: string): void {
+  try {
+    if (nextUrl) wx.setStorageSync('pending_next', nextUrl);
+  } catch {
+    /* ignore */
+  }
+  wx.navigateTo({ url: '/pages/login/login' });
+}
+
+/** 登录成功后的去向：有未完成的邀请则回加入页，否则回到用户刚才要去的地方 */
 export function enterAppAfterLogin(): void {
   try {
     const pending = wx.getStorageSync('pending_join') as
       | { c?: string; t?: string }
       | '';
-    if (pending && pending.c) {
+    if (pending && pending.c && pending.t) {
       wx.removeStorageSync('pending_join');
       wx.redirectTo({
-        url: `/pages/join/join?c=${pending.c}&t=${pending.t || ''}`,
+        url: `/pages/join/join?c=${encodeURIComponent(pending.c)}&t=${encodeURIComponent(pending.t)}`,
       });
+      return;
+    }
+    const next = wx.getStorageSync('pending_next') as string;
+    if (typeof next === 'string' && next.startsWith('/pages/')) {
+      wx.removeStorageSync('pending_next');
+      wx.reLaunch({ url: next });
       return;
     }
   } catch {
@@ -186,7 +213,8 @@ export async function ensureLogin(opts?: {
 }
 
 /**
- * 退出登录 / 撤销授权：通知服务端废票 + 清本地，回到登录引导。
+ * 退出登录 / 撤销授权：通知服务端废票 + 清本地，回到可浏览的首页。
+ * 不再落在登录页，避免一打开又被要求授权。
  */
 export async function logoutAndLeave(): Promise<void> {
   try {
@@ -194,7 +222,8 @@ export async function logoutAndLeave(): Promise<void> {
   } catch {
     /* 即使服务端失败，本地也必须清干净 */
   }
-  goLoginGate();
+  clearSession();
+  wx.reLaunch({ url: '/pages/my-shops/my-shops' });
 }
 
 export async function request<T>(

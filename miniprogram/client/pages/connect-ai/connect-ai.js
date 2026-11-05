@@ -2,31 +2,27 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const api_1 = require("../../utils/api");
 const config_1 = require("../../utils/config");
-const SKILL_DIR = 'https://github.com/Jam-free/opendianping/tree/main/skills/feimaocat-cloud';
-/** 尽量短：粘贴给 AI 就能用 */
+/** 尽量短：粘贴给 AI 就能看店、记店 */
 function buildInstallCmd(token) {
     return [
-        '你是我的美食助手。用下面接口读写「我的店」；写入前先跟我确认店名，以及要不要标「心心念念」。',
+        '你是我的美食助手。可以看我记过的店，也可以帮我记下新店。记下之前先跟我确认店名。',
         '',
-        `FEIMAOCAT_API_BASE=${config_1.API_BASE}`,
-        `FEIMAOCAT_TOKEN=${token}`,
+        `地址：${config_1.API_BASE}`,
+        `口令：${token}`,
         '',
-        '所有请求加 Header：Authorization: Bearer $FEIMAOCAT_TOKEN',
-        'GET  $FEIMAOCAT_API_BASE/api/agent/shops',
-        'GET  $FEIMAOCAT_API_BASE/api/agent/friends',
-        'POST $FEIMAOCAT_API_BASE/api/agent/shops',
-        'POST 示例：{"name":"店名","city":"城市","note":"备注","wishlist":false}',
-        '',
-        `说明：${SKILL_DIR}`,
+        '每次请求加上：Authorization: Bearer 口令',
+        '查看我的店：GET 地址/api/agent/shops',
+        '查看朋友：GET 地址/api/agent/friends',
+        '记下一家店：POST 地址/api/agent/shops',
+        '例如：{"name":"店名","city":"城市","note":"一句话"}',
     ].join('\n');
 }
 Page({
     data: {
         capabilities: [
-            { title: '查看我的店', desc: '读你导入、记下和好友共享的店' },
-            { title: '记下店铺', desc: '确认后写入你的「我的店」' },
-            { title: '附近与路线', desc: '按距离挑店、串店顺序' },
-            { title: '心心念念', desc: '优先用你很想去的店来规划' },
+            { title: '查看我的店', desc: '看你记过的店，和朋友分享的店' },
+            { title: '记下店铺', desc: '你确认店名之后，帮你记下来' },
+            { title: '附近与路线', desc: '按远近挑店，排一个吃饭顺序' },
         ],
         installCmd: '',
         hasToken: false,
@@ -39,7 +35,7 @@ Page({
     },
     onLoad() {
         this.setData({
-            installCmd: buildInstallCmd('<点下方复制后这里会变成真实 Token>'),
+            installCmd: buildInstallCmd('<点下方复制后，这里会变成你的口令>'),
         });
         this.loadMeta();
     },
@@ -105,7 +101,7 @@ Page({
         }
         wx.setClipboardData({
             data: this.data.plainToken,
-            success: () => wx.showToast({ title: '已复制 Token' }),
+            success: () => wx.showToast({ title: '已复制口令' }),
         });
     },
     async resetToken() {
@@ -116,7 +112,7 @@ Page({
                 busy: false,
                 installCmd: buildInstallCmd(token),
             });
-            wx.showToast({ title: 'Token 已重置' });
+            wx.showToast({ title: '口令已重置' });
         }
         catch (err) {
             this.setData({ busy: false });

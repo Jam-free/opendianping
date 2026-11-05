@@ -19,10 +19,15 @@ export function haversineMeters(
 /** 规格 0.1：<1km 显示 m，否则 km；跨城可带城市名 */
 export function formatDistanceLabel(
   meters: number,
-  opts?: { userCity?: string; shopCity?: string }
+  opts?: { userCity?: string; shopCity?: string; coarse?: boolean }
 ): string {
   if (opts?.userCity && opts.shopCity && opts.userCity !== opts.shopCity) {
     return opts.shopCity;
+  }
+  // 模糊坐标误差常有一个街区。写成「1公里内」而不是「268m」，避免假精度。
+  if (opts?.coarse) {
+    const km = Math.max(1, Math.ceil(meters / 1000));
+    return `${km}公里内`;
   }
   if (meters < 1000) {
     return `${Math.round(meters)} m`;

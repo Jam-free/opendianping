@@ -5,6 +5,7 @@ exports.peekCachedUser = peekCachedUser;
 exports.saveCachedUser = saveCachedUser;
 exports.clearSession = clearSession;
 exports.goLoginGate = goLoginGate;
+exports.askToLogin = askToLogin;
 exports.enterAppAfterLogin = enterAppAfterLogin;
 exports.ensureLogin = ensureLogin;
 exports.logoutAndLeave = logoutAndLeave;
@@ -75,31 +76,54 @@ function clearSession() {
  * 若当前在邀请页，先记下参数，登录成功后回到加入流程。
  */
 function goLoginGate() {
+    var _a, _b, _c, _d;
     try {
         const pages = getCurrentPages();
         const cur = pages[pages.length - 1];
-        if ((cur === null || cur === void 0 ? void 0 : cur.route) === 'pages/join/join' && cur.options) {
-            wx.setStorageSync('pending_join', {
-                c: cur.options.c || '',
-                t: cur.options.t || '',
-            });
+        if ((cur === null || cur === void 0 ? void 0 : cur.route) === 'pages/join/join') {
+            // 页面参数有时是空的。用空值覆盖会把刚记下的邀请清掉，
+            // 登录完就进了首页，两边的吃货排行都还是空的。
+            const c = cur._circleId || ((_a = cur.data) === null || _a === void 0 ? void 0 : _a.circleId) || ((_b = cur.options) === null || _b === void 0 ? void 0 : _b.c) || '';
+            const t = cur._token || ((_c = cur.data) === null || _c === void 0 ? void 0 : _c.token) || ((_d = cur.options) === null || _d === void 0 ? void 0 : _d.t) || '';
+            if (c && t)
+                wx.setStorageSync('pending_join', { c, t });
         }
     }
-    catch (_a) {
+    catch (_e) {
         /* ignore */
     }
     clearSession();
     wx.reLaunch({ url: '/pages/login/login' });
 }
-/** 登录成功后的去向：有未完成的邀请则回加入页，否则进「我的店」 */
+/**
+ * 用户自己点了导入、分享等操作，才去登录。
+ * 不踢回登录墙：没登完可以返回，继续看首页。
+ */
+function askToLogin(nextUrl) {
+    try {
+        if (nextUrl)
+            wx.setStorageSync('pending_next', nextUrl);
+    }
+    catch (_a) {
+        /* ignore */
+    }
+    wx.navigateTo({ url: '/pages/login/login' });
+}
+/** 登录成功后的去向：有未完成的邀请则回加入页，否则回到用户刚才要去的地方 */
 function enterAppAfterLogin() {
     try {
         const pending = wx.getStorageSync('pending_join');
-        if (pending && pending.c) {
+        if (pending && pending.c && pending.t) {
             wx.removeStorageSync('pending_join');
             wx.redirectTo({
-                url: `/pages/join/join?c=${pending.c}&t=${pending.t || ''}`,
+                url: `/pages/join/join?c=${encodeURIComponent(pending.c)}&t=${encodeURIComponent(pending.t)}`,
             });
+            return;
+        }
+        const next = wx.getStorageSync('pending_next');
+        if (typeof next === 'string' && next.startsWith('/pages/')) {
+            wx.removeStorageSync('pending_next');
+            wx.reLaunch({ url: next });
             return;
         }
     }
@@ -172,7 +196,8 @@ async function ensureLogin(opts) {
     }
 }
 /**
- * 退出登录 / 撤销授权：通知服务端废票 + 清本地，回到登录引导。
+ * 退出登录 / 撤销授权：通知服务端废票 + 清本地，回到可浏览的首页。
+ * 不再落在登录页，避免一打开又被要求授权。
  */
 async function logoutAndLeave() {
     try {
@@ -181,7 +206,8 @@ async function logoutAndLeave() {
     catch (_a) {
         /* 即使服务端失败，本地也必须清干净 */
     }
-    goLoginGate();
+    clearSession();
+    wx.reLaunch({ url: '/pages/my-shops/my-shops' });
 }
 async function request(path, options = {}) {
     const auth = options.auth !== false;

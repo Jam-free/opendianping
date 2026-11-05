@@ -1,4 +1,5 @@
 import { request, buildQuery } from '../../utils/api';
+import { getUserLocation } from '../../utils/location';
 import {
   LocatePlace,
   nearbyFoodName,
@@ -31,7 +32,7 @@ Page({
     loading: true,
     locError: '',
     keyword: '',
-    listLabel: '附近',
+    listLabel: '地点',
     lat: 0,
     lng: 0,
     mapLat: 22.54,
@@ -58,16 +59,24 @@ Page({
     if (this._searchTimer) clearTimeout(this._searchTimer);
   },
 
+  /**
+   * 打开就列出地点，第一项永远是「我当前位置」。
+   * 输入店名只是刷新下面的地点，不把当前位置拿掉。
+   * 坐标用模糊位置：精确位置申请未通过，且不能和列表同时开。
+   */
   async bootstrap() {
     this.setData({ loading: true, locError: '' });
     try {
-      const res = await new Promise<WechatMiniprogram.GetLocationSuccessCallbackResult>(
-        (resolve, reject) => {
-          wx.getLocation({ type: 'gcj02', success: resolve, fail: reject });
-        }
-      );
-      const lat = res.latitude;
-      const lng = res.longitude;
+      const loc = await getUserLocation();
+      if (!loc) {
+        this.setData({
+          loading: false,
+          locError: '无法获取位置，请在设置里打开位置权限后再试',
+        });
+        return;
+      }
+      const lat = loc.lat;
+      const lng = loc.lng;
       this.setData({ lat, lng, mapLat: lat, mapLng: lng, loading: true });
 
       const qs = buildQuery({ lat, lng });
@@ -127,7 +136,7 @@ Page({
         items,
         nearbyItems: items,
         selectedId: here.id,
-        listLabel: '附近',
+        listLabel: '地点',
       });
       this.syncMap(here);
     } catch {
@@ -167,24 +176,35 @@ Page({
     this.setData({ keyword });
     if (this._searchTimer) clearTimeout(this._searchTimer);
     if (!keyword.trim()) {
-      this.setData({
-        items: this.data.nearbyItems,
-        listLabel: '附近',
-        selectedId: (this.data.nearbyItems[0] as PlaceItem | undefined)?.id || '',
-      });
-      const first = this.data.nearbyItems[0] as PlaceItem | undefined;
-      if (first) this.syncMap(first);
+      const items = this.data.nearbyItems as PlaceItem[];
+      const selectedId = this.keepOrHere(items);
+      this.setData({ items, listLabel: '地点', selectedId });
+      const picked = items.find((p) => p.id === selectedId);
+      if (picked) this.syncMap(picked);
       return;
     }
     this._searchTimer = setTimeout(() => this.runSearch(keyword.trim()), 350) as unknown as number;
   },
 
+  /** 当前位置始终留在列表里，方便随时改选。 */
+  withHere(hits: PlaceItem[]): PlaceItem[] {
+    const here = (this.data.nearbyItems as PlaceItem[]).find((p) => p.isCurrent);
+    const rest = hits.filter((p) => !p.isCurrent && p.id !== '__here__');
+    return here ? [here, ...rest] : rest;
+  },
+
+  keepOrHere(items: PlaceItem[]): string {
+    const still = items.find((p) => p.id === this.data.selectedId);
+    if (still) return still.id;
+    return items.find((p) => p.isCurrent)?.id || items[0]?.id || '';
+  },
+
   clearKeyword() {
-    this.setData({
-      keyword: '',
-      items: this.data.nearbyItems,
-      listLabel: '附近',
-    });
+    const items = this.data.nearbyItems as PlaceItem[];
+    const selectedId = this.keepOrHere(items);
+    this.setData({ keyword: '', items, listLabel: '地点', selectedId });
+    const picked = items.find((p) => p.id === selectedId);
+    if (picked) this.syncMap(picked);
   },
 
   onSearch() {
@@ -193,7 +213,7 @@ Page({
   },
 
   async runSearch(keyword: string) {
-    this.setData({ listLabel: '搜索中…' });
+    this.setData({ listLabel: '地点' });
     try {
       const qs = buildQuery({
         q: keyword,
@@ -211,9 +231,6 @@ Page({
         }>;
       }>(`/api/geo/search?${qs}`);
 
-      const here = (this.data.nearbyItems as PlaceItem[]).find(
-        (p) => p.isCurrent
-      );
       const hits: PlaceItem[] = (res.pois || []).map((p) => ({
         id: p.id,
         title: p.title,
@@ -224,18 +241,15 @@ Page({
         poiId: p.id,
       }));
 
-      // 搜不到店时仍保留「我当前位置」，方便记成附近美食
-      const items = here ? [...hits, here] : hits;
-      const selected = items[0];
-      this.setData({
-        items,
-        listLabel: hits.length ? '搜索结果' : '没搜到店',
-        selectedId: selected?.id || '',
-      });
-      if (selected) this.syncMap(selected);
+      // 输入店名只刷新候选；当前位置永远留在最上面，由用户自己点选。
+      const items = this.withHere(hits);
+      const selectedId = this.keepOrHere(items);
+      this.setData({ items, listLabel: '地点', selectedId });
+      const picked = items.find((p) => p.id === selectedId);
+      if (picked) this.syncMap(picked);
     } catch (err) {
-      wx.showToast({ title: (err as Error).message || '搜索失败', icon: 'none' });
-      this.setData({ listLabel: '搜索结果' });
+      wx.showToast({ title: (err as Error).message || '没有刷新地点', icon: 'none' });
+      this.setData({ listLabel: '地点' });
     }
   },
 
@@ -266,6 +280,11 @@ Page({
     }
 
     const place = this.toLocatePlace(item);
+    const typed = (this.data.keyword || '').trim();
+    // 手写了店名，又选的是当前位置：店名用输入的字，位置仍是脚下这一点。
+    if (item.isCurrent && typed) {
+      place.name = typed;
+    }
     writeLocateDraft({ place });
 
     if (this.data.entry) {

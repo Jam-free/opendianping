@@ -468,6 +468,8 @@ export async function listMyShops(
       distanceLabel = formatDistanceLabel(distanceMeters, {
         userCity: opts.userCity,
         shopCity: r.city ?? undefined,
+        // 客户端传来的是模糊坐标，距离只表示大概远近
+        coarse: true,
       });
     }
     
@@ -1326,11 +1328,153 @@ function consumeAgentShopWriteOrThrow(userId: string): void {
   }
 }
 
+/** 去掉括号里的分店说明，方便「朴墅」对上「朴墅（西湖店）」 */
+function looseShopName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '')
+    .replace(/[（(][^）)]*[）)]/g, '');
+}
+
+type FriendSharedHit = {
+  shopId: string;
+  poiKey: string;
+  fromUserId: string;
+};
+
+/**
+ * 美食网里朋友已经分享的那一家。
+ * 记下来时应沿用这份店，而不是再造一家只有店名的新店。
+ */
+function findFriendSharedShop(
+  userId: string,
+  networkId: string,
+  name: string,
+  city: string | null,
+  poiKey: string | null,
+  sourceShopId: string | null
+): FriendSharedHit | undefined {
+  const rows = getDb()
+    .prepare(
+      `SELECT s.id AS shop_id,
+              COALESCE(s.source_shop_id, s.amap_poi_id, s.id) AS poi_key,
+              s.raw_name AS name,
+              s.city AS city,
+              s.address AS address,
+              s.lat AS lat,
+              f.user_id AS from_user_id
+       FROM circle_members cm
+       JOIN favorites f ON f.user_id = cm.user_id AND f.visibility = 'circles'
+       JOIN shops s ON s.id = f.shop_id
+       WHERE cm.circle_id = ? AND cm.user_id != ?`
+    )
+    .all(networkId, userId) as Array<{
+    shop_id: string;
+    poi_key: string;
+    name: string;
+    city: string | null;
+    address: string | null;
+    lat: number | null;
+    from_user_id: string;
+  }>;
+  if (!rows.length) return undefined;
+
+  const asHit = (row: (typeof rows)[number]): FriendSharedHit => ({
+    shopId: row.shop_id,
+    poiKey: row.poi_key,
+    fromUserId: row.from_user_id,
+  });
+
+  if (sourceShopId) {
+    const byId = rows.find((r) => r.poi_key === sourceShopId);
+    if (byId) return asHit(byId);
+  }
+  if (poiKey) {
+    const byPoi = rows.find(
+      (r) => r.poi_key === poiKey || r.shop_id === poiKey
+    );
+    if (byPoi) return asHit(byPoi);
+  }
+
+  const keyName = normalizeDedupName(name);
+  const keyCity = normalizeDedupCity(city);
+  const loose = looseShopName(name);
+  const sameCity = (row: (typeof rows)[number]) =>
+    !keyCity || normalizeDedupCity(row.city) === keyCity;
+
+  const exact = rows.filter(
+    (r) => normalizeDedupName(r.name) === keyName && sameCity(r)
+  );
+  const looseHits = exact.length
+    ? exact
+    : rows.filter((r) => looseShopName(r.name) === loose && loose && sameCity(r));
+
+  // 没写城市时，只有全网就这一家同名店才认，避免记错
+  const pool = keyCity
+    ? looseHits
+    : looseHits.length === 1
+      ? looseHits
+      : rows.filter((r) => normalizeDedupName(r.name) === keyName);
+  if (!keyCity && pool.length !== 1 && exact.length !== 1) {
+    const uniqueLoose = rows.filter((r) => looseShopName(r.name) === loose && loose);
+    if (uniqueLoose.length !== 1) return undefined;
+    return asHit(uniqueLoose[0]);
+  }
+  if (!pool.length) return undefined;
+
+  const ranked = [...pool].sort((a, b) => {
+    const score = (row: (typeof rows)[number]) =>
+      (row.address ? 2 : 0) + (row.lat != null ? 1 : 0);
+    return score(b) - score(a);
+  });
+  return asHit(ranked[0]);
+}
+
+/**
+ * 朋友已经分享过这家店：加进自己的私藏，并点亮心心念念。
+ * 和在小程序里打开朋友的店、点「心心念念」是同一件事：沿用那份地址和图片，记下推荐人。
+ * 若之前误建成了只有店名的 Agent 店，改挂到朋友那一份上。
+ */
+async function adoptFriendSharedShop(
+  userId: string,
+  hit: FriendSharedHit,
+  note: string | null,
+  stubFavoriteId: string | null
+): Promise<{ created: boolean; favoriteId: string }> {
+  const db = getDb();
+  if (stubFavoriteId) {
+    db.prepare(
+      `DELETE FROM favorites WHERE id = ? AND user_id = ?`
+    ).run(stubFavoriteId, userId);
+  }
+  const already = db
+    .prepare(`SELECT id FROM favorites WHERE user_id = ? AND shop_id = ?`)
+    .get(userId, hit.shopId) as { id: string } | undefined;
+  const saved = await setWishlistByPoi(userId, hit.poiKey, true, hit.fromUserId);
+  const favoriteId = saved.favoriteId || already?.id;
+  if (!favoriteId) {
+    throw httpError('没能把朋友的店加入私藏', 500);
+  }
+  if (note) {
+    const current = db
+      .prepare(`SELECT note FROM favorites WHERE id = ?`)
+      .get(favoriteId) as { note: string | null } | undefined;
+    db.prepare(`UPDATE favorites SET note = ? WHERE id = ? AND user_id = ?`).run(
+      appendNotes(current?.note ?? null, note),
+      favoriteId,
+      userId
+    );
+  }
+  return { created: !already, favoriteId };
+}
+
 /**
  * Agent 记下一家店，写入调用者自己的「我的店」。
  *
  * 不走 createCheckin：那边强制 lat/lng，且 source_type=locate → origin 会变成「我记下」。
  * 本路径 source_type=agent、文案「Agent 记下」。
+ * 若美食网里已有同名的朋友分享，则改为加入那一份，不新建残缺店。
  * 字段与小程序收藏店对齐：address / category / phone / lat/lng / note / wishlist / source_shop_id。
  * 点评 id 只存调用方给出的真实数字或点评链接；没有可靠单店定位时保持 pending。
  */
@@ -1347,7 +1491,7 @@ export async function createAgentShop(
   await assertAgentShopTextSafe(parsed);
   consumeAgentShopWriteOrThrow(userId);
 
-  await ensurePersonalNetwork(userId);
+  const network = await ensurePersonalNetwork(userId);
   const existing = findDuplicateShop(
     listUserFavoriteShops(userId),
     name,
@@ -1357,6 +1501,49 @@ export async function createAgentShop(
   );
   const createdAt = nowIso();
   const db = getDb();
+
+  // 朋友已经分享过：直接加入那一份，等同于在小程序里点心心念念
+  const friendHit = findFriendSharedShop(
+    userId,
+    network.id,
+    name,
+    parsed.city,
+    parsed.poiKey,
+    parsed.sourceShopId
+  );
+  const existingSource = existing
+    ? (
+        db
+          .prepare(`SELECT source_type FROM shops WHERE id = ?`)
+          .get(existing.shop_id) as { source_type: string } | undefined
+      )?.source_type
+    : undefined;
+  const replaceStub =
+    friendHit &&
+    existing &&
+    existing.shop_id !== friendHit.shopId &&
+    existingSource === 'agent';
+  if (friendHit && (!existing || replaceStub)) {
+    const adopted = await adoptFriendSharedShop(
+      userId,
+      friendHit,
+      parsed.note,
+      replaceStub ? existing.favorite_id : null
+    );
+    console.info(
+      JSON.stringify({
+        event: 'agent_shop_write',
+        userId,
+        name,
+        adoptedFromFriend: true,
+        ts: createdAt,
+      })
+    );
+    return {
+      created: adopted.created,
+      shop: await agentShopByFavoriteId(userId, adopted.favoriteId),
+    };
+  }
 
   // H4：body.source 乱传也忽略，永远按 agent 落库
   if (existing) {

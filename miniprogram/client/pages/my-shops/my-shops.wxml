@@ -7,7 +7,7 @@
     标题相对位置固定：左「私藏好店」右「吃货排行」；
     只切换字号/字色（当前大橙、另一页小灰），很常见的 UX。
   -->
-  <view class="header" style="min-height: {{navRowHeight}}px;">
+  <view class="header" style="min-height: {{navRowHeight}}px; padding-right: {{capsulePad}}px;">
     <view class="titles">
       <view class="title-hit" bindtap="goPanel" data-panel="0">
         <text class="title {{panel === 0 ? 'title--on' : 'title--off'}}">私藏好店</text>
@@ -17,8 +17,9 @@
       </view>
     </view>
     <view class="avatar-entry" bindtap="goAccount" hover-class="avatar-hover">
-      <image wx:if="{{avatar}}" class="me-av" src="{{avatar}}" mode="aspectFill" />
-      <view wx:else class="me-av text">{{initial}}</view>
+      <image wx:if="{{loggedIn && avatar}}" class="me-av" src="{{avatar}}" mode="aspectFill" />
+      <view wx:elif="{{loggedIn}}" class="me-av text">{{initial}}</view>
+      <view wx:else class="me-av text">我</view>
     </view>
   </view>
   <view class="header-line"></view>
@@ -58,7 +59,21 @@
 
     <swiper-item>
       <scroll-view scroll-y class="panel-scroll" enhanced show-scrollbar="{{false}}">
-        <view class="rank-hint" wx:if="{{friends.length}}">按共享好店数排一排</view>
+        <view class="rank-bar" wx:if="{{friends.length}}">
+          <text class="rank-hint">按共享好店数排一排</text>
+          <button
+            wx:if="{{loggedIn}}"
+            class="rank-invite"
+            open-type="share"
+            hover-class="rank-invite--press"
+          >邀请好友</button>
+          <button
+            wx:else
+            class="rank-invite"
+            hover-class="rank-invite--press"
+            bindtap="askLoginForShare"
+          >邀请好友</button>
+        </view>
 
         <view class="sheet" wx:if="{{friends.length}}">
           <block wx:for="{{friends}}" wx:key="id">
@@ -90,7 +105,8 @@
         <view class="empty" wx:elif="{{!friendsLoading}}">
           <view class="empty-title">还没有吃货上榜</view>
           <view class="empty-desc">邀请好友加入并共享收藏后，会出现在这里。</view>
-          <button class="btn-primary btn-block empty-btn" open-type="share">邀请好友</button>
+          <button wx:if="{{loggedIn}}" class="btn-primary btn-block empty-btn" open-type="share">邀请好友</button>
+          <button wx:else class="btn-primary btn-block empty-btn" bindtap="askLoginForShare">邀请好友</button>
         </view>
         <view class="scroll-pad"></view>
       </scroll-view>

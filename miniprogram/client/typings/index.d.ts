@@ -70,7 +70,8 @@ declare const wx: {
   removeStorageSync: (k: string) => void;
   setClipboardData: (opts: any) => void;
   openLocation: (opts: any) => void;
-  getLocation: (opts: any) => void;
+  /** 模糊位置：列表、详情和记美食附近列表。不可与精确位置同时使用。 */
+  getFuzzyLocation: (opts: any) => void;
   chooseMedia: (opts: any) => void;
   previewImage: (opts: any) => void;
   setNavigationBarTitle: (opts: any) => void;

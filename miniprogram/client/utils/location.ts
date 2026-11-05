@@ -6,12 +6,26 @@ export type UserLocation = {
   userCity?: string;
 };
 
-/** 获取 GCJ-02 坐标；用户坐标仅内存/本地缓存，不上传落库 */
+/**
+ * 列表和详情只用模糊位置。
+ *
+ * 为什么不用精确位置：微信不允许同一个小程序同时声明「精确位置」和「模糊位置」。
+ * 精确位置接口的开放范围也不包含「按距离排店、看离我多远」。
+ * 模糊坐标够用来分出大概远近；误差常常有一个街区，所以距离文案不写几十米。
+ *
+ * 记美食的附近列表也走这里，页面交互仍是选附近店或搜店名。
+ * 模糊坐标对不齐门口那几米；认准某一家时用搜索店名。
+ * 用户坐标只留在手机本地，不上传落库。
+ */
 export async function getUserLocation(): Promise<UserLocation | null> {
   try {
     const res = await new Promise<WechatMiniprogram.GetLocationSuccessCallbackResult>(
       (resolve, reject) => {
-        wx.getLocation({ type: 'gcj02', success: resolve, fail: reject });
+        wx.getFuzzyLocation({
+          type: 'gcj02',
+          success: resolve,
+          fail: reject,
+        });
       }
     );
     const loc: UserLocation = { lat: res.latitude, lng: res.longitude };

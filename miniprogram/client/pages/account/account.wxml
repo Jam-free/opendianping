@@ -13,7 +13,7 @@
       />
       <view wx:else class="avatar text">{{initial}}</view>
     </button>
-    <view class="muted avatar-hint">点头像可更换</view>
+    <view class="muted avatar-hint">{{loggedIn ? '点头像可更换' : '点头像，选用微信头像'}}</view>
 
     <input
       class="nick-input"
@@ -34,12 +34,12 @@
     </button>
   </view>
 
-  <view class="card actions-card">
+  <view class="card actions-card" wx:if="{{loggedIn}}">
     <button class="btn-ghost btn-block danger-btn" loading="{{busy}}" bindtap="onLogout">
       退出登录 / 撤销授权
     </button>
     <view class="muted foot">
-      将清除本机登录状态。下次使用需重新登录；不影响已导入的店铺数据。
+      将清除本机登录状态，回到首页继续浏览。不影响已导入的店铺数据。
     </view>
   </view>
 </view>

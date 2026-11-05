@@ -1,10 +1,19 @@
+/*
+  矮胶囊：压掉上下留白，少挡店铺列表。
+  高度账：胶囊 104rpx + 距屏幕底 16rpx = 120rpx，再加安全区。
+  列表垫高请用 calc(168rpx + env(safe-area-inset-bottom))
+  （120rpx 底栏 + 48rpx 透气，阴影不会压到最后一张卡）。
+  配色：白底墨黑线标。荧光 #C6F500 只做按下高亮——
+  小字直接铺荧光，在白底上几乎看不清。
+*/
+
 .dock-safe {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 100;
-  padding: 0 40rpx calc(20rpx + env(safe-area-inset-bottom));
+  z-index: 1000;
+  padding: 0 32rpx calc(16rpx + env(safe-area-inset-bottom));
   pointer-events: none;
   box-sizing: border-box;
 }
@@ -13,42 +22,50 @@
   pointer-events: auto;
   display: flex;
   align-items: stretch;
-  height: 120rpx;
+  height: 104rpx;
   background: #ffffff;
   border-radius: 999rpx;
-  box-shadow:
-    0 10rpx 40rpx rgba(0, 0, 0, 0.08),
-    0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  border: 1rpx solid rgba(17, 17, 17, 0.08);
+  box-shadow: 0 8rpx 24rpx rgba(17, 17, 17, 0.08);
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
+/* 热区铺满整格（约 ≥44px）；高亮内缩成小胶囊，避免直边切开外轮廓 */
 .dock-item {
+  flex: 1;
+  min-height: 88rpx;
+  display: flex;
+  align-items: stretch;
+  padding: 8rpx 10rpx;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dock-hit {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6rpx;
+  gap: 4rpx;
   border-radius: 999rpx;
 }
 
-.dock-item--press {
-  background: rgba(255, 107, 74, 0.06);
+.dock-item--press .dock-hit {
+  background: rgba(198, 245, 0, 0.55);
 }
 
 .dock-icon {
-  width: 44rpx;
-  height: 44rpx;
-}
-
-.dock-icon--ai {
-  width: 48rpx;
-  height: 48rpx;
+  width: 40rpx;
+  height: 40rpx;
+  display: block;
 }
 
 .dock-label {
   font-size: 22rpx;
-  line-height: 1.2;
-  color: var(--primary);
+  line-height: 1.15;
+  color: #111111;
   font-weight: 500;
   letter-spacing: 0.5rpx;
+  white-space: nowrap;
 }

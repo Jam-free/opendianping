@@ -101,8 +101,9 @@
   padding: 0 40rpx;
 }
 
+/* 与底栏同高：104 胶囊 + 16 底边 + 48 透气，再加安全区 */
 .scroll-pad {
-  height: calc(240rpx + env(safe-area-inset-bottom));
+  height: calc(168rpx + env(safe-area-inset-bottom));
 }
 
 .sheet {
@@ -268,57 +269,3 @@
   margin-top: 20rpx;
 }
 
-/* —— 悬浮胶囊底栏：极简白线图标 + 品牌渐变方底 —— */
-.dock-safe {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 9999;
-  padding: 0 48rpx calc(18rpx + env(safe-area-inset-bottom));
-  box-sizing: border-box;
-  pointer-events: none;
-}
-
-.dock {
-  pointer-events: auto;
-  display: flex;
-  align-items: center;
-  height: 148rpx;
-  padding: 0 12rpx;
-  background: #ffffff;
-  border-radius: 999rpx;
-  box-shadow:
-    0 12rpx 40rpx rgba(0, 0, 0, 0.08),
-    0 2rpx 10rpx rgba(0, 0, 0, 0.04);
-}
-
-.dock-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10rpx;
-  height: 100%;
-  border-radius: 40rpx;
-}
-
-.dock-item--press {
-  opacity: 0.72;
-}
-
-/* 渐变方标本体已在 png 里，这里只控尺寸 */
-.dock-icon {
-  width: 64rpx;
-  height: 64rpx;
-  display: block;
-}
-
-.dock-label {
-  font-size: 22rpx;
-  line-height: 1.2;
-  color: #ff6b4a;
-  font-weight: 500;
-  letter-spacing: 1rpx;
-}

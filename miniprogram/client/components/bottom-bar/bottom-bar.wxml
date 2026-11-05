@@ -1,17 +1,26 @@
-<!-- 参考：圆角胶囊悬浮条，三等分，图标+短文案，主题色 -->
+<!--
+  悬浮胶囊底栏。三个入口等宽：导入 / 连接 AI / 记美食。
+  主页与仍引用本组件的页面共用这一条，避免各写一份又长高。
+-->
 <view class="dock-safe">
   <view class="dock">
     <view class="dock-item" hover-class="dock-item--press" bindtap="onImport">
-      <image class="dock-icon" src="/assets/icons/dock/import.png" mode="aspectFit" />
-      <text class="dock-label">导入</text>
+      <view class="dock-hit">
+        <image class="dock-icon" src="/assets/icons/dock/import.png" mode="aspectFit" />
+        <text class="dock-label">导入</text>
+      </view>
     </view>
     <view class="dock-item" hover-class="dock-item--press" bindtap="onConnectAi">
-      <image class="dock-icon dock-icon--ai" src="/assets/icons/dock/connect-ai.png" mode="aspectFit" />
-      <text class="dock-label">连接 AI</text>
+      <view class="dock-hit">
+        <image class="dock-icon" src="/assets/icons/dock/connect-ai.png" mode="aspectFit" />
+        <text class="dock-label">连接 AI</text>
+      </view>
     </view>
     <view class="dock-item" hover-class="dock-item--press" bindtap="onLocate">
-      <image class="dock-icon" src="/assets/icons/dock/locate.png" mode="aspectFit" />
-      <text class="dock-label">记美食</text>
+      <view class="dock-hit">
+        <image class="dock-icon" src="/assets/icons/dock/locate.png" mode="aspectFit" />
+        <text class="dock-label">记美食</text>
+      </view>
     </view>
   </view>
 </view>

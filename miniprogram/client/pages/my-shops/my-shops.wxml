@@ -98,20 +98,5 @@
   </swiper>
 </view>
 
-<!-- 悬浮底栏：白胶囊 + 品牌渐变方标白线图标（与 page 同级，防裁切） -->
-<view class="dock-safe">
-  <view class="dock">
-    <view class="dock-item" hover-class="dock-item--press" bindtap="goImport">
-      <image class="dock-icon" src="/assets/icons/dock/import.png" mode="aspectFit" />
-      <text class="dock-label">导入</text>
-    </view>
-    <view class="dock-item" hover-class="dock-item--press" bindtap="goConnectAi">
-      <image class="dock-icon" src="/assets/icons/dock/connect-ai.png" mode="aspectFit" />
-      <text class="dock-label">连接 AI</text>
-    </view>
-    <view class="dock-item" hover-class="dock-item--press" bindtap="goLocate">
-      <image class="dock-icon" src="/assets/icons/dock/locate.png" mode="aspectFit" />
-      <text class="dock-label">记美食</text>
-    </view>
-  </view>
-</view>
+<!-- 悬浮底栏放在 .page 外：微信会把 overflow 裁掉同树里的 fixed -->
+<bottom-bar />

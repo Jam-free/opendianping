@@ -69,31 +69,34 @@ function checkContainerConfig(): CheckResult[] {
     return results;
   }
 
-  // 检查持久存储（阻塞警告）
-  if (!config.volumeMounts || !config.volumeMounts['/data']) {
-    results.push({
-      name: 'persistent_storage',
-      passed: false,
-      severity: 'error',
-      message: '⚠️  持久存储配置缺失（阻塞）',
-      suggestion: `container.config.json 不支持 volumeMounts 配置。
-      
-      必须在微信云托管控制台手动配置持久盘：
-      1. 进入云托管控制台
-      2. 服务设置 → 存储
-      3. 挂载持久盘到 /data（容量 1GB）
-      
-      ❌ 未找到官方文档支持 container.config.json volumeMounts
-      ❌ SQLite 多实例并发安全性未验证
-      ⏳ 需要查看官方文档确认持久存储配置方式
-      
-      如果微信云托管不支持可靠的持久盘，请考虑：
-      - 迁移到微信云数据库
-      - 使用外部数据库服务
-      
-      参考：OFFICIAL_DOCS_RESEARCH.md`,
-    });
-  }
+  // 检查：SQLite 容器存储不可靠（官方证据）
+  results.push({
+    name: 'sqlite_unreliable',
+    passed: false,
+    severity: 'error',
+    message: '❌ SQLite 容器存储不可靠（官方证据）',
+    suggestion: `
+微信云托管官方FAQ明确：
+"容器不支持持久化存储……容器扩缩容/重启自愈时，这些写入的文件会被还原"
+
+来源：https://developers.weixin.qq.com/miniprogram/dev/wxcloudservice/wxcloudrun/src/guide/service/faq.html
+更新：2026-08-24
+
+当前 SQLite 架构存在数据丢失风险：
+❌ 扩缩容时数据丢失
+❌ 重启自愈时数据丢失
+❌ minNum=1 仅避免冷启动，不保证持久化
+
+官方推荐方案：迁移到独立 MySQL
+- VPC 内网连接
+- 控制台创建
+- 需要配置备份计划
+
+详见：OFFICIAL_DOCS_VERIFIED.md
+
+⚠️  在迁移到MySQL前，禁止部署到生产
+`,
+  });
 
   // 检查 2：DB_PATH 必须指向持久盘
   const dbPath = config.envParams?.DB_PATH;

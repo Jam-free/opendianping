@@ -307,13 +307,6 @@ function main() {
   console.log('安全数据恢复工具');
   console.log('');
 
-  // 生产环境拒绝
-  if (process.env.NODE_ENV === 'production') {
-    console.error('❌ 生产环境禁止运行恢复工具');
-    console.error('请在隔离的测试环境运行');
-    process.exit(1);
-  }
-
   const args = parseArgs();
 
   if (!args.backup) {
@@ -325,6 +318,36 @@ function main() {
   if (!args.target) {
     console.error('❌ 缺少 --target 参数');
     console.error('用法: tsx scripts/restore-db-safe.ts --backup ./backup.json --target /tmp/test.db');
+    process.exit(1);
+  }
+
+  // 安全检查：目标路径必须是明确的隔离临时路径
+  const resolvedTarget = path.resolve(args.target);
+  const safePrefixes = ['/tmp/', '/var/tmp/', path.resolve(process.cwd(), 'tmp/'), path.resolve(process.cwd(), 'test/')];
+  const isSafePath = safePrefixes.some(prefix => resolvedTarget.startsWith(prefix));
+  
+  if (!isSafePath) {
+    console.error('❌ 目标路径不安全，仅允许写入隔离临时路径：');
+    console.error('   - /tmp/');
+    console.error('   - /var/tmp/');
+    console.error('   - ./tmp/');
+    console.error('   - ./test/');
+    console.error('');
+    console.error(`当前目标: ${resolvedTarget}`);
+    console.error('');
+    console.error('拒绝写入可能的生产路径，防止误操作');
+    process.exit(1);
+  }
+  
+  // 额外检查：拒绝 /data/ 路径（生产持久盘路径）
+  if (resolvedTarget.startsWith('/data/')) {
+    console.error('❌ 禁止写入 /data/ 路径（生产持久盘）');
+    process.exit(1);
+  }
+  
+  // 生产环境多重拒绝（NODE_ENV 可能被绕过，所以还要检查路径）
+  if (process.env.NODE_ENV === 'production') {
+    console.error('❌ NODE_ENV=production，禁止运行恢复工具');
     process.exit(1);
   }
 

@@ -77,25 +77,10 @@ export function createApp() {
   // 记美食照片走 base64 JSON，需略大于默认 1mb
   app.use(express.json({ limit: '4mb' }));
 
-  app.get('/health', (req, res) => {
-    // albumImport=true 表示本镜像可解析点评公开专辑（不依赖根目录 lib）
-    const basicHealth = { ok: true, albumImport: true };
-    
-    // 生产环境不暴露敏感信息（dbPath、用户统计）
-    if (config.nodeEnv === 'production') {
-      // 需要 debug 参数才返回详细信息（用于运维排查）
-      const debugKey = req.query.debug as string;
-      if (debugKey === config.healthDebugKey) {
-        const persistence = getPersistenceHealth();
-        res.json({ ...basicHealth, persistence });
-      } else {
-        res.json(basicHealth);
-      }
-    } else {
-      // 开发环境返回详细信息
-      const persistence = getPersistenceHealth();
-      res.json({ ...basicHealth, persistence });
-    }
+  app.get('/health', (_req, res) => {
+    // 只返回必要的存活信息（ok 和 albumImport）
+    // 诊断信息通过只读本地命令获取，不暴露远程接口
+    res.json({ ok: true, albumImport: true });
   });
 
   app.get(

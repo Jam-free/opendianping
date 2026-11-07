@@ -43,6 +43,4 @@ export const config = {
   /** 邀请 token 有效天数 */
   inviteTokenDays: 7,
   circleMemberLimit: 200,
-  /** 健康端点详细信息的debug密钥（生产环境保护敏感信息） */
-  healthDebugKey: process.env.HEALTH_DEBUG_KEY || '',
 };

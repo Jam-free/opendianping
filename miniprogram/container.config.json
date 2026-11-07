@@ -2,17 +2,24 @@
   "containerPort": 80,
   "dockerfilePath": "miniprogram/Dockerfile",
   "buildDir": "",
-  "minNum": 0,
+  "minNum": 1,
   "maxNum": 2,
   "cpu": 0.5,
   "mem": 1,
   "policyType": "cpu",
   "policyThreshold": 60,
+  "volumeMounts": {
+    "/data": {
+      "sizeInGiB": 1,
+      "mountType": "CloudStorage"
+    }
+  },
   "envParams": {
     "PORT": "80",
     "DB_PATH": "/data/miniprogram.db",
     "DEV_AUTH_BYPASS": "false",
-    "SOURCE_ADAPTER": "opendianping"
+    "SOURCE_ADAPTER": "opendianping",
+    "PREVENT_EMPTY_DB_START": "true"
   },
   "customLogs": "stdout",
   "initialDelaySeconds": 4

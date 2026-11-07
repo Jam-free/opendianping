@@ -8,6 +8,16 @@ import type Database from 'better-sqlite3';
  */
 export const PERSISTENCE_LOG_PREFIX = '[PERSISTENCE]';
 
+/** 临时盘降级模式下业务接口统一返回的说明文案 */
+export const STORAGE_UNMOUNTED_ERROR =
+  '存储盘未挂载，服务已暂停以保护数据。请检查云托管持久卷是否挂载到 /data';
+
+export function isAllowEphemeralWrites(): boolean {
+  const v = process.env.ALLOW_EPHEMERAL_WRITES;
+  if (v === undefined || v === '') return false;
+  return ['1', 'true', 'yes', 'on'].includes(v.toLowerCase());
+}
+
 /** 微信云托管约定：持久盘挂载点，和 DB 文件都在这块盘上。 */
 export const CLOUD_DATA_VOLUME_ROOT = '/data';
 

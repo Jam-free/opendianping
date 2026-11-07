@@ -69,41 +69,30 @@ function checkContainerConfig(): CheckResult[] {
     return results;
   }
 
-  // 检查 1：volumeMounts 必须存在且挂载 /data
-  if (!config.volumeMounts) {
+  // 检查持久存储（阻塞警告）
+  if (!config.volumeMounts || !config.volumeMounts['/data']) {
     results.push({
-      name: 'volumeMounts_exists',
+      name: 'persistent_storage',
       passed: false,
       severity: 'error',
-      message: 'container.config.json 缺少 volumeMounts 字段',
-      suggestion: '添加: "volumeMounts": { "/data": { "sizeInGiB": 1, "mountType": "CloudStorage" } }',
+      message: '⚠️  持久存储配置缺失（阻塞）',
+      suggestion: `container.config.json 不支持 volumeMounts 配置。
+      
+      必须在微信云托管控制台手动配置持久盘：
+      1. 进入云托管控制台
+      2. 服务设置 → 存储
+      3. 挂载持久盘到 /data（容量 1GB）
+      
+      ❌ 未找到官方文档支持 container.config.json volumeMounts
+      ❌ SQLite 多实例并发安全性未验证
+      ⏳ 需要查看官方文档确认持久存储配置方式
+      
+      如果微信云托管不支持可靠的持久盘，请考虑：
+      - 迁移到微信云数据库
+      - 使用外部数据库服务
+      
+      参考：OFFICIAL_DOCS_RESEARCH.md`,
     });
-  } else if (!config.volumeMounts['/data']) {
-    results.push({
-      name: 'volumeMounts_data',
-      passed: false,
-      severity: 'error',
-      message: 'volumeMounts 未配置 /data 挂载',
-      suggestion: '添加: "/data": { "sizeInGiB": 1, "mountType": "CloudStorage" }',
-    });
-  } else {
-    const mount = config.volumeMounts['/data'];
-    if (mount.sizeInGiB && mount.sizeInGiB < 1) {
-      results.push({
-        name: 'volumeMounts_size',
-        passed: false,
-        severity: 'warning',
-        message: `/data 持久盘容量过小: ${mount.sizeInGiB}GB`,
-        suggestion: '建议至少 1GB',
-      });
-    } else {
-      results.push({
-        name: 'volumeMounts_data',
-        passed: true,
-        severity: 'info',
-        message: `✅ 持久盘挂载配置正确: /data (${mount.sizeInGiB || '?'}GB)`,
-      });
-    }
   }
 
   // 检查 2：DB_PATH 必须指向持久盘

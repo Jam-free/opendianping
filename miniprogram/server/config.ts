@@ -21,6 +21,7 @@ function envBool(key: string, fallback: boolean): boolean {
  */
 export const config = {
   port: Number(process.env.PORT || 8787),
+  nodeEnv: process.env.NODE_ENV || 'development',
   rootDir,
   // 生产必须是 /data/miniprogram.db（持久盘）；本地才用 ./data。禁止无盘发布。
   dbPath: path.resolve(rootDir, process.env.DB_PATH || './data/miniprogram.db'),
@@ -42,4 +43,6 @@ export const config = {
   /** 邀请 token 有效天数 */
   inviteTokenDays: 7,
   circleMemberLimit: 200,
+  /** 健康端点详细信息的debug密钥（生产环境保护敏感信息） */
+  healthDebugKey: process.env.HEALTH_DEBUG_KEY || '',
 };

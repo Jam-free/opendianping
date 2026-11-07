@@ -8,12 +8,6 @@
   "mem": 1,
   "policyType": "cpu",
   "policyThreshold": 60,
-  "volumeMounts": {
-    "/data": {
-      "sizeInGiB": 1,
-      "mountType": "CloudStorage"
-    }
-  },
   "envParams": {
     "PORT": "80",
     "DB_PATH": "/data/miniprogram.db",

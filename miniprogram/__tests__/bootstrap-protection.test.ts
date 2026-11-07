@@ -144,11 +144,18 @@ function shouldBlockStartup(
 }
 
 describe('Bootstrap 启动保护', () => {
-  beforeEach(() => {
+  beforeAll(() => {
     setup();
   });
 
-  afterEach(() => {
+  beforeEach(() => {
+    // 每个测试前删除数据库文件
+    if (fs.existsSync(TEST_DB)) {
+      fs.unlinkSync(TEST_DB);
+    }
+  });
+
+  afterAll(() => {
     if (fs.existsSync(TEST_DIR)) {
       fs.rmSync(TEST_DIR, { recursive: true });
     }

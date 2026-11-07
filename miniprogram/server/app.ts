@@ -78,11 +78,9 @@ export function createApp() {
   app.use(express.json({ limit: '4mb' }));
 
   app.get('/health', (_req, res) => {
-    // albumImport=true 表示本镜像可解析点评公开专辑（不依赖根目录 lib）
-    // persistence 是只读计数：发版后用来确认 Token/收藏还在同一块盘上。
-    // ok 保持 true = 进程活着；盘空了看 persistence.warning / 计数，不要把探活打死。
-    const persistence = getPersistenceHealth();
-    res.json({ ok: true, albumImport: true, persistence });
+    // 只返回必要的存活信息（ok 和 albumImport）
+    // 诊断信息通过只读本地命令获取，不暴露远程接口
+    res.json({ ok: true, albumImport: true });
   });
 
   app.get(

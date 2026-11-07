@@ -260,6 +260,15 @@ describe('Bootstrap 启动保护', () => {
 });
 
 describe('门禁局限性说明', () => {
+  beforeEach(() => {
+    if (!fs.existsSync(TEST_DIR)) {
+      fs.mkdirSync(TEST_DIR, { recursive: true });
+    }
+    if (fs.existsSync(TEST_DB)) {
+      fs.unlinkSync(TEST_DB);
+    }
+  });
+
   test('用户数量阈值不能检测部分收藏丢失', () => {
     // 场景：100用户，原有200收藏，现在只剩50收藏
     createDatabaseWithUsers(100, 50);
@@ -303,6 +312,15 @@ describe('门禁局限性说明', () => {
 });
 
 describe('保守阻塞策略', () => {
+  beforeEach(() => {
+    if (!fs.existsSync(TEST_DIR)) {
+      fs.mkdirSync(TEST_DIR, { recursive: true });
+    }
+    if (fs.existsSync(TEST_DB)) {
+      fs.unlinkSync(TEST_DB);
+    }
+  });
+
   test('疑似数据丢失：应该阻塞发布', () => {
     createEmptyDatabase();
     const health = checkPersistence(TEST_DB);

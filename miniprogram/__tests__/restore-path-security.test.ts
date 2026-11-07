@@ -49,8 +49,13 @@ describe('路径安全测试', () => {
       );
       fail('应该拒绝/data/路径');
     } catch (err: any) {
-      expect(err.stdout).toContain('禁止写入 /data/ 路径');
+      expect(err.status).toBe(1);
+      const output = err.stderr || err.stdout || '';
+      expect(output).toContain('/data/');
     }
+    
+    // 验证目标文件未创建
+    expect(fs.existsSync('/data/test.db')).toBe(false);
   });
 
   test('拒绝不安全路径（如/var/lib）', () => {
@@ -61,8 +66,13 @@ describe('路径安全测试', () => {
       );
       fail('应该拒绝/var/lib路径');
     } catch (err: any) {
-      expect(err.stdout).toContain('目标路径不安全');
+      expect(err.status).toBe(1);
+      const output = err.stderr || err.stdout || '';
+      expect(output).toContain('目标路径不安全');
     }
+    
+    // 验证目标文件未创建
+    expect(fs.existsSync('/var/lib/test.db')).toBe(false);
   });
 
   test('允许/tmp/路径', () => {
@@ -93,20 +103,23 @@ describe('路径安全测试', () => {
       );
       fail('应该拒绝/tmp/../data/路径');
     } catch (err: any) {
-      expect(err.stdout).toContain('禁止写入 /data/ 路径');
+      expect(err.status).toBe(1);
+      const output = err.stderr || err.stdout || '';
+      expect(output).toContain('/data/');
     }
+    
+    // 验证通过路径遍历无法绕过
+    expect(fs.existsSync('/data/test.db')).toBe(false);
   });
 
   test('符号链接：拒绝指向/data/的符号链接', () => {
     const linkPath = path.join(TEST_DIR, 'symlink-to-data');
     
-    // 创建指向/data/的符号链接（如果/data/存在）
-    // 注意：如果/data/不存在，符号链接仍然可以创建
+    // 创建指向/data/的符号链接（即使/data/不存在也可以创建）
     try {
-      fs.symlinkSync('/data', linkPath);
+      fs.symlinkSync('/data', linkPath, 'dir');
     } catch (err) {
-      // /data 可能不存在，跳过这个测试
-      console.log('跳过符号链接测试：/data 目录不存在');
+      console.log('跳过符号链接测试：无法创建符号链接');
       return;
     }
     
@@ -117,13 +130,18 @@ describe('路径安全测试', () => {
       );
       fail('应该拒绝指向/data/的符号链接');
     } catch (err: any) {
-      // 应该在路径规范化后检测到/data/
-      expect(err.stdout).toContain('路径不安全');
+      expect(err.status).toBe(1);
+      // realpath会解析符号链接，检测到/data/
+      const output = err.stderr || err.stdout || '';
+      expect(output).toMatch(/data|路径不安全|无法解析/);
     } finally {
       if (fs.existsSync(linkPath)) {
         fs.unlinkSync(linkPath);
       }
     }
+    
+    // 验证目标文件未创建
+    expect(fs.existsSync('/data/test.db')).toBe(false);
   });
 
   test('realpath规范化：处理多个/../', () => {
@@ -134,19 +152,48 @@ describe('路径安全测试', () => {
       );
       fail('应该拒绝/tmp/../../data/路径');
     } catch (err: any) {
-      expect(err.stdout).toContain('路径');
+      expect(err.status).toBe(1);
+      const output = err.stderr || err.stdout || '';
+      expect(output).toMatch(/data|路径不安全/);
     }
+    
+    // 验证路径遍历无法绕过安全检查
+    expect(fs.existsSync('/data/test.db')).toBe(false);
   });
 
   test('NODE_ENV=production：拒绝运行', () => {
     try {
       execSync(
-        `NODE_ENV=production npx tsx "${RESTORE_SCRIPT}" --backup "${BACKUP_JSON}" --target /tmp/test.db`,
+        `NODE_ENV=production npx tsx "${RESTORE_SCRIPT}" --backup "${BACKUP_JSON}" --target /tmp/test-prod.db`,
         { encoding: 'utf8', stdio: 'pipe' }
       );
       fail('应该拒绝在生产环境运行');
     } catch (err: any) {
-      expect(err.stdout).toContain('NODE_ENV=production');
+      expect(err.status).toBe(1);
+      const output = err.stderr || err.stdout || '';
+      expect(output).toContain('NODE_ENV=production');
     }
+    
+    // 验证目标文件未创建
+    expect(fs.existsSync('/tmp/test-prod.db')).toBe(false);
+  });
+
+  test('不存在的父目录：正确处理', () => {
+    const nonExistentPath = '/tmp/nonexistent-dir-12345/subdir/test.db';
+    
+    // 确保父目录不存在
+    const parentDir = path.dirname(nonExistentPath);
+    if (fs.existsSync(parentDir)) {
+      fs.rmSync(parentDir, { recursive: true });
+    }
+    
+    // 应该因为父目录不存在而使用path.resolve，仍然允许/tmp/下的路径
+    const output = execSync(
+      `npx tsx "${RESTORE_SCRIPT}" --backup "${BACKUP_JSON}" --target "${nonExistentPath}"`,
+      { encoding: 'utf8', stdio: 'pipe' }
+    );
+    
+    // Dry-run应该成功（因为在/tmp/下）
+    expect(output).toContain('DRY-RUN');
   });
 });

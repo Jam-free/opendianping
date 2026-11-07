@@ -380,7 +380,49 @@ function main() {
   }
 
   // 安全检查：目标路径必须是明确的隔离临时路径
-  const resolvedTarget = path.resolve(args.target);
+  // 使用 fs.realpathSync 解析符号链接和规范化路径
+  let resolvedTarget: string;
+  try {
+    // 尝试解析目标路径（包括符号链接）
+    const targetDir = path.dirname(args.target);
+    
+    // 检查父目录是否是符号链接
+    if (fs.existsSync(targetDir)) {
+      try {
+        const realDir = fs.realpathSync(targetDir);
+        resolvedTarget = path.join(realDir, path.basename(args.target));
+      } catch (err) {
+        // 如果realpath失败（如符号链接指向不存在的目标），仍然拒绝
+        console.error(`❌ 无法解析目标路径: ${args.target}`);
+        console.error(`   父目录可能是无效的符号链接`);
+        process.exit(1);
+      }
+    } else if (fs.lstatSync(targetDir).isSymbolicLink && fs.lstatSync(targetDir).isSymbolicLink()) {
+      // 符号链接存在但目标不存在
+      console.error(`❌ 目标路径包含无效的符号链接: ${targetDir}`);
+      process.exit(1);
+    } else {
+      // 父目录不存在，使用 path.resolve
+      resolvedTarget = path.resolve(args.target);
+    }
+  } catch (err) {
+    // 可能是检查符号链接时出错
+    const targetDir = path.dirname(args.target);
+    try {
+      // 尝试检查是否是符号链接
+      const stats = fs.lstatSync(targetDir);
+      if (stats.isSymbolicLink()) {
+        // 是符号链接但目标不存在
+        console.error(`❌ 目标路径包含符号链接: ${targetDir}`);
+        console.error(`   符号链接指向的目标可能不存在或不可访问`);
+        process.exit(1);
+      }
+    } catch {
+      // 父目录完全不存在，使用 path.resolve
+    }
+    resolvedTarget = path.resolve(args.target);
+  }
+  
   const safePrefixes = ['/tmp/', '/var/tmp/', path.resolve(process.cwd(), 'tmp/'), path.resolve(process.cwd(), 'test/')];
   const isSafePath = safePrefixes.some(prefix => resolvedTarget.startsWith(prefix));
   
@@ -391,7 +433,8 @@ function main() {
     console.error('   - ./tmp/');
     console.error('   - ./test/');
     console.error('');
-    console.error(`当前目标: ${resolvedTarget}`);
+    console.error(`目标路径: ${args.target}`);
+    console.error(`解析后: ${resolvedTarget}`);
     console.error('');
     console.error('拒绝写入可能的生产路径，防止误操作');
     process.exit(1);
@@ -400,6 +443,7 @@ function main() {
   // 额外检查：拒绝 /data/ 路径（生产持久盘路径）
   if (resolvedTarget.startsWith('/data/')) {
     console.error('❌ 禁止写入 /data/ 路径（生产持久盘）');
+    console.error(`解析后: ${resolvedTarget}`);
     process.exit(1);
   }
   

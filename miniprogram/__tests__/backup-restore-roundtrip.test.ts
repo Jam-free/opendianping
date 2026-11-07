@@ -598,4 +598,46 @@ describe('备份恢复Roundtrip测试（实际schema）', () => {
     expect(output).toContain('用户不存在于备份中');
     expect(output).toContain('拒绝: 1');
   });
+
+  test('失败时数据库保持一致：已恢复数据不受影响', () => {
+    // 当前restored.db有2个用户、2个收藏
+    const dbBefore = new Database(RESTORED_DB, { readonly: true });
+    const userCountBefore = dbBefore.prepare('SELECT COUNT(*) as count FROM users').get()?.count;
+    const favoriteCountBefore = dbBefore.prepare('SELECT COUNT(*) as count FROM favorites').get()?.count;
+    dbBefore.close();
+    
+    expect(userCountBefore).toBe(2);
+    expect(favoriteCountBefore).toBe(2);
+    
+    // 尝试恢复包含外键冲突的备份
+    const badBackup = JSON.parse(fs.readFileSync(BACKUP_JSON, 'utf8'));
+    badBackup.favorites.push({
+      id: 'fav-bad-fk',
+      user_id: 'nonexistent-user-123',
+      shop_id: 'shop-1',
+      note: 'Bad FK',
+      visibility: 'private',
+      wishlist: 0,
+      created_at: new Date().toISOString(),
+    });
+    
+    const badBackupPath2 = path.join(TEST_DIR, 'bad-backup-2.json');
+    fs.writeFileSync(badBackupPath2, JSON.stringify(badBackup));
+    
+    // 恢复应该拒绝坏数据但不影响已有数据
+    execSync(
+      `npx tsx "${RESTORE_SCRIPT}" --backup "${badBackupPath2}" --target "${RESTORED_DB}" --confirm`,
+      { encoding: 'utf8', stdio: 'pipe' }
+    );
+    
+    // 验证数据库状态未改变（没有部分写入）
+    const dbAfter = new Database(RESTORED_DB, { readonly: true });
+    const userCountAfter = dbAfter.prepare('SELECT COUNT(*) as count FROM users').get()?.count;
+    const favoriteCountAfter = dbAfter.prepare('SELECT COUNT(*) as count FROM favorites').get()?.count;
+    dbAfter.close();
+    
+    // 数据应该保持不变
+    expect(userCountAfter).toBe(2);
+    expect(favoriteCountAfter).toBe(2);
+  });
 });

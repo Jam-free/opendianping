@@ -53,6 +53,7 @@ interface ExportedShop {
   lat?: number | null;
   lng?: number | null;
   source_url?: string | null;
+  display_cache_policy?: string | null;
   head_img?: string | null;
   phone?: string | null; // 脱敏处理
 }
@@ -163,7 +164,7 @@ function exportShops(db: Database.Database): ExportedShop[] {
     SELECT 
       id, source_type, source_shop_id, amap_poi_id, raw_name,
       adcode, category, district, city, address, avg_price,
-      lat, lng, source_url, head_img, phone
+      lat, lng, source_url, display_cache_policy, head_img, phone
     FROM shops
   `).all() as ExportedShop[];
   

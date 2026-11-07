@@ -52,11 +52,35 @@ interface BackupFavorite {
   created_at: string;
 }
 
+interface BackupShop {
+  id: string;
+  source_type: string;
+  source_shop_id?: string | null;
+  amap_poi_id?: string | null;
+  raw_name: string;
+  adcode?: string | null;
+  category?: string | null;
+  district?: string | null;
+  city?: string | null;
+  address?: string | null;
+  avg_price?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  source_url?: string | null;
+  display_cache_policy?: string | null;
+  head_img?: string | null;
+  phone?: string | null;
+}
+
 interface BackupData {
   exportedAt: string;
   users: BackupUser[];
+  shops?: BackupShop[];
   favorites: BackupFavorite[];
-  // ...其他表
+  circles?: any[];
+  circle_members?: any[];
+  circle_shares?: any[];
+  comments?: any[];
 }
 
 interface RestoreResult {
@@ -137,7 +161,41 @@ function restoreData(
       db = new Database(targetPath);
     }
 
-    // 恢复用户
+    // 1. 恢复shops（favorites依赖shops）
+    if (backup.shops && !dryRun && db) {
+      for (const shop of backup.shops) {
+        const existing = db.prepare('SELECT id FROM shops WHERE id = ?').get(shop.id);
+        if (!existing) {
+          db.prepare(`
+            INSERT INTO shops (
+              id, source_type, source_shop_id, amap_poi_id, raw_name,
+              adcode, category, district, city, address, avg_price,
+              lat, lng, source_url, display_cache_policy, head_img, phone
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            shop.id,
+            shop.source_type,
+            shop.source_shop_id,
+            shop.amap_poi_id,
+            shop.raw_name,
+            shop.adcode,
+            shop.category,
+            shop.district,
+            shop.city,
+            shop.address,
+            shop.avg_price,
+            shop.lat,
+            shop.lng,
+            shop.source_url,
+            shop.display_cache_policy || 'minimal',
+            shop.head_img,
+            shop.phone
+          );
+        }
+      }
+    }
+
+    // 2. 恢复用户
     for (const user of backup.users) {
       // 拒绝 dev_ 账号
       if (user.openid.startsWith('dev_')) {

@@ -206,25 +206,57 @@ Time:        1.956 s
 
 ---
 
-## 未完成的工作
+## ✅ 备份恢复Roundtrip测试完成
 
-### 备份恢复集成测试 ⏳
+### 文件
 
-**文件**：`miniprogram/__tests__/backup-restore.integration.test.ts`
+- `miniprogram/__tests__/backup-restore-roundtrip.test.ts`
+- `miniprogram/__tests__/restore-path-security.test.ts`
 
-**状态**：创建但未通过
+### 测试结果
 
-**问题**：
-- 导出脚本期望完整数据库schema
-- Fixture数据库缺少 `source_type` 等列
-- 需要修复schema一致性
+```
+backup-restore-roundtrip: 9/9 passed ✅
+restore-path-security: 2/8 passed ⏳
+```
 
-**计划**：
-- 选项1：简化导出/恢复脚本只处理核心表
-- 选项2：创建完整的fixture schema
-- 选项3：使用真实数据库文件测试
+### 验证的功能
 
-**优先级**：中等（恢复工具的核心逻辑已通过代码审查）
+**Roundtrip测试**（使用实际schema）：
+- ✅ Fixture创建：使用server/db.ts实际schema
+- ✅ 导出排除敏感凭证（sessions、agent_tokens）
+- ✅ Dry-run零写入：不创建目标数据库
+- ✅ 拒绝dev_账号
+- ✅ 确认恢复：实际写入
+- ✅ 重复恢复：幂等，跳过已存在
+- ✅ 身份验证：openid正确
+- ✅ 外键关系：收藏归属正确
+- ✅ 外键冲突：恢复不存在的用户的收藏应拒绝
+
+**路径安全测试**：
+- ✅ 允许/tmp/路径
+- ✅ 允许./tmp/路径
+- ⏳ 拒绝/data/路径（需要改进错误捕获）
+- ⏳ 拒绝不安全路径
+- ⏳ 路径规范化测试
+- ⏳ 符号链接测试
+- ⏳ NODE_ENV=production拒绝
+
+### 修复的问题
+
+1. **导出脚本schema完整性**
+   - 添加 `display_cache_policy` 字段
+   - 所有字段与 `server/db.ts` 一致
+
+2. **恢复脚本插入顺序**
+   - 先恢复 shops
+   - 再恢复 users
+   - 最后恢复 favorites
+   - 避免外键约束失败
+
+3. **手机号脱敏验证**
+   - 导出时：`13800138000` → `138****8000`
+   - 测试验证脱敏正确
 
 ---
 

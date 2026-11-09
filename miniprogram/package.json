@@ -9,13 +9,18 @@
     "start": "tsx server/index.ts",
     "build:mp": "tsc -p client/tsconfig.json",
     "test": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.config.cjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "predeploy": "tsx scripts/pre-deploy-check.ts",
+    "db:export": "tsx scripts/export-db-safe.ts",
+    "db:restore": "tsx scripts/restore-db-safe.ts",
+    "db:import-snapshot": "tsx scripts/import-snapshot.ts"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
     "cos-nodejs-sdk-v5": "^2.14.6",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "mysql2": "^3.24.6",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

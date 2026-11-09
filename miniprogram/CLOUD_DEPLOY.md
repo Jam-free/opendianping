@@ -2,15 +2,20 @@
 
 AppID：`wx219e6044fdb7a6cd`
 
-> ## 禁止无盘发布（必读）
+> ## 生产必须用 MySQL（必读）
 >
-> `feimaocat-api` **每一次**发布都必须同时满足：
-> 1. 服务挂载**持久盘**到 **`/data`**
-> 2. 环境变量 **`DB_PATH=/data/miniprogram.db`**（换版本也不许改这条路径）
+> 微信云托管官方 FAQ：**容器不支持持久化存储**，扩缩容/重启时写在容器里的文件会被还原。
+> SQLite 落在 `/data` 或镜像可写层都会丢收藏和 Agent Token。
 >
-> Agent Token（`agent_tokens`）和收藏（`favorites`）在**同一个 SQLite 文件、同一块盘**上。镜像本身是空的：没挂盘时进程会在容器临时层 `mkdir /data` 并建一个空库，接口看起来正常，但旧 Token 会全部变成 401「无效的 Agent Token」，「我的店」也会空。
+> **根治**：云托管 MySQL。步骤见 [`MYSQL_MIGRATION.md`](./MYSQL_MIGRATION.md)。
 >
 > 发版 / 启动 **不得**清 Token 表或收藏表。用户只能在小程序里点「连接 AI」走 `POST /api/agent-tokens` 或 `/api/agent-tokens/reset` 主动重置。
+>
+> 本地开发仍默认 SQLite（`./data/miniprogram.db`）。
+
+> ## （历史）禁止无盘发布
+>
+> 在迁完 MySQL 之前，旧清单要求挂载持久盘到 `/data` 且 `DB_PATH=/data/miniprogram.db`。那是缓解措施，**不是根治**。Jam 已批准迁 MySQL 后，请不要再把生产数据写回容器盘 SQLite。
 
 ## A. 开通云开发（你正在看的页）
 
@@ -44,7 +49,12 @@ AppID：`wx219e6044fdb7a6cd`
 | 变量 | 值 |
 |------|-----|
 | `PORT` | `80` |
-| `DB_PATH` | `/data/miniprogram.db`（**跨版本保持不变**） |
+| `DB_BACKEND` | `mysql` |
+| `MYSQL_ADDRESS` | 控制台 MySQL 内网地址 `HOST:PORT`（**只填控制台**） |
+| `MYSQL_USERNAME` | `<YOUR_MYSQL_USERNAME>` |
+| `MYSQL_PASSWORD` | `<YOUR_MYSQL_PASSWORD>`（**只填控制台，不要进仓库**） |
+| `MYSQL_DATABASE` | `feimaocat` |
+| `EXPECTED_MIN_USERS` | 第一次切库 `0`；导入后再改为 `1` |
 | `DEV_AUTH_BYPASS` | `false` |
 | `WECHAT_APPID` | `wx219e6044fdb7a6cd` |
 | `WECHAT_APP_SECRET` | 公众平台 → 开发管理 → 开发设置里的 AppSecret |
@@ -54,10 +64,10 @@ AppID：`wx219e6044fdb7a6cd`
 | `AGENT_SHOP_WRITE_PER_MIN` | 可选，默认 `30`（Agent 写店每用户每分钟） |
 | `AGENT_SHOP_WRITE_PER_DAY` | 可选，默认 `200`（Agent 写店每用户每天） |
 
-7. **持久盘（禁止无盘发布）**：
-   - 必须挂载，挂载路径 **`/data`**，容量 1GB 即可（存 SQLite）
-   - 没有这块盘就不要点发布。新版本不会把旧 Token「迁移」到空库里
-   - Token 表与 favorites **同库同盘**；发版不得清表
+7. **MySQL（生产持久化）**：
+   - 先开通云托管 MySQL，并 `CREATE DATABASE feimaocat`（见 `MYSQL_MIGRATION.md`）
+   - 连接信息只放控制台环境变量，不要写进 Dockerfile / Git
+   - 不再把 SQLite 文件当生产数据源。发版不得清表
 
 8. 监听端口：`80`
 9. 发布版本，等变绿
@@ -72,9 +82,10 @@ AppID：`wx219e6044fdb7a6cd`
 
 1. 应有 `"ok":true` 和 `"albumImport":true`（说明新镜像已生效）
 2. 看 `persistence`：
-   - `dbPath` 必须是 `/data/miniprogram.db`
-   - 若生产里**本来就有**用户 / 收藏 / Agent Token：`agentTokenCount` 和 `favoriteCount` **必须不是 0**
-   - 若计数是 0，或日志出现 `[PERSISTENCE]`：先查挂盘和 `DB_PATH`，**不要**让用户重新点「连接 AI」——除非已经确认旧盘数据没了，只能重发 Token
+   - `backend` 必须是 `mysql`
+   - `dbPath` 应是 `mysql://用户@主机:端口/feimaocat`（无密码）
+   - 切库当天空库（`userCount=0`）是预期；导入快照后收藏数应接近本机 59 家店
+   - 若 `backend` 仍是 sqlite 或路径仍是 `/data/miniprogram.db`：说明没吃到 MySQL 环境变量，**不要**让用户重新点「连接 AI」冒充修复
 3. 容器日志搜 `[PERSISTENCE]`。生产路径下空库会打大字警告，不是「第一次开机很健康」
 
 ### 登录依赖（必读）
@@ -121,8 +132,8 @@ AppID：`wx219e6044fdb7a6cd`
 
 ## D. 今日验收
 
-- [ ] `/health` 公网可访问，且 `persistence.dbPath` 为 `/data/miniprogram.db`
-- [ ] 生产已有数据时：`persistence.agentTokenCount` / `favoriteCount` 非空（不是 0）
+- [ ] `/health` 公网可访问，且 `persistence.backend` 为 `mysql`
+- [ ] 导入完成后：`persistence.favoriteCount` / `userCount` 符合预期（不是误建成空库）
 - [ ] 体验版能登录，朋友圈 / 我的店能开
 - [ ] 邀请分享、导入或记美食、连接 AI 出 Token（Token **只**在用户主动点「连接 AI」时重置，发版不会清）
 

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type Database from 'better-sqlite3';
+import type { DbDialect, MiniDatabase } from './engine/types.js';
 
 /**
  * 稳定日志前缀：云托管控制台按这个搜，就能看到「盘没挂上 / 库被建成空的」。
@@ -38,6 +38,9 @@ export type PersistenceSignals = {
   userCount: number;
   favoriteCount: number;
   agentTokenCount: number;
+  /** 缺省按 sqlite，兼容旧测试 */
+  backend?: DbDialect;
+  mysqlConnected?: boolean;
 };
 
 export type PersistenceAssessment = {
@@ -52,6 +55,7 @@ export type PersistenceHealth = {
   userCount: number | null;
   warning: string | null;
   error?: string;
+  backend?: DbDialect;
 };
 
 /**
@@ -111,7 +115,7 @@ export function looksLikeEphemeralDataMount(
 }
 
 export function readPersistenceCounts(
-  database: Database.Database
+  database: MiniDatabase
 ): PersistenceCounts {
   const count = (table: 'users' | 'favorites' | 'agent_tokens'): number => {
     const row = database.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as {
@@ -129,11 +133,29 @@ export function readPersistenceCounts(
 /**
  * 生产路径（/data/...）不允许把空库当成「第一次开机很正常」。
  * 本地 ./data/miniprogram.db 首次创建保持安静。
+ * MySQL：连不上或空库要警告；不再要求挂 /data 盘。
  */
 export function assessProductionPersistence(
   signals: PersistenceSignals
 ): PersistenceAssessment {
   const reasons: string[] = [];
+  const backend = signals.backend ?? 'sqlite';
+  if (backend === 'mysql') {
+    if (signals.mysqlConnected === false) {
+      reasons.push('MySQL 连不上（检查 MYSQL_ADDRESS / 账号 / 库是否已创建，以及是否冷启动 resuming）');
+    }
+    if (
+      signals.cloudDataPath &&
+      signals.userCount === 0 &&
+      signals.favoriteCount === 0 &&
+      signals.agentTokenCount === 0
+    ) {
+      reasons.push(
+        `库是空的：users=${signals.userCount} favorites=${signals.favoriteCount} agent_tokens=${signals.agentTokenCount}`
+      );
+    }
+    return { shouldWarn: reasons.length > 0, reasons };
+  }
   if (!signals.cloudDataPath) {
     return { shouldWarn: false, reasons };
   }
@@ -161,11 +183,26 @@ export function formatPersistenceWarning(
   signals: PersistenceSignals,
   reasons: string[]
 ): string {
+  const backend = signals.backend ?? 'sqlite';
+  const header =
+    backend === 'mysql'
+      ? `${PERSISTENCE_LOG_PREFIX} 生产 MySQL 看起来像连不上或空库，不要当成健康的第一次启动。`
+      : `${PERSISTENCE_LOG_PREFIX} 生产 SQLite 看起来像丢盘或空库，不要当成健康的第一次启动。`;
+  const guidance =
+    backend === 'mysql'
+      ? [
+          `${PERSISTENCE_LOG_PREFIX} 目标=${signals.dbPath}`,
+          `${PERSISTENCE_LOG_PREFIX} 生产应使用云托管 MySQL（DATABASE_URL 或 MYSQL_ADDRESS/MYSQL_USERNAME/MYSQL_PASSWORD/MYSQL_DATABASE=feimaocat）。`,
+          `${PERSISTENCE_LOG_PREFIX} Token 与收藏必须写在 MySQL 里；发版不得清表。用户只能主动点「连接 AI」重置 Token。`,
+        ]
+      : [
+          `${PERSISTENCE_LOG_PREFIX} dbPath=${signals.dbPath}`,
+          `${PERSISTENCE_LOG_PREFIX} 禁止无盘发布：必须挂载持久盘到 /data，且 DB_PATH=/data/miniprogram.db。`,
+          `${PERSISTENCE_LOG_PREFIX} Token 与收藏同库同盘；发版不得清表。用户只能主动点「连接 AI」重置 Token。`,
+        ];
   const lines = [
-    `${PERSISTENCE_LOG_PREFIX} 生产 SQLite 看起来像丢盘或空库，不要当成健康的第一次启动。`,
-    `${PERSISTENCE_LOG_PREFIX} dbPath=${signals.dbPath}`,
-    `${PERSISTENCE_LOG_PREFIX} 禁止无盘发布：必须挂载持久盘到 /data，且 DB_PATH=/data/miniprogram.db。`,
-    `${PERSISTENCE_LOG_PREFIX} Token 与收藏同库同盘；发版不得清表。用户只能主动点「连接 AI」重置 Token。`,
+    header,
+    ...guidance,
     ...reasons.map((r) => `${PERSISTENCE_LOG_PREFIX} 原因: ${r}`),
   ];
   return lines.join('\n');

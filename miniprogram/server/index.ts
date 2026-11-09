@@ -1,7 +1,12 @@
 import { config } from './config.js';
 import { createApp } from './app.js';
 import { shutdownBackup } from './backup.js';
-import { closeDb, getDb, startupDatabase } from './db.js';
+import {
+  applyBootstrapLogs,
+  evaluateBootstrapGate,
+} from './bootstrap.js';
+import { closeDb, getDb, getPersistenceHealth, markMysqlUnreachable, startupDatabase } from './db.js';
+import { isMysqlRequested, resolveDbBackend } from './engine/resolve-backend.js';
 import { PERSISTENCE_LOG_PREFIX } from './persistence.js';
 
 async function main(): Promise<void> {
@@ -9,15 +14,42 @@ async function main(): Promise<void> {
   try {
     await startupDatabase();
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     console.error(
       `${PERSISTENCE_LOG_PREFIX} 无法打开数据库，服务仍会监听端口以便 GET /health 排查`,
       err
     );
-    try {
-      getDb();
-    } catch {
-      /* 二次失败留给 /health persistence.error */
+    if (isMysqlRequested()) {
+      markMysqlUnreachable(message);
+    } else {
+      try {
+        getDb();
+      } catch {
+        /* 二次失败留给 /health persistence.error */
+      }
     }
+  }
+
+  const mysqlConfigured = (() => {
+    try {
+      const resolved = resolveDbBackend();
+      return resolved.dialect === 'mysql';
+    } catch {
+      return false;
+    }
+  })();
+  const health = getPersistenceHealth();
+  const decision = evaluateBootstrapGate({
+    nodeEnv: config.nodeEnv,
+    backend: health.backend ?? (mysqlConfigured ? 'mysql' : 'sqlite'),
+    preventEmptyStart: process.env.PREVENT_EMPTY_DB_START !== 'false',
+    expectedMinUsers: Number(process.env.EXPECTED_MIN_USERS || 0),
+    health,
+    mysqlConfigured,
+  });
+  applyBootstrapLogs(decision);
+  if (decision.action === 'exit') {
+    process.exit(1);
   }
 
   const app = createApp();

@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import Database from 'better-sqlite3';
 import { config } from './config.js';
 import {
   initBackupRuntime,
@@ -19,12 +18,20 @@ import {
   readPersistenceCounts,
   type PersistenceHealth,
 } from './persistence.js';
+import { applySchema } from './engine/schema.js';
+import { openMysqlDatabase } from './engine/mysql.js';
+import { resolveDbBackend } from './engine/resolve-backend.js';
+import { openSqliteRaw, wrapSqliteDatabase } from './engine/sqlite.js';
+import type { MiniDatabase, MysqlConnectionConfig } from './engine/types.js';
 
-let db: Database.Database | null = null;
+export type { MiniDatabase } from './engine/types.js';
+
+let db: MiniDatabase | null = null;
 let openedDbPath: string = config.dbPath;
 let lastPersistenceWarning: string | null = null;
 let persistenceDegraded = false;
 let lastOpenCreatedNewFile = false;
+let lastBackend: MiniDatabase['dialect'] = 'sqlite';
 
 export type OpenDatabaseOptions = {
   /**
@@ -52,12 +59,19 @@ type OpenDatabaseMeta = {
   cloudDataPath: boolean;
   createdNewFile: boolean;
   ephemeralMount: boolean;
+  backend: MiniDatabase['dialect'];
+  mysqlConnected?: boolean;
 };
 
 function shouldAttemptCosRestore(
-  database: Database.Database,
+  database: MiniDatabase,
   meta: OpenDatabaseMeta
 ): boolean {
+  if (meta.backend === 'mysql') {
+    if (meta.mysqlConnected === false) return false;
+    const c = readPersistenceCounts(database);
+    return c.userCount === 0 && c.favoriteCount === 0 && c.agentTokenCount === 0;
+  }
   if (!meta.cloudDataPath || meta.ephemeralMount) return false;
   if (meta.createdNewFile) return true;
   const c = readPersistenceCounts(database);
@@ -88,17 +102,24 @@ function prepareDatabaseFile(
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   }
 
-  return { dbPath, cloudDataPath, createdNewFile, ephemeralMount };
+  return {
+    dbPath,
+    cloudDataPath,
+    createdNewFile,
+    ephemeralMount,
+    backend: 'sqlite',
+  };
 }
 
 function finalizeOpenDatabase(
-  database: Database.Database,
+  database: MiniDatabase,
   meta: OpenDatabaseMeta,
   options: OpenDatabaseOptions
-): Database.Database {
+): MiniDatabase {
   const logger = options.logger ?? console;
   const { dbPath, cloudDataPath, createdNewFile, ephemeralMount } = meta;
   lastOpenCreatedNewFile = createdNewFile;
+  lastBackend = meta.backend;
 
   const counts = readPersistenceCounts(database);
   const signals = {
@@ -106,6 +127,8 @@ function finalizeOpenDatabase(
     cloudDataPath,
     createdNewFile,
     ephemeralMount,
+    backend: meta.backend,
+    mysqlConnected: meta.mysqlConnected,
     ...counts,
   };
   const assessment = assessProductionPersistence(signals);
@@ -114,17 +137,25 @@ function finalizeOpenDatabase(
     : null;
   openedDbPath = dbPath;
 
-  persistenceDegraded =
-    cloudDataPath &&
-    ephemeralMount &&
-    !isAllowEphemeralWrites() &&
-    dbPath !== ':memory:';
+  if (meta.backend === 'mysql') {
+    persistenceDegraded =
+      meta.mysqlConnected === false && !isAllowEphemeralWrites();
+  } else {
+    persistenceDegraded =
+      cloudDataPath &&
+      ephemeralMount &&
+      !isAllowEphemeralWrites() &&
+      dbPath !== ':memory:';
+  }
 
   if (persistenceDegraded) {
     logger.error(
-      `${PERSISTENCE_LOG_PREFIX} 已进入降级模式：云托管路径且持久盘未挂载，业务写入将全部拒绝`
+      meta.backend === 'mysql'
+        ? `${PERSISTENCE_LOG_PREFIX} 已进入降级模式：MySQL 不可用，业务写入将全部拒绝`
+        : `${PERSISTENCE_LOG_PREFIX} 已进入降级模式：云托管路径且持久盘未挂载，业务写入将全部拒绝`
     );
   } else if (
+    meta.backend === 'sqlite' &&
     cloudDataPath &&
     ephemeralMount &&
     isAllowEphemeralWrites()
@@ -149,6 +180,31 @@ function finalizeOpenDatabase(
   return database;
 }
 
+function openSqliteDatabase(
+  dbPath: string,
+  options: OpenDatabaseOptions,
+  withCosRestore: boolean
+): MiniDatabase | Promise<MiniDatabase> {
+  const logger = options.logger ?? console;
+  const meta = prepareDatabaseFile(dbPath, options);
+  const raw = openSqliteRaw(dbPath);
+  const database = wrapSqliteDatabase(raw);
+  applySchema(database);
+
+  if (meta.cloudDataPath && meta.ephemeralMount) {
+    logger.log(`${BACKUP_LOG_PREFIX} 临时盘：跳过备份恢复`);
+  }
+
+  if (withCosRestore && shouldAttemptCosRestore(database, meta)) {
+    return tryRestoreFromLatestBackup(database, {
+      storage: options.backupStorage,
+      logger,
+    }).then(() => finalizeOpenDatabase(database, meta, options));
+  }
+
+  return finalizeOpenDatabase(database, meta, options);
+}
+
 /**
  * 打开 SQLite。Agent Token 和收藏都在这一个文件里，不要拆库。
  * 产品意图：换镜像只换代码，盘上的「连接 AI」口令和我的店必须还在。
@@ -157,19 +213,8 @@ function finalizeOpenDatabase(
 export function openDatabase(
   dbPath: string = config.dbPath,
   options: OpenDatabaseOptions = {}
-): Database.Database {
-  const logger = options.logger ?? console;
-  const meta = prepareDatabaseFile(dbPath, options);
-  const database = new Database(dbPath);
-  database.pragma('journal_mode = WAL');
-  database.pragma('foreign_keys = ON');
-  initSchema(database);
-
-  if (meta.cloudDataPath && meta.ephemeralMount) {
-    logger.log(`${BACKUP_LOG_PREFIX} 临时盘：跳过备份恢复`);
-  }
-
-  return finalizeOpenDatabase(database, meta, options);
+): MiniDatabase {
+  return openSqliteDatabase(dbPath, options, false) as MiniDatabase;
 }
 
 /**
@@ -178,23 +223,45 @@ export function openDatabase(
 export async function openDatabaseWithStartup(
   dbPath: string = config.dbPath,
   options: OpenDatabaseOptions = {}
-): Promise<Database.Database> {
-  const logger = options.logger ?? console;
-  const meta = prepareDatabaseFile(dbPath, options);
-  const database = new Database(dbPath);
-  database.pragma('journal_mode = WAL');
-  database.pragma('foreign_keys = ON');
-  initSchema(database);
+): Promise<MiniDatabase> {
+  return openSqliteDatabase(dbPath, options, true);
+}
 
-  if (meta.cloudDataPath && meta.ephemeralMount) {
-    logger.log(`${BACKUP_LOG_PREFIX} 临时盘：跳过备份恢复`);
-  } else if (shouldAttemptCosRestore(database, meta)) {
-    await tryRestoreFromLatestBackup(database, {
+function mysqlCloudSignals(options: OpenDatabaseOptions): boolean {
+  return (
+    options.treatAsCloudData === true ||
+    process.env.NODE_ENV === 'production'
+  );
+}
+
+function openMysqlAndSchema(
+  mysql: MysqlConnectionConfig,
+  options: OpenDatabaseOptions,
+  withCosRestore: boolean
+): MiniDatabase | Promise<MiniDatabase> {
+  const logger = options.logger ?? console;
+  const database = openMysqlDatabase(mysql);
+  applySchema(database);
+  const counts = readPersistenceCounts(database);
+  const empty =
+    counts.userCount === 0 &&
+    counts.favoriteCount === 0 &&
+    counts.agentTokenCount === 0;
+  const meta: OpenDatabaseMeta = {
+    dbPath: database.summary,
+    cloudDataPath: mysqlCloudSignals(options),
+    createdNewFile: empty,
+    ephemeralMount: false,
+    backend: 'mysql',
+    mysqlConnected: true,
+  };
+  if (withCosRestore && shouldAttemptCosRestore(database, meta)) {
+    logger.log(`${BACKUP_LOG_PREFIX} MySQL 空库：尝试从 COS 备份恢复`);
+    return tryRestoreFromLatestBackup(database, {
       storage: options.backupStorage,
       logger,
-    });
+    }).then(() => finalizeOpenDatabase(database, meta, options));
   }
-
   return finalizeOpenDatabase(database, meta, options);
 }
 
@@ -202,11 +269,26 @@ export async function startupDatabase(
   options: OpenDatabaseOptions = {}
 ): Promise<void> {
   if (db) return;
+  const resolved = resolveDbBackend();
+  if (resolved.dialect === 'mysql') {
+    db = await openMysqlAndSchema(resolved.mysql, options, true);
+    return;
+  }
   db = await openDatabaseWithStartup(config.dbPath, options);
 }
 
-export function getDb(): Database.Database {
-  if (!db) db = openDatabase();
+export function getDb(): MiniDatabase {
+  if (!db) {
+    if (lastBackend === 'mysql' && persistenceDegraded) {
+      throw new Error(lastPersistenceWarning || 'MySQL 不可用');
+    }
+    const resolved = resolveDbBackend();
+    if (resolved.dialect === 'mysql') {
+      db = openMysqlAndSchema(resolved.mysql, {}, false) as MiniDatabase;
+    } else {
+      db = openDatabase();
+    }
+  }
   return db;
 }
 
@@ -218,6 +300,10 @@ export function getLastPersistenceWarning(): string | null {
   return lastPersistenceWarning;
 }
 
+export function getOpenedDbBackend(): MiniDatabase['dialect'] {
+  return lastBackend;
+}
+
 /**
  * GET /health 用的只读计数。库打不开时进程仍应活着，把错误放进 JSON。
  */
@@ -227,6 +313,7 @@ export function getPersistenceHealth(): PersistenceHealth {
     const counts = readPersistenceCounts(database);
     return {
       dbPath: openedDbPath,
+      backend: database.dialect,
       agentTokenCount: counts.agentTokenCount,
       favoriteCount: counts.favoriteCount,
       userCount: counts.userCount,
@@ -239,6 +326,7 @@ export function getPersistenceHealth(): PersistenceHealth {
     );
     return {
       dbPath: openedDbPath || config.dbPath,
+      backend: lastBackend,
       agentTokenCount: null,
       favoriteCount: null,
       userCount: null,
@@ -249,7 +337,7 @@ export function getPersistenceHealth(): PersistenceHealth {
 }
 
 /** 仅供测试：重置为全新库 */
-export function resetDbForTests(database?: Database.Database): Database.Database {
+export function resetDbForTests(database?: MiniDatabase): MiniDatabase {
   if (db) {
     try {
       db.close();
@@ -260,8 +348,10 @@ export function resetDbForTests(database?: Database.Database): Database.Database
   lastPersistenceWarning = null;
   persistenceDegraded = false;
   lastOpenCreatedNewFile = false;
+  lastBackend = 'sqlite';
   resetBackupForTests();
   db = database || openDatabase(':memory:', { skipBackupInit: true });
+  openedDbPath = ':memory:';
   return db;
 }
 
@@ -273,230 +363,14 @@ export function closeDb(): void {
 }
 
 /** 测试用：把已打开的库挂到进程单例（配合 createApp / getDb） */
-export function setDbSingletonForTests(database: Database.Database): void {
+export function setDbSingletonForTests(database: MiniDatabase): void {
   db = database;
+  lastBackend = database.dialect;
 }
 
-/**
- * 只建表、补索引。禁止在启动时 DROP / DELETE agent_tokens 或 favorites。
- * Token 只能由用户点「连接 AI」（POST /api/agent-tokens 或 /reset）重置。
- */
-function initSchema(database: Database.Database): void {
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      openid TEXT NOT NULL UNIQUE,
-      unionid TEXT,
-      nickname TEXT,
-      avatar TEXT,
-      created_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS sessions (
-      token TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS shops (
-      id TEXT PRIMARY KEY,
-      source_type TEXT NOT NULL,
-      source_shop_id TEXT,
-      amap_poi_id TEXT,
-      raw_name TEXT NOT NULL,
-      adcode TEXT,
-      category TEXT,
-      district TEXT,
-      city TEXT,
-      address TEXT,
-      avg_price TEXT,
-      lat REAL,
-      lng REAL,
-      source_url TEXT,
-      head_img TEXT,
-      display_cache_policy TEXT NOT NULL DEFAULT 'minimal'
-    );
-
-    CREATE TABLE IF NOT EXISTS import_batches (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      source_type TEXT NOT NULL,
-      source_url TEXT,
-      albumid TEXT,
-      status TEXT NOT NULL,
-      counts TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS favorites (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL,
-      shop_id TEXT NOT NULL,
-      note TEXT,
-      visibility TEXT NOT NULL DEFAULT 'private',
-      import_batch_id TEXT,
-      created_at TEXT NOT NULL,
-      UNIQUE(user_id, shop_id),
-      FOREIGN KEY (user_id) REFERENCES users(id),
-      FOREIGN KEY (shop_id) REFERENCES shops(id),
-      FOREIGN KEY (import_batch_id) REFERENCES import_batches(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS circles (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      owner_id TEXT NOT NULL,
-      invite_token TEXT NOT NULL,
-      token_expires_at TEXT NOT NULL,
-      opengid TEXT,
-      member_limit INTEGER NOT NULL DEFAULT 200,
-      is_personal INTEGER,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY (owner_id) REFERENCES users(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS circle_members (
-      circle_id TEXT NOT NULL,
-      user_id TEXT NOT NULL,
-      role TEXT NOT NULL,
-      joined_at TEXT NOT NULL,
-      PRIMARY KEY (circle_id, user_id),
-      FOREIGN KEY (circle_id) REFERENCES circles(id) ON DELETE CASCADE,
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    );
-
-    CREATE TABLE IF NOT EXISTS circle_shares (
-      circle_id TEXT NOT NULL,
-      favorite_id TEXT NOT NULL,
-      PRIMARY KEY (circle_id, favorite_id),
-      FOREIGN KEY (circle_id) REFERENCES circles(id) ON DELETE CASCADE,
-      FOREIGN KEY (favorite_id) REFERENCES favorites(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS agent_tokens (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL UNIQUE,
-      token_hash TEXT NOT NULL,
-      token_prefix TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      last_used_at TEXT,
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
-    CREATE INDEX IF NOT EXISTS idx_favorites_visibility ON favorites(visibility);
-    CREATE INDEX IF NOT EXISTS idx_shops_source ON shops(source_shop_id);
-    CREATE INDEX IF NOT EXISTS idx_shops_amap ON shops(amap_poi_id);
-    CREATE INDEX IF NOT EXISTS idx_circle_members_user ON circle_members(user_id);
-  `);
-
-  // 迁移：添加 is_personal 列（如果不存在）
-  const columns = database.pragma('table_info(circles)') as Array<{ name: string }>;
-  const hasIsPersonal = columns.some((col) => col.name === 'is_personal');
-  
-  if (!hasIsPersonal) {
-    database.exec(`ALTER TABLE circles ADD COLUMN is_personal INTEGER;`);
-    // 回填：将「我的美食网」标记为个人空间
-    database.exec(`UPDATE circles SET is_personal = 1 WHERE name = '我的美食网';`);
-  }
-
-  migrateSchema(database);
-}
-
-/**
- * 兼容已有磁盘库：只 ADD COLUMN / CREATE TABLE IF NOT EXISTS。
- * 不要 DROP TABLE，也不要 DELETE FROM agent_tokens / favorites。
- */
-function migrateSchema(database: Database.Database): void {
-  const shopCols = database
-    .prepare(`PRAGMA table_info(shops)`)
-    .all() as Array<{ name: string }>;
-  if (!shopCols.some((c) => c.name === 'head_img')) {
-    database.exec(`ALTER TABLE shops ADD COLUMN head_img TEXT`);
-  }
-  if (!shopCols.some((c) => c.name === 'phone')) {
-    database.exec(`ALTER TABLE shops ADD COLUMN phone TEXT`);
-  }
-
-  const favCols = database
-    .prepare(`PRAGMA table_info(favorites)`)
-    .all() as Array<{ name: string }>;
-  if (!favCols.some((c) => c.name === 'photo_url')) {
-    database.exec(`ALTER TABLE favorites ADD COLUMN photo_url TEXT`);
-  }
-  // 心心念念：很想去；导入默认 1，记美食默认 0
-  if (!favCols.some((c) => c.name === 'wishlist')) {
-    database.exec(
-      `ALTER TABLE favorites ADD COLUMN wishlist INTEGER NOT NULL DEFAULT 0`
-    );
-    // 已有导入收藏视为心心念念
-    database.exec(
-      `UPDATE favorites SET wishlist = 1 WHERE import_batch_id IS NOT NULL`
-    );
-  }
-  // 从哪位好友那里加进私藏（用于「来自XX」）
-  if (!favCols.some((c) => c.name === 'from_user_id')) {
-    database.exec(`ALTER TABLE favorites ADD COLUMN from_user_id TEXT`);
-  }
-
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS agent_tokens (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL UNIQUE,
-      token_hash TEXT NOT NULL,
-      token_prefix TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      last_used_at TEXT,
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    );
-
-    -- 评论流：一人可发多条；旧 favorites.note 迁成首条评论
-    CREATE TABLE IF NOT EXISTS shop_comments (
-      id TEXT PRIMARY KEY,
-      shop_id TEXT NOT NULL,
-      user_id TEXT NOT NULL,
-      body TEXT NOT NULL,
-      created_at TEXT NOT NULL,
-      FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
-      FOREIGN KEY (user_id) REFERENCES users(id)
-    );
-    CREATE INDEX IF NOT EXISTS idx_shop_comments_shop ON shop_comments(shop_id, created_at);
-  `);
-
-  // 一次性：把非空备注迁成评论（用 note 前缀标记避免重复迁）
-  const pending = database
-    .prepare(
-      `SELECT id, user_id, shop_id, note FROM favorites
-       WHERE note IS NOT NULL AND note != ''
-         AND note NOT LIKE '[migrated]%'`
-    )
-    .all() as Array<{
-    id: string;
-    user_id: string;
-    shop_id: string;
-    note: string;
-  }>;
-  if (pending.length) {
-    const insert = database.prepare(
-      `INSERT INTO shop_comments (id, shop_id, user_id, body, created_at)
-       VALUES (?, ?, ?, ?, datetime('now'))`
-    );
-    const mark = database.prepare(
-      `UPDATE favorites SET note = ? WHERE id = ?`
-    );
-    const tx = database.transaction(() => {
-      for (const row of pending) {
-        insert.run(
-          `c_${row.id}`,
-          row.shop_id,
-          row.user_id,
-          row.note.slice(0, 500)
-        );
-        mark.run(`[migrated]${row.note.slice(0, 180)}`, row.id);
-      }
-    });
-    tx();
-  }
+export function markMysqlUnreachable(message: string, logger: Pick<Console, 'error'> = console): void {
+  persistenceDegraded = true;
+  lastBackend = 'mysql';
+  lastPersistenceWarning = `${PERSISTENCE_LOG_PREFIX} MySQL 不可用: ${message}`;
+  logger.error(lastPersistenceWarning);
 }

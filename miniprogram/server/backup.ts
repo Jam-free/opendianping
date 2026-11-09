@@ -1,5 +1,5 @@
-import type Database from 'better-sqlite3';
-import { PERSISTENCE_LOG_PREFIX } from './persistence.js';
+import { tableExists } from './engine/table-exists.js';
+import type { MiniDatabase } from './engine/types.js';
 
 export const BACKUP_LOG_PREFIX = '[BACKUP]';
 
@@ -63,7 +63,7 @@ type BackupRuntime = {
 };
 
 let runtime: BackupRuntime | null = null;
-let instrumentedDb: Database.Database | null = null;
+let instrumentedDb: MiniDatabase | null = null;
 
 function envBackupPrefix(): string {
   return process.env.BACKUP_PREFIX || 'backups';
@@ -73,7 +73,17 @@ function envBackupRegion(): string {
   return process.env.BACKUP_REGION || 'ap-guangzhou';
 }
 
-export function listTablesPresentInDb(database: Database.Database): string[] {
+export function listTablesPresentInDb(database: MiniDatabase): string[] {
+  if (database.dialect === 'mysql') {
+    const rows = database
+      .prepare(
+        `SELECT table_name AS name FROM information_schema.tables
+         WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'
+         ORDER BY table_name`
+      )
+      .all() as Array<{ name: string }>;
+    return rows.map((r) => r.name);
+  }
   const rows = database
     .prepare(
       `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`
@@ -83,16 +93,11 @@ export function listTablesPresentInDb(database: Database.Database): string[] {
 }
 
 export function exportDatabaseSnapshot(
-  database: Database.Database
+  database: MiniDatabase
 ): BackupPayload {
   const tables: BackupPayload['tables'] = {};
   for (const table of BACKUP_BUSINESS_TABLES) {
-    const exists = database
-      .prepare(
-        `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`
-      )
-      .get(table);
-    if (!exists) continue;
+    if (!tableExists(database, table)) continue;
     tables[table] = database
       .prepare(`SELECT * FROM ${table}`)
       .all() as Record<string, unknown>[];
@@ -104,21 +109,25 @@ export function exportDatabaseSnapshot(
   };
 }
 
+function setForeignKeys(database: MiniDatabase, enabled: boolean): void {
+  if (database.dialect === 'mysql') {
+    database.exec(`SET FOREIGN_KEY_CHECKS=${enabled ? 1 : 0}`);
+    return;
+  }
+  database.pragma(enabled ? 'foreign_keys = ON' : 'foreign_keys = OFF');
+}
+
 export function restoreDatabaseFromPayload(
-  database: Database.Database,
+  database: MiniDatabase,
   payload: BackupPayload
 ): void {
   const restoreOrder: BackupBusinessTable[] = [...BACKUP_BUSINESS_TABLES];
   const deleteOrder = [...restoreOrder].reverse();
 
   const tx = database.transaction(() => {
-    database.pragma('foreign_keys = OFF');
+    setForeignKeys(database, false);
     for (const table of deleteOrder) {
-      if (!database
-        .prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`)
-        .get(table)) {
-        continue;
-      }
+      if (!tableExists(database, table)) continue;
       database.exec(`DELETE FROM ${table}`);
     }
     for (const table of restoreOrder) {
@@ -132,7 +141,7 @@ export function restoreDatabaseFromPayload(
         insert.run(...columns.map((c) => row[c]));
       }
     }
-    database.pragma('foreign_keys = ON');
+    setForeignKeys(database, true);
   });
   tx();
 }
@@ -166,7 +175,7 @@ async function pruneOldBackups(
 }
 
 async function performDump(
-  database: Database.Database,
+  database: MiniDatabase,
   rt: BackupRuntime,
   force = false
 ): Promise<void> {
@@ -194,7 +203,7 @@ async function performDump(
   }
 }
 
-function scheduleDebouncedDump(database: Database.Database): void {
+function scheduleDebouncedDump(database: MiniDatabase): void {
   const rt = runtime;
   if (!rt?.enabled) return;
   if (rt.timer) clearTimeout(rt.timer);
@@ -211,12 +220,12 @@ export function markBackupDirty(): void {
   if (instrumentedDb) scheduleDebouncedDump(instrumentedDb);
 }
 
-export function instrumentDatabaseWrites(database: Database.Database): void {
+export function instrumentDatabaseWrites(database: MiniDatabase): void {
   if (instrumentedDb === database) return;
   instrumentedDb = database;
   const origPrepare = database.prepare.bind(database);
   database.prepare = function instrumentedPrepare(
-    this: Database.Database,
+    this: MiniDatabase,
     sql: string
   ) {
     const stmt = origPrepare(sql);
@@ -233,7 +242,7 @@ export function instrumentDatabaseWrites(database: Database.Database): void {
 }
 
 export function initBackupRuntime(
-  database: Database.Database,
+  database: MiniDatabase,
   options: BackupRuntimeOptions = {}
 ): void {
   const logger = options.logger ?? console;
@@ -291,7 +300,7 @@ export function initBackupRuntime(
 }
 
 export async function flushBackupNow(
-  database?: Database.Database
+  database?: MiniDatabase
 ): Promise<void> {
   const db = database ?? instrumentedDb;
   const rt = runtime;
@@ -304,7 +313,7 @@ export async function flushBackupNow(
 }
 
 export async function shutdownBackup(options?: {
-  database?: Database.Database;
+  database?: MiniDatabase;
   flush?: boolean;
 }): Promise<void> {
   const rt = runtime;
@@ -319,7 +328,7 @@ export async function shutdownBackup(options?: {
 }
 
 export async function tryRestoreFromLatestBackup(
-  database: Database.Database,
+  database: MiniDatabase,
   options: {
     storage?: BackupStorage;
     logger?: Pick<Console, 'error' | 'log'>;

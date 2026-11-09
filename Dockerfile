@@ -20,8 +20,10 @@ WORKDIR /app/miniprogram
 
 ENV NODE_ENV=production
 ENV PORT=80
-# 禁止无盘发布：服务必须挂载持久盘到 /data，且跨版本保持这条路径。
-ENV DB_PATH=/data/miniprogram.db
+# 生产持久化走云托管 MySQL（控制台注入 MYSQL_* 或 DATABASE_URL）。
+# 镜像不内置密码。未注入 MySQL 时不要静默回退到容器盘 SQLite。
+ENV DB_BACKEND=mysql
+ENV MYSQL_DATABASE=feimaocat
 ENV DEV_AUTH_BYPASS=true
 ENV SOURCE_ADAPTER=opendianping
 

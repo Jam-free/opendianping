@@ -194,17 +194,23 @@ describe('openDatabase 空库告警与不清表', () => {
   });
 
   test('initSchema / migrateSchema 源码不含 DROP 或清 Token/收藏', () => {
-    const src = fs.readFileSync(path.join(testsDir, '../server/db.ts'), 'utf8');
-    // 注释里会写「不要 DROP TABLE」，只检查可执行代码行
-    const code = src
-      .split('\n')
-      .filter((line) => {
-        const t = line.trim();
-        return !t.startsWith('//') && !t.startsWith('*') && !t.startsWith('/*');
-      })
-      .join('\n');
-    expect(code).not.toMatch(/DROP\s+TABLE/i);
-    expect(code).not.toMatch(/DELETE\s+FROM\s+(agent_tokens|favorites)/i);
+    const files = [
+      path.join(testsDir, '../server/db.ts'),
+      path.join(testsDir, '../server/engine/schema.ts'),
+    ];
+    for (const file of files) {
+      const src = fs.readFileSync(file, 'utf8');
+      // 注释里会写「不要 DROP TABLE」，只检查可执行代码行
+      const code = src
+        .split('\n')
+        .filter((line) => {
+          const t = line.trim();
+          return !t.startsWith('//') && !t.startsWith('*') && !t.startsWith('/*');
+        })
+        .join('\n');
+      expect(code).not.toMatch(/DROP\s+TABLE/i);
+      expect(code).not.toMatch(/DELETE\s+FROM\s+(agent_tokens|favorites)/i);
+    }
   });
 });
 

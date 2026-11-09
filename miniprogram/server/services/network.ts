@@ -35,7 +35,7 @@ function detectPoiKeyCollisions(userId: string): Array<{
        FROM favorites f
        JOIN shops s ON s.id = f.shop_id
        WHERE f.user_id = ?
-       GROUP BY poi_key
+       GROUP BY COALESCE(s.source_shop_id, s.amap_poi_id, s.id)
        HAVING shop_count > 1`
     )
     .all(userId) as Array<{

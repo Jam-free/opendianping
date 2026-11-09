@@ -22,6 +22,7 @@ function envBool(key: string, fallback: boolean): boolean {
 export const config = {
   port: Number(process.env.PORT || 8787),
   rootDir,
+  nodeEnv: process.env.NODE_ENV || 'development',
   // 生产必须是 /data/miniprogram.db（持久盘）；本地才用 ./data。禁止无盘发布。
   dbPath:
     process.env.DB_PATH === ':memory:'
